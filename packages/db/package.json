@@ -1,0 +1,20 @@
+{
+  "name": "@werewolf/db",
+  "type": "module",
+  "private": true,
+  "exports": { ".": "./src/client.ts" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@werewolf/shared": "workspace:*",
+    "drizzle-orm": "^0.45.0",
+    "postgres": "^3.4.7",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

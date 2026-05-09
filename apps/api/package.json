@@ -1,0 +1,25 @@
+{
+  "name": "@werewolf/api",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@werewolf/agent-client": "workspace:*",
+    "@werewolf/db": "workspace:*",
+    "@werewolf/engine": "workspace:*",
+    "@werewolf/shared": "workspace:*",
+    "hono": "^4.10.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}

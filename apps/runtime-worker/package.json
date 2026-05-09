@@ -1,0 +1,22 @@
+{
+  "name": "@werewolf/runtime-worker",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@werewolf/agent-client": "workspace:*",
+    "@werewolf/db": "workspace:*",
+    "@werewolf/engine": "workspace:*",
+    "@werewolf/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.0.0"
+  }
+}
