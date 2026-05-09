@@ -1,1 +1,1 @@
-export const runtimeWorkerPackageReady = true;
+console.log("werewolf runtime worker ready");
