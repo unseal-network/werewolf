@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { sharedPackageReady } from ".";
+import { roleSchema } from ".";
 
 describe("shared package", () => {
   it("loads", () => {
-    expect(sharedPackageReady).toBe(true);
+    expect(roleSchema.parse("villager")).toBe("villager");
   });
 });
