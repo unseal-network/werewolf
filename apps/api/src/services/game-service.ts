@@ -2,7 +2,13 @@ import {
   AppError,
   createGameRequestSchema,
   type CreateGameRequest,
+  type GameEvent,
 } from "@werewolf/shared";
+import {
+  startGame,
+  type PlayerPrivateState,
+  type RoomProjection,
+} from "@werewolf/engine";
 
 export interface StoredPlayer {
   id: string;
@@ -27,6 +33,13 @@ export interface StoredGameRoom {
   allowedSourceMatrixRoomIds: string[];
   agentSourceMatrixRoomId: string;
   players: StoredPlayer[];
+}
+
+export interface StartedGame {
+  room: StoredGameRoom;
+  projection: RoomProjection;
+  privateStates: PlayerPrivateState[];
+  events: GameEvent[];
 }
 
 export class InMemoryGameService {
@@ -107,7 +120,7 @@ export class InMemoryGameService {
     return player;
   }
 
-  start(gameRoomId: string, userId: string): StoredGameRoom {
+  start(gameRoomId: string, userId: string): StartedGame {
     const room = this.requireWaitingRoom(gameRoomId);
     if (room.creatorUserId !== userId) {
       throw new AppError("forbidden", "Only creator can start the game", 403);
@@ -120,8 +133,28 @@ export class InMemoryGameService {
         409
       );
     }
+
+    const started = startGame({
+      gameRoomId: room.id,
+      targetPlayerCount: room.targetPlayerCount,
+      seats: activePlayers.map((player) => ({
+        playerId: player.id,
+        displayName: player.displayName,
+        seatNo: player.seatNo,
+        kind: player.kind,
+      })),
+      now: new Date(),
+      shuffleSeed: room.id,
+      timing: room.timing,
+    });
+
     room.status = "active";
-    return room;
+    return {
+      room,
+      projection: started.projection,
+      privateStates: started.privateStates,
+      events: started.events,
+    };
   }
 
   private requireWaitingRoom(gameRoomId: string): StoredGameRoom {

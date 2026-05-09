@@ -73,8 +73,13 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   app.post("/:gameRoomId/start", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix);
-      const room = deps.games.start(c.req.param("gameRoomId"), user.id);
-      return c.json({ status: room.status });
+      const started = deps.games.start(c.req.param("gameRoomId"), user.id);
+      return c.json({
+        status: started.room.status,
+        projection: started.projection,
+        privateStates: started.privateStates,
+        events: started.events,
+      });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
