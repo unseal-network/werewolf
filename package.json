@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "dev": "pnpm --parallel --filter @werewolf/api --filter @werewolf/runtime-worker --filter @werewolf/web dev",
+    "smoke": "vitest run apps/api/src/smoke.test.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck"
