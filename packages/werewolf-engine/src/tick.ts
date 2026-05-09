@@ -14,6 +14,8 @@ const phaseOrder: GamePhase[] = [
 
 export function nextPhaseAfterClosedPhase(phase: GamePhase): GamePhase {
   if (phase === "day_resolution") return "night_guard";
+  if (phase === "tie_speech") return "tie_vote";
+  if (phase === "tie_vote") return "day_resolution";
 
   const index = phaseOrder.indexOf(phase);
   if (index < 0 || index + 1 >= phaseOrder.length) {

@@ -34,6 +34,8 @@ export const gamePhaseSchema = z.enum([
   "night_resolution",
   "day_speak",
   "day_vote",
+  "tie_speech",
+  "tie_vote",
   "day_resolution",
   "post_game",
 ]);

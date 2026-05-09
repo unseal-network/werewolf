@@ -9,12 +9,16 @@ export interface ResolveDayVoteInput {
   gameRoomId: string;
   day: number;
   alivePlayerIds: string[];
+  allowedTargetPlayerIds?: string[];
   votes: VoteRecord[];
   now: Date;
 }
 
 export interface ResolveDayVoteResult {
   exiledPlayerId: string | null;
+  tiedPlayerIds: string[];
+  nextPhase: "day_resolution" | "tie_speech";
+  speechQueue: string[];
   tally: Record<string, number>;
   events: GameEvent[];
 }
@@ -23,9 +27,13 @@ export function resolveDayVote(
   input: ResolveDayVoteInput
 ): ResolveDayVoteResult {
   const tally: Record<string, number> = {};
+  const allowedTargets = input.allowedTargetPlayerIds
+    ? new Set(input.allowedTargetPlayerIds)
+    : null;
   for (const vote of input.votes) {
     if (!input.alivePlayerIds.includes(vote.actorPlayerId)) continue;
     if (!input.alivePlayerIds.includes(vote.targetPlayerId)) continue;
+    if (allowedTargets && !allowedTargets.has(vote.targetPlayerId)) continue;
     tally[vote.targetPlayerId] = (tally[vote.targetPlayerId] ?? 0) + 1;
   }
 
@@ -33,6 +41,14 @@ export function resolveDayVote(
   const top = sorted[0];
   const second = sorted[1];
   const exiledPlayerId = top && (!second || top[1] > second[1]) ? top[0] : null;
+  const tiedPlayerIds =
+    top && second && top[1] === second[1]
+      ? sorted
+          .filter((entry) => entry[1] === top[1])
+          .map(([playerId]) => playerId)
+          .sort()
+      : [];
+  const nextPhase = tiedPlayerIds.length > 0 ? "tie_speech" : "day_resolution";
   const createdAt = input.now.toISOString();
   const events: GameEvent[] = [
     {
@@ -42,7 +58,14 @@ export function resolveDayVote(
       type: "phase_closed",
       visibility: "public",
       actorId: "runtime",
-      payload: { phase: "day_vote", day: input.day, tally, exiledPlayerId },
+      payload: {
+        phase: "day_vote",
+        day: input.day,
+        tally,
+        exiledPlayerId,
+        tiedPlayerIds,
+        nextPhase,
+      },
       createdAt,
     },
   ];
@@ -61,7 +84,14 @@ export function resolveDayVote(
     });
   }
 
-  return { exiledPlayerId, tally, events };
+  return {
+    exiledPlayerId,
+    tiedPlayerIds,
+    nextPhase,
+    speechQueue: tiedPlayerIds,
+    tally,
+    events,
+  };
 }
 
 export interface WinnerPlayerState {

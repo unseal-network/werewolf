@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Werewolf Runtime Verification</title>
+    <style>
+      body {
+        background: #161719;
+        color: #f7f1e7;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 24px;
+      }
+      pre {
+        background: #202226;
+        border: 1px solid #393d44;
+        padding: 16px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Werewolf Runtime Verification</h1>
+    <pre id="out">Running...</pre>
+    <script type="module">
+      const out = document.getElementById("out");
+      const config = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+      const api = config.api ?? "http://localhost:3000";
+      const roomId = config.roomId ?? "!FWTlpFYoOXfndnfReT:keepsecret.io";
+
+      function log(...args) {
+        out.textContent += `${args.join(" ")}\n`;
+      }
+
+      async function request(path, token, init = {}) {
+        const response = await fetch(`${api}${path}`, {
+          ...init,
+          headers: {
+            authorization: `Bearer ${token}`,
+            "content-type": "application/json",
+            ...(init.headers ?? {}),
+          },
+        });
+        const text = await response.text();
+        const body = text ? JSON.parse(text) : null;
+        if (!response.ok) {
+          throw new Error(`${path} ${response.status} ${text}`);
+        }
+        return body;
+      }
+
+      try {
+        out.textContent = "";
+        const whoami = await fetch(
+          "https://keepsecret.io/_matrix/client/v3/account/whoami",
+          { headers: { authorization: `Bearer ${config.tokens[0]}` } }
+        ).then((response) => response.json());
+        log("whoami", whoami.user_id);
+
+        const created = await request("/games", config.tokens[0], {
+          method: "POST",
+          body: JSON.stringify({
+            sourceMatrixRoomId: roomId,
+            title: "Browser Real Runtime Verification",
+            targetPlayerCount: 6,
+            timing: {
+              nightActionSeconds: 45,
+              speechSeconds: 60,
+              voteSeconds: 30,
+            },
+            allowedSourceMatrixRoomIds: [],
+            agentSourceMatrixRoomId: roomId,
+          }),
+        });
+        log("create", created.gameRoomId, created.card.sourceMatrixRoomId);
+
+        for (const [index, token] of config.tokens.entries()) {
+          const joined = await request(
+            `/games/${created.gameRoomId}/join`,
+            token,
+            { method: "POST" }
+          );
+          log("join", index + 1, joined.player.displayName, joined.player.id);
+        }
+
+        const started = await request(
+          `/games/${created.gameRoomId}/start`,
+          config.tokens[0],
+          { method: "POST" }
+        );
+        log("start", started.status, started.projection.phase);
+
+        let finalProjection = started.projection;
+        for (let index = 0; index < 30; index += 1) {
+          const tick = await request(
+            `/games/${created.gameRoomId}/runtime/tick`,
+            config.tokens[0],
+            {
+              method: "POST",
+              body: JSON.stringify({
+                agentApiKey: config.agentApiKey,
+                agentApiBaseUrl:
+                  "https://un-server.dev-excel-alt.pagepeek.org/api",
+              }),
+            }
+          );
+          finalProjection = tick.projection;
+          log(
+            "tick",
+            index + 1,
+            tick.projection.phase,
+            tick.events.map((event) => event.type).join(",")
+          );
+          if (tick.done) break;
+        }
+
+        log("verified", finalProjection.phase, finalProjection.winner);
+      } catch (error) {
+        log("ERROR", error instanceof Error ? error.message : String(error));
+      }
+    </script>
+  </body>
+</html>

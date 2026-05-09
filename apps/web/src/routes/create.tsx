@@ -35,7 +35,7 @@ export function CreateGamePage() {
         allowedSourceMatrixRoomIds: [],
       });
       setCreatedUrl(
-        result.card.webUrl ?? `${window.location.pathname}?gameRoomId=${result.gameRoomId}`
+        `${window.location.pathname}?gameRoomId=${result.gameRoomId}`
       );
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));

@@ -19,6 +19,27 @@ export interface JoinedPlayer {
   };
 }
 
+export interface GameEventDto {
+  id: string;
+  seq: number;
+  type: string;
+  actorId?: string;
+  subjectId?: string;
+  visibility: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface RuntimeTickDto {
+  status: string;
+  done: boolean;
+  projection: {
+    phase: string;
+    winner: "wolf" | "good" | null;
+  };
+  events: GameEventDto[];
+}
+
 export function createApiClient(options: ApiClientOptions) {
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${options.baseUrl}${path}`, {
@@ -53,6 +74,21 @@ export function createApiClient(options: ApiClientOptions) {
       return request<{ status: string }>(`/games/${gameRoomId}/start`, {
         method: "POST",
       });
+    },
+    runRuntimeTick(
+      gameRoomId: string,
+      body: { agentApiKey?: string; agentApiBaseUrl?: string } = {}
+    ) {
+      return request<RuntimeTickDto>(`/games/${gameRoomId}/runtime/tick`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    },
+    getGame(gameRoomId: string) {
+      return request<{
+        projection: RuntimeTickDto["projection"] | null;
+        events: GameEventDto[];
+      }>(`/games/${gameRoomId}`);
     },
     subscribeUrl(gameRoomId: string) {
       return `${options.baseUrl}/games/${gameRoomId}/subscribe`;
