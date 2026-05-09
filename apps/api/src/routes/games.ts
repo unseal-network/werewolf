@@ -11,6 +11,16 @@ export interface GamesRouteDeps {
 export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   const app = new Hono();
 
+  function appErrorResponse(error: AppError): Response {
+    return new Response(
+      JSON.stringify({ error: error.message, code: error.code }),
+      {
+        status: error.status,
+        headers: { "content-type": "application/json" },
+      }
+    );
+  }
+
   app.post("/", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix);
@@ -19,14 +29,54 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       return c.json({ gameRoomId: room.id, card }, 201);
     } catch (error) {
       if (error instanceof AppError) {
-        return new Response(
-          JSON.stringify({ error: error.message, code: error.code }),
-          {
-            status: error.status,
-            headers: { "content-type": "application/json" },
-          }
-        );
+        return appErrorResponse(error);
       }
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
+  app.post("/:gameRoomId/join", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const player = deps.games.join(
+        c.req.param("gameRoomId"),
+        user.id,
+        user.displayName
+      );
+      return c.json({ player });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
+  app.post("/:gameRoomId/leave", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const player = deps.games.leave(c.req.param("gameRoomId"), user.id);
+      return c.json({ player });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
+  app.post("/:gameRoomId/start", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const room = deps.games.start(c.req.param("gameRoomId"), user.id);
+      return c.json({ status: room.status });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
         { error: error instanceof Error ? error.message : String(error) },
         400
