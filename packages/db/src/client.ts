@@ -1,3 +1,4 @@
+export * from "./db";
 export * from "./schema";
 export * from "./repositories/drizzle-events";
 export * from "./repositories/drizzle-rooms";

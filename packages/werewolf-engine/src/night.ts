@@ -39,8 +39,12 @@ export function resolveNight(input: ResolveNightInput): ResolveNightResult {
   const poisonTarget = latestTarget(input.actions, "witchPoison");
 
   const deaths = new Set<string>();
-  if (wolfTarget && wolfTarget !== guardTarget && wolfTarget !== healTarget) {
-    deaths.add(wolfTarget);
+  if (wolfTarget) {
+    const guarded = wolfTarget === guardTarget;
+    const healed = wolfTarget === healTarget;
+    if ((!guarded && !healed) || (guarded && healed)) {
+      deaths.add(wolfTarget);
+    }
   }
   if (poisonTarget) {
     deaths.add(poisonTarget);
@@ -63,6 +67,8 @@ export function resolveNight(input: ResolveNightInput): ResolveNightResult {
         wolfTarget,
         guardTarget,
         healTarget,
+        guardAndHealConflict:
+          Boolean(wolfTarget) && wolfTarget === guardTarget && wolfTarget === healTarget,
         poisonTarget,
         eliminatedPlayerIds,
       },

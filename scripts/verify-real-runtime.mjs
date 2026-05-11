@@ -76,6 +76,8 @@ const started = await request(`/games/${create.gameRoomId}/start`, tokens[0], {
 console.log("start", started.status, started.projection.phase);
 
 const eventTypes = [];
+const nightActionKinds = [];
+const agentToolNames = [];
 let finalProjection = started.projection;
 for (let index = 0; index < 30; index += 1) {
   const tick = await request(`/games/${create.gameRoomId}/runtime/tick`, tokens[0], {
@@ -89,6 +91,18 @@ for (let index = 0; index < 30; index += 1) {
   });
   finalProjection = tick.projection;
   eventTypes.push(...tick.events.map((event) => event.type));
+  nightActionKinds.push(
+    ...tick.events
+      .filter((event) => event.type === "night_action_submitted")
+      .map((event) => event.payload?.action?.kind)
+      .filter(Boolean)
+  );
+  agentToolNames.push(
+    ...tick.events
+      .filter((event) => event.type === "agent_llm_completed")
+      .map((event) => event.payload?.toolName)
+      .filter(Boolean)
+  );
   console.log("tick", index + 1, tick.projection.phase, tick.events.map((event) => event.type).join(","));
   if (tick.done) break;
 }
@@ -103,9 +117,21 @@ for (const required of [
   "vote_submitted",
   "player_eliminated",
   "game_ended",
+  "agent_llm_requested",
+  "agent_llm_completed",
 ]) {
   if (!eventTypes.includes(required)) {
     throw new Error(`Missing event type ${required}`);
+  }
+}
+for (const requiredAction of ["guardProtect", "wolfKill", "seerInspect"]) {
+  if (!nightActionKinds.includes(requiredAction)) {
+    throw new Error(`Missing night action from agent tool-call ${requiredAction}`);
+  }
+}
+for (const requiredTool of ["guardProtect", "wolfKill", "seerInspect", "submitVote"]) {
+  if (!agentToolNames.includes(requiredTool)) {
+    throw new Error(`Missing completed agent tool-call ${requiredTool}`);
   }
 }
 console.log("verified", finalProjection.phase, finalProjection.winner);

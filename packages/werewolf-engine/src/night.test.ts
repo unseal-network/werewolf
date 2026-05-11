@@ -45,4 +45,20 @@ describe("resolveNight", () => {
     });
     expect(result.eliminatedPlayerIds).toEqual(["wolf"]);
   });
+
+  it("kills the wolf target when guard and witch both protect the same target", () => {
+    const result = resolveNight({
+      gameRoomId: "game_1",
+      day: 1,
+      alivePlayerIds: ["wolf", "guard", "witch", "seer", "villager", "villager2"],
+      actions: [
+        { actorPlayerId: "wolf", kind: "wolfKill", targetPlayerId: "villager" },
+        { actorPlayerId: "guard", kind: "guardProtect", targetPlayerId: "villager" },
+        { actorPlayerId: "witch", kind: "witchHeal", targetPlayerId: "villager" },
+      ],
+      now: new Date("2026-05-09T10:00:00.000Z"),
+    });
+    expect(result.eliminatedPlayerIds).toEqual(["villager"]);
+    expect(result.events[0]?.payload.guardAndHealConflict).toBe(true);
+  });
 });

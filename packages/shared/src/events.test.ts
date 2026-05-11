@@ -19,6 +19,26 @@ describe("game event contracts", () => {
     );
   });
 
+  it("validates private seer result events", () => {
+    const event = gameEventSchema.parse({
+      id: "evt_3",
+      gameRoomId: "game_1",
+      seq: 3,
+      type: "seer_result_revealed",
+      visibility: "private:user:player_2",
+      actorId: "runtime",
+      subjectId: "player_1",
+      payload: {
+        day: 1,
+        seerPlayerId: "player_2",
+        inspectedPlayerId: "player_1",
+        alignment: "wolf",
+      },
+      createdAt: "2026-05-09T10:00:02.000Z",
+    });
+    expect(event.visibility).toBe("private:user:player_2");
+  });
+
   it("rejects user lifecycle events from the game timeline", () => {
     expect(() =>
       gameEventSchema.parse({

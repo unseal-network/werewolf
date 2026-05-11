@@ -3,18 +3,24 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "node dist/server.js",
+    "dev": "tsx watch --env-file=.env src/server.ts",
+    "start": "node --env-file=.env dist/server.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@hono/node-server": "^1.19.0",
+    "@livekit/rtc-node": "^0.13.24",
+    "@types/ws": "^8.18.1",
     "@werewolf/agent-client": "workspace:*",
     "@werewolf/db": "workspace:*",
     "@werewolf/engine": "workspace:*",
     "@werewolf/shared": "workspace:*",
+    "drizzle-orm": "^0.45.0",
     "hono": "^4.10.0",
+    "livekit-server-sdk": "^2.15.2",
+    "mpg123-decoder": "^1.0.3",
+    "ws": "^8.20.0",
     "zod": "^4.1.0"
   },
   "devDependencies": {

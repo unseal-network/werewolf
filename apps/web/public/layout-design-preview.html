@@ -1,0 +1,1740 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Werewolf Responsive Seats Preview</title>
+    <style>
+      :root {
+        --bg: #f4f6fb;
+        --surface: #ffffff;
+        --soft: #eef3fb;
+        --ink: #141b2d;
+        --muted: #66738b;
+        --line: #d8e0ee;
+        --night: #11182a;
+        --accent: #435cff;
+        --good: #13a36c;
+        --dead: #d84848;
+        --gold: #f0c95a;
+        --shadow: 0 18px 52px rgba(25, 35, 63, 0.13);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: linear-gradient(180deg, #f9fbff 0%, var(--bg) 100%);
+        font: 14px/1.4 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      button {
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .page {
+        min-height: 100vh;
+        position: relative;
+      }
+
+      .topbar {
+        position: fixed;
+        left: 22px;
+        top: 18px;
+        z-index: 7;
+        min-height: 0;
+        padding: 10px 12px;
+        display: inline-flex;
+        align-items: center;
+        border: 1px solid rgba(216, 224, 238, 0.68);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.46);
+        box-shadow: 0 14px 38px rgba(24, 34, 63, 0.12);
+        backdrop-filter: blur(16px);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }
+
+      .mark {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: var(--night);
+        font-weight: 900;
+      }
+
+      .title {
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      .subtitle {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        color: #34415b;
+        font-weight: 850;
+      }
+
+      .breadcrumb .slash {
+        color: #9aa6bb;
+      }
+
+      .breadcrumb .phase-crumb {
+        color: var(--accent);
+      }
+
+      .controls {
+        position: fixed;
+        right: 18px;
+        top: 86px;
+        z-index: 12;
+        width: min(460px, calc(100vw - 36px));
+        border: 1px solid rgba(216, 224, 238, 0.9);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 18px 55px rgba(24, 34, 63, 0.18);
+        padding: 12px;
+        display: none;
+        gap: 10px;
+      }
+
+      body.preview-open .controls {
+        display: grid;
+      }
+
+      .preview-toggle {
+        position: fixed;
+        right: 18px;
+        top: 18px;
+        z-index: 13;
+        height: 40px;
+        border: 1px solid rgba(216, 224, 238, 0.9);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 12px 32px rgba(24, 34, 63, 0.14);
+        padding: 0 14px;
+        color: #34415b;
+        font-weight: 900;
+      }
+
+      .role-card-entry {
+        position: fixed;
+        right: 18px;
+        top: 66px;
+        z-index: 12;
+        width: 46px;
+        height: 60px;
+        border: 1px solid rgba(216, 224, 238, 0.9);
+        border-radius: 10px;
+        background:
+          linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(237, 242, 252, 0.96));
+        box-shadow: 0 12px 32px rgba(24, 34, 63, 0.16);
+        display: none;
+        place-items: center;
+        color: var(--accent);
+        font-size: 24px;
+        cursor: pointer;
+      }
+
+      .role-card-entry.visible {
+        display: grid;
+      }
+
+      .control-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 900;
+      }
+
+      .control-group {
+        display: flex;
+        gap: 6px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+        flex-wrap: wrap;
+      }
+
+      .control-group button {
+        height: 30px;
+        border: 0;
+        border-radius: 999px;
+        padding: 0 10px;
+        background: transparent;
+        color: #56647c;
+        font-weight: 850;
+      }
+
+      .control-group button.active {
+        color: #fff;
+        background: var(--night);
+      }
+
+      .game {
+        position: relative;
+        min-height: 100vh;
+        padding: 84px 28px 88px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .phase-head {
+        display: none;
+      }
+
+      .phase-strip {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+      }
+
+      .phase-strip button {
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0 12px;
+        color: #55647c;
+        background: #fff;
+        font-size: 12px;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+
+      .phase-strip button.active {
+        color: #fff;
+        border-color: var(--accent);
+        background: var(--accent);
+      }
+
+      .timer {
+        min-width: 88px;
+        height: 42px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: var(--night);
+        box-shadow: 0 12px 30px rgba(17, 24, 42, 0.2);
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .room {
+        min-height: calc(100vh - 190px);
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+        display: grid;
+        grid-template-columns: minmax(74px, 96px) minmax(360px, 1fr) minmax(74px, 96px);
+        grid-template-areas: "left stage right";
+        align-items: center;
+        gap: clamp(12px, 2vw, 28px);
+        padding: 24px;
+      }
+
+      .seat-layer {
+        display: contents;
+      }
+
+      .seat-column {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: clamp(10px, 1.8vh, 20px);
+      }
+
+      .seat-column.left {
+        grid-area: left;
+      }
+
+      .seat-column.right {
+        grid-area: right;
+      }
+
+      .seat {
+        width: 64px;
+        min-height: 76px;
+        border: 0;
+        border-radius: 18px;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+        display: grid;
+        justify-items: center;
+        align-content: start;
+        gap: 5px;
+        position: relative;
+        cursor: pointer;
+      }
+
+      .seat.active {
+        border-color: transparent;
+        box-shadow: none;
+      }
+
+      .avatar {
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: linear-gradient(135deg, #7487ff, #4259ee);
+        font-weight: 950;
+        box-shadow: 0 10px 26px rgba(45, 62, 140, 0.22);
+      }
+
+      .seat.active .avatar {
+        box-shadow:
+          0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent),
+          0 12px 30px rgba(45, 62, 140, 0.28);
+      }
+
+      .seat.selectable .avatar {
+        animation: selectablePulse 1.4s ease-in-out infinite;
+        outline: 2px solid color-mix(in srgb, var(--accent) 40%, transparent);
+        outline-offset: 4px;
+      }
+
+      @keyframes selectablePulse {
+        0%, 100% {
+          transform: translateY(0);
+          box-shadow: 0 10px 26px rgba(45, 62, 140, 0.22);
+        }
+        50% {
+          transform: translateY(-2px);
+          box-shadow: 0 0 0 8px color-mix(in srgb, var(--accent) 13%, transparent), 0 16px 34px rgba(45, 62, 140, 0.28);
+        }
+      }
+
+      .seat.active .seat-name {
+        color: var(--accent);
+      }
+
+      .seat.dead .avatar {
+        filter: grayscale(1);
+        opacity: 0.5;
+      }
+
+      .seat.empty .avatar {
+        color: #53617b;
+        background: #e6edf8;
+        box-shadow: none;
+        outline: 1px dashed #c9d5e8;
+        outline-offset: 4px;
+      }
+
+      .seat.empty .seat-name {
+        color: #66738b;
+      }
+
+      .seat-name {
+        max-width: 64px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-align: center;
+        font-weight: 900;
+        font-size: 12px;
+        line-height: 1.1;
+      }
+
+      .seat-meta {
+        display: none;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .seat::after {
+        content: attr(data-full-name);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 8px);
+        transform: translateX(-50%) translateY(4px);
+        opacity: 0;
+        pointer-events: none;
+        white-space: nowrap;
+        border: 1px solid rgba(216, 224, 238, 0.9);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 12px 30px rgba(25, 35, 63, 0.14);
+        padding: 6px 10px;
+        color: #27344e;
+        font-size: 12px;
+        font-weight: 850;
+        transition: opacity 140ms ease, transform 140ms ease;
+      }
+
+      .seat:hover::after {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .table {
+        grid-area: stage;
+        justify-self: center;
+        align-self: center;
+        width: min(760px, 100%);
+        min-width: 0;
+        aspect-ratio: 1.45 / 1;
+        border-radius: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        display: grid;
+        place-items: center;
+      }
+
+      .phase-card {
+        width: min(430px, 76%);
+        border: 1px solid #d7e0ef;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 18px 45px rgba(28, 40, 74, 0.13);
+        padding: 24px;
+        text-align: center;
+      }
+
+      .phase-kicker {
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+
+      .phase-title {
+        margin: 8px 0;
+        font-size: 32px;
+        font-weight: 950;
+      }
+
+      .phase-copy {
+        color: var(--muted);
+      }
+
+      .target-row {
+        margin-top: 18px;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .target-chip {
+        min-width: 68px;
+        height: 34px;
+        border: 1px solid #cfd8e8;
+        border-radius: 999px;
+        background: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 850;
+      }
+
+      .target-chip.selected {
+        color: #fff;
+        border-color: var(--accent);
+        background: var(--accent);
+      }
+
+      .stage-confirm {
+        min-width: 150px;
+        height: 44px;
+        border: 0;
+        border-radius: 999px;
+        color: #fff;
+        background: var(--accent);
+        font-weight: 950;
+      }
+
+      .stage-skip {
+        min-width: 96px;
+        height: 44px;
+        border: 1px solid #cfd8e8;
+        border-radius: 999px;
+        color: #17213a;
+        background: #fff;
+        font-weight: 900;
+      }
+
+      .target-select {
+        min-width: 190px;
+        height: 42px;
+        border: 1px solid #cfd8e8;
+        border-radius: 999px;
+        background: #fff;
+        padding: 0 14px;
+        color: #17213a;
+        font-weight: 850;
+      }
+
+      .target-hint {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .target-confirm {
+        display: grid;
+        justify-items: center;
+        gap: 12px;
+      }
+
+      .target-confirm-avatar {
+        width: 86px;
+        height: 86px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: linear-gradient(135deg, #7487ff, #4259ee);
+        box-shadow: 0 16px 40px rgba(45, 62, 140, 0.24);
+        font-size: 26px;
+        font-weight: 950;
+        cursor: pointer;
+      }
+
+      .deal-confirm {
+        margin-top: 16px;
+      }
+
+      .target-confirm-name {
+        font-size: 22px;
+        font-weight: 950;
+      }
+
+      .target-confirm-copy {
+        max-width: 360px;
+        color: var(--muted);
+      }
+
+      .action-bar {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .action-bar.hidden {
+        display: none;
+      }
+
+      .action {
+        height: 52px;
+        border: 0;
+        border-radius: 16px;
+        font-weight: 900;
+      }
+
+      .action.primary {
+        color: #fff;
+        background: var(--accent);
+      }
+
+      .action.secondary {
+        color: #17213a;
+        background: #e5ebf8;
+      }
+
+      .stage-start {
+        min-width: 180px;
+        height: 56px;
+        border: 0;
+        border-radius: 999px;
+        color: #fff;
+        background: var(--accent);
+        box-shadow: 0 18px 42px color-mix(in srgb, var(--accent) 28%, transparent);
+        font-weight: 950;
+      }
+
+      body.phase-lobby .table {
+        width: min(420px, 82%);
+        aspect-ratio: auto;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+      }
+
+      body.phase-lobby .phase-card {
+        width: auto;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+      }
+
+      body.phase-lobby .phase-kicker,
+      body.phase-lobby .phase-copy {
+        display: none;
+      }
+
+      body.phase-lobby .phase-title {
+        margin: 0 0 18px;
+        color: #24304a;
+        font-size: 22px;
+      }
+
+      .log-peek {
+        position: fixed;
+        left: 50%;
+        bottom: 18px;
+        transform: translateX(-50%);
+        cursor: grab;
+        user-select: none;
+        touch-action: none;
+        z-index: 10;
+        border: 1px solid #cfd9eb;
+        border-radius: 999px;
+        background: #fff;
+        box-shadow: 0 16px 42px rgba(24, 34, 63, 0.18);
+        min-width: 210px;
+        height: 50px;
+        padding: 0 18px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        color: #3c4963;
+        font-weight: 850;
+        transition: opacity 160ms ease, transform 180ms ease;
+      }
+
+      .log-peek.hidden {
+        display: none;
+      }
+
+      .log-peek.dragging {
+        cursor: grabbing;
+        transition: none;
+      }
+
+      .log-peek span {
+        width: 42px;
+        height: 5px;
+        border-radius: 999px;
+        background: #b9c4d8;
+      }
+
+      body.logs-open .log-peek {
+        opacity: 0;
+        transform: translateY(16px);
+        pointer-events: none;
+      }
+
+      .sheet-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 8;
+        pointer-events: none;
+        opacity: 0;
+        background: rgba(17, 24, 42, 0.2);
+        transition: opacity 180ms ease;
+      }
+
+      .log-sheet {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        z-index: 9;
+        width: min(820px, calc(100vw - 40px));
+        height: min(560px, calc(100vh - 120px));
+        border-radius: 28px;
+        background: var(--night);
+        color: #fff;
+        box-shadow: 0 28px 90px rgba(17, 24, 42, 0.34);
+        padding: 14px 18px 18px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -50%) scale(0.12);
+        transform-origin: 50% calc(100% + 34px);
+        transition: transform 240ms ease, opacity 180ms ease;
+      }
+
+      body.logs-open .sheet-backdrop,
+      body.role-card-open .sheet-backdrop,
+      body.profile-open .sheet-backdrop,
+      body.start-open .sheet-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      body.logs-open .log-sheet {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .sheet-grip {
+        display: none;
+      }
+
+      .sheet-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .sheet-title {
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .sheet-close {
+        width: 38px;
+        height: 38px;
+        border: 1px solid #3a4357;
+        border-radius: 999px;
+        color: #fff;
+        background: #242c3f;
+      }
+
+      .log-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .profile-dialog {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        z-index: 11;
+        width: min(360px, calc(100vw - 32px));
+        border: 1px solid rgba(216, 224, 238, 0.86);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 28px 90px rgba(17, 24, 42, 0.26);
+        padding: 18px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -48%) scale(0.96);
+        transition: opacity 160ms ease, transform 180ms ease;
+      }
+
+      body.profile-open .profile-dialog {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .start-dialog {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        z-index: 11;
+        width: min(420px, calc(100vw - 32px));
+        border: 1px solid rgba(216, 224, 238, 0.88);
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 28px 90px rgba(17, 24, 42, 0.25);
+        padding: 20px;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -48%) scale(0.96);
+        transition: opacity 160ms ease, transform 180ms ease;
+      }
+
+      body.start-open .start-dialog {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .start-title {
+        font-size: 20px;
+        font-weight: 950;
+      }
+
+      .start-copy {
+        margin: 8px 0 18px;
+        color: var(--muted);
+      }
+
+      .start-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .role-card-dialog {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        z-index: 11;
+        width: auto;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+        padding: 0;
+        opacity: 0;
+        pointer-events: none;
+        transform: translate(-50%, -48%) scale(0.96);
+        transition: opacity 160ms ease, transform 180ms ease;
+      }
+
+      body.role-card-open .role-card-dialog {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translate(-50%, -50%) scale(1);
+      }
+
+      .role-card-art {
+        width: 220px;
+        height: 320px;
+        margin: 0;
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 50% 32%, rgba(255,255,255,0.95), rgba(211,221,255,0.38) 45%, rgba(92,105,220,0.9) 100%);
+        border: 1px solid rgba(137, 150, 235, 0.7);
+        box-shadow: 0 22px 60px rgba(75, 86, 180, 0.28);
+        display: grid;
+        place-items: center;
+        grid-template-rows: 1fr auto;
+        color: #fff;
+        font-weight: 950;
+        cursor: pointer;
+        padding: 28px 18px;
+      }
+
+      .role-card-title {
+        text-align: center;
+        font-size: 22px;
+        font-weight: 950;
+      }
+
+      .role-card-symbol {
+        font-size: 72px;
+      }
+
+      .profile-head {
+        display: grid;
+        grid-template-columns: 64px 1fr auto;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .profile-avatar {
+        width: 64px;
+        height: 64px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        background: linear-gradient(135deg, #7487ff, #4259ee);
+        font-size: 22px;
+        font-weight: 950;
+      }
+
+      .profile-name {
+        font-size: 18px;
+        font-weight: 950;
+      }
+
+      .profile-meta {
+        margin-top: 4px;
+        color: var(--muted);
+      }
+
+      .profile-close {
+        width: 34px;
+        height: 34px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: #fff;
+      }
+
+      .profile-facts {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .profile-fact {
+        border: 1px solid #dce4f1;
+        border-radius: 14px;
+        background: #f8faff;
+        padding: 10px;
+      }
+
+      .profile-fact b {
+        display: block;
+        margin-bottom: 4px;
+        color: #33415e;
+      }
+
+      .log-item {
+        border: 1px solid #333d55;
+        border-radius: 16px;
+        background: #20283b;
+        padding: 12px;
+        display: grid;
+        grid-template-columns: 70px 1fr;
+        gap: 12px;
+      }
+
+      .log-type {
+        color: var(--gold);
+        font-weight: 900;
+      }
+
+      .log-text {
+        color: #e8ecf8;
+      }
+
+      .log-time {
+        margin-top: 4px;
+        color: #8d97ad;
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .game {
+          padding: 82px 14px 88px;
+        }
+
+        .room {
+          min-height: calc(100vh - 130px);
+          padding: 16px;
+          grid-template-columns: 58px minmax(260px, 1fr) 58px;
+          grid-template-areas: "left stage right";
+          gap: 8px;
+        }
+
+        .seat-layer {
+          display: contents;
+        }
+
+        .seat-column {
+          min-width: 0;
+          width: 100%;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          gap: 8px;
+          overflow: visible;
+          padding: 0;
+          scrollbar-width: none;
+        }
+
+        .seat-column.left {
+          grid-area: left;
+        }
+
+        .seat-column.right {
+          grid-area: right;
+        }
+
+        .seat {
+          flex: 0 0 auto;
+          width: 50px;
+          min-height: 58px;
+        }
+
+        .avatar {
+          width: 42px;
+          height: 42px;
+        }
+
+        .seat-name {
+          max-width: 54px;
+          font-size: 11px;
+        }
+
+        .table {
+          grid-area: stage;
+          width: min(430px, 100%);
+          min-width: 0;
+          aspect-ratio: 1.35 / 1;
+          min-height: 0;
+          border-radius: 26px;
+        }
+
+        .phase-card {
+          width: min(330px, 88%);
+          padding: 16px;
+        }
+
+        .phase-title {
+          font-size: 22px;
+        }
+
+        .phase-copy {
+          font-size: 13px;
+        }
+
+        .log-sheet {
+          width: calc(100vw - 24px);
+          height: min(620px, calc(100vh - 72px));
+          border-radius: 24px;
+        }
+
+        .log-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .topbar {
+          left: 10px;
+          right: 10px;
+          top: 10px;
+          padding: 8px 10px;
+        }
+
+        .mark {
+          width: 26px;
+          height: 26px;
+        }
+
+        .breadcrumb {
+          font-size: 13px;
+        }
+
+        .subtitle {
+          max-width: 280px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+        .game {
+          padding: 82px 10px 78px;
+        }
+
+        .room {
+          border-radius: 22px;
+          padding: 12px;
+          min-height: calc(100vh - 112px);
+          grid-template-columns: 48px minmax(220px, 1fr) 48px;
+        }
+
+        .table {
+          width: min(320px, 100%);
+          aspect-ratio: 1.08 / 1;
+        }
+
+        .phase-card {
+          width: 90%;
+          border-radius: 18px;
+          padding: 14px;
+        }
+
+        .seat {
+          width: 44px;
+          min-height: 54px;
+        }
+
+        .avatar {
+          width: 38px;
+          height: 38px;
+        }
+
+        .seat-name {
+          max-width: 46px;
+          font-size: 10px;
+        }
+
+        .target-confirm-avatar {
+          width: 70px;
+          height: 70px;
+          font-size: 22px;
+        }
+
+        .target-confirm-name {
+          font-size: 18px;
+        }
+
+        .log-peek {
+          min-width: 180px;
+          height: 44px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <div class="mark">W</div>
+          <div>
+            <div class="breadcrumb">
+              <span>月雾村</span>
+              <span class="slash">/</span>
+              <span>12人局</span>
+              <span class="slash">/</span>
+              <span class="phase-crumb" id="phase-crumb">准备</span>
+            </div>
+            <div class="subtitle">room_8YQ2 · source !FWTlpFYoOXfndnfReT</div>
+          </div>
+        </div>
+      </header>
+
+      <button class="preview-toggle" onclick="togglePreview()">预览控制</button>
+      <button class="role-card-entry" id="role-card-entry" onclick="openRoleCard()" title="查看身份牌">♜</button>
+      <div class="controls">
+        <div class="control-label">人数</div>
+        <div class="control-group" id="player-counts"></div>
+        <div class="control-label">阶段</div>
+        <div class="control-group" id="phase-buttons"></div>
+        <div class="control-label">当前用户角色</div>
+        <div class="control-group" id="role-buttons"></div>
+      </div>
+
+      <main class="game">
+        <div class="phase-head">
+          <div class="phase-strip" id="phase-strip"></div>
+          <div class="timer" id="timer">00:45</div>
+        </div>
+
+        <section class="room" id="room">
+          <div class="seat-layer" id="seat-layer">
+            <div class="seat-column left" id="left-seats"></div>
+            <div class="seat-column right" id="right-seats"></div>
+          </div>
+          <div class="table">
+            <div class="phase-card">
+              <div class="phase-kicker" id="phase-kicker"></div>
+              <div class="phase-title" id="phase-title"></div>
+              <div class="phase-copy" id="phase-copy"></div>
+              <div class="target-row" id="target-row"></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="action-bar" id="action-bar">
+          <button class="action primary" id="primary-action"></button>
+          <button class="action secondary" id="secondary-action"></button>
+        </div>
+      </main>
+    </div>
+
+    <button class="log-peek hidden" id="log-peek"><span></span><strong>日志 / 发言 / 事件</strong></button>
+    <div class="sheet-backdrop" id="modal-backdrop" onclick="closeOverlays()"></div>
+    <section class="log-sheet">
+      <div class="sheet-grip"></div>
+      <div class="sheet-head">
+        <div>
+          <div class="sheet-title">阶段记录</div>
+          <div class="subtitle">默认隐藏，从下方拉起查看</div>
+        </div>
+        <button class="sheet-close" onclick="toggleLogs()">×</button>
+      </div>
+      <div class="log-grid" id="log-grid"></div>
+    </section>
+
+    <section class="profile-dialog" id="profile-dialog">
+      <div class="profile-head">
+        <div class="profile-avatar" id="profile-avatar">1</div>
+        <div>
+          <div class="profile-name" id="profile-name">kimigame1</div>
+          <div class="profile-meta" id="profile-meta">1号位 · 存活</div>
+        </div>
+        <button class="profile-close" onclick="closeProfile()">×</button>
+      </div>
+      <div class="profile-facts">
+        <div class="profile-fact"><b>座位</b><span id="profile-seat">1号</span></div>
+        <div class="profile-fact"><b>状态</b><span id="profile-state">存活</span></div>
+        <div class="profile-fact"><b>身份</b><span>未公开</span></div>
+        <div class="profile-fact"><b>类型</b><span id="profile-kind">玩家</span></div>
+      </div>
+    </section>
+
+    <section class="start-dialog" id="start-dialog">
+      <div class="start-title">还有空位</div>
+      <div class="start-copy" id="start-copy">可以补 AI 玩家后开始，也可以继续等待真实玩家加入。</div>
+      <div class="start-actions">
+        <button class="action secondary" onclick="closeStartDialog()">继续等待</button>
+        <button class="action primary" onclick="fillAiAndDeal()">补 AI 开始</button>
+      </div>
+    </section>
+
+    <section class="role-card-dialog" id="role-card-dialog">
+      <div class="role-card-art" onclick="confirmRoleCard()">
+        <div class="role-card-symbol">占</div>
+        <div class="role-card-title">预言家</div>
+      </div>
+    </section>
+
+    <script>
+      const phases = [
+        {
+          id: 'lobby',
+          label: '准备',
+          accent: '#435cff',
+          kicker: 'Lobby',
+          title: '准备开始',
+          copy: '',
+          timer: '--:--',
+          primary: '',
+          secondary: '',
+          actionable: false,
+          targets: ['开始游戏'],
+          logs: [['系统', '房间已创建，等待玩家加入。'], ['配置', '当前人数可在 6-12 间切换。']]
+        },
+        {
+          id: 'deal',
+          label: '发牌',
+          accent: '#7357d9',
+          kicker: 'Deal',
+          title: '身份卡发放',
+          copy: '玩家从房间名单进入两侧座位，中央播放身份卡发放动画后正式开始。',
+          timer: '00:10',
+          primary: '查看身份',
+          secondary: '隐藏身份',
+          actionable: false,
+          targets: ['卡牌发放', '座位入场', '准备夜晚'],
+          logs: [['系统', '游戏开始。'], ['发牌', '身份卡正在发放。']]
+        },
+        {
+          id: 'night',
+          label: '夜晚',
+          accent: '#2c8cff',
+          kicker: 'Night',
+          title: '夜幕降临',
+          copy: '天黑后进入统一的村庄夜景。所有玩家看到相同公共阶段画面，不泄露行动目标。',
+          timer: '00:08',
+          primary: '等待夜晚开始',
+          secondary: '查看规则',
+          actionable: false,
+          targets: ['夜幕转场', '村庄背景', '公共动画'],
+          logs: [['阶段', '天黑转场开始。'], ['系统', '即将进入夜间角色行动。']]
+        },
+        {
+          id: 'guard',
+          label: '守卫',
+          accent: '#2c8cff',
+          kicker: 'Night · Guard',
+          title: '守卫行动',
+          copy: '公共画面展示守卫纹章与护盾氛围。只有守卫本人才显示可选目标。',
+          timer: '00:22',
+          primary: '选择守护目标',
+          secondary: '跳过',
+          actionable: true,
+          targets: ['1号', '3号', '7号', '12号'],
+          logs: [['阶段', '进入守卫阶段。'], ['等待', '守卫行动或等待 deadline。']]
+        },
+        {
+          id: 'wolf',
+          label: '狼人',
+          accent: '#c43d4d',
+          kicker: 'Night · Wolves',
+          title: '狼人讨论与投票',
+          copy: '狼人发言讨论并投票选择击杀对象。平票且截止则击杀无效。',
+          timer: '00:36',
+          primary: '投票击杀',
+          secondary: '发表讨论',
+          actionable: true,
+          targets: ['3号', '7号', '9号', '12号'],
+          logs: [['发言', '2号：我倾向先看 7 号。'], ['投票', '当前 7 号获得 2 票。']]
+        },
+        {
+          id: 'witch-save',
+          label: '女巫救人',
+          accent: '#28a86d',
+          kicker: 'Night · Witch',
+          title: '女巫救人',
+          copy: '公共画面展示绿色药剂氛围。只有女巫本人才看到今晚被击杀目标与解药操作。',
+          timer: '00:25',
+          primary: '使用解药',
+          secondary: '不救',
+          actionable: true,
+          targets: ['今晚目标', '解药可用'],
+          logs: [['阶段', '进入女巫救人阶段。'], ['规则', '同守同救由服务端结算。']]
+        },
+        {
+          id: 'witch-poison',
+          label: '女巫毒人',
+          accent: '#7751d9',
+          kicker: 'Night · Witch',
+          title: '女巫毒人',
+          copy: '公共画面展示紫色药雾。只有女巫本人才显示毒药目标选择。',
+          timer: '00:20',
+          primary: '选择毒杀目标',
+          secondary: '跳过',
+          actionable: true,
+          targets: ['2号', '4号', '9号', '12号'],
+          logs: [['阶段', '进入女巫毒人阶段。'], ['系统', '毒药仅可使用一次。']]
+        },
+        {
+          id: 'seer',
+          label: '预言家',
+          accent: '#1d95b8',
+          kicker: 'Night · Seer',
+          title: '预言家查验',
+          copy: '公共画面展示月光与占卜氛围。查验目标与结果只在预言家私密层展示。',
+          timer: '00:24',
+          primary: '选择查验目标',
+          secondary: '跳过',
+          actionable: true,
+          targets: ['2号', '4号', '7号', '12号'],
+          logs: [['阶段', '进入预言家阶段。'], ['私密', '查验结果不进入公开日志。']]
+        },
+        {
+          id: 'day',
+          label: '白天',
+          accent: '#d58b21',
+          kicker: 'Day · Speech',
+          title: '白天顺序发言',
+          copy: '所有存活玩家按座位顺序发言。当前发言者在座位上高亮。',
+          timer: '00:45',
+          primary: '提交发言',
+          secondary: '跳过发言',
+          actionable: true,
+          targets: ['当前：3号', '下一位：4号', '发言 3/12'],
+          logs: [['结果', '昨夜死亡：6号。'], ['发言', '3号正在发言。']]
+        },
+        {
+          id: 'vote',
+          label: '投票',
+          accent: '#d84848',
+          kicker: 'Day · Vote',
+          title: '投票驱逐',
+          copy: '所有存活玩家投票。平票后进入候选人发言与重投。',
+          timer: '00:30',
+          primary: '投票驱逐',
+          secondary: '弃票',
+          actionable: true,
+          targets: ['3号', '7号', '9号', '12号'],
+          logs: [['投票', '当前最高票：7号。'], ['规则', '平票会进入候选发言与重投。']]
+        },
+        {
+          id: 'tie',
+          label: '平票重投',
+          accent: '#b554d9',
+          kicker: 'Day · Tie',
+          title: '平票发言与重投',
+          copy: '平票候选人依次发言，然后所有存活玩家只在候选人之间重新投票。',
+          timer: '00:28',
+          primary: '在候选中投票',
+          secondary: '查看候选发言',
+          actionable: true,
+          targets: ['候选：7号', '候选：12号'],
+          allowedTargets: [7, 12],
+          logs: [['系统', '7号与12号平票。'], ['发言', '7号开始平票发言。']]
+        },
+        {
+          id: 'end',
+          label: '结束',
+          accent: '#13a36c',
+          kicker: 'Game Over',
+          title: '游戏结束',
+          copy: '展示胜利阵营与完整身份。GM 会自动生成复盘总结并发到 timeline 发言里。',
+          timer: '--:--',
+          primary: '',
+          secondary: '',
+          actionable: false,
+          targets: ['胜利：狼人阵营', '回合：4', '总结已进入 timeline'],
+          logs: [['系统', '游戏结束。'], ['胜利', '狼人阵营获胜。'], ['GM', '本局复盘总结已发送到 timeline。']]
+        }
+      ];
+
+      let playerCount = 12;
+      let currentPhase = 'lobby';
+      let mySeat = 1;
+      let myRole = 'seer';
+      let selectedTarget = null;
+      let roleCardConfirmed = false;
+      let checkedBySeer = new Set([4, 9]);
+      let occupiedSeats = new Set([1, 2, 3, 4, 5, 7, 8]);
+
+      function playerName(seat) {
+        return seat === mySeat ? '你' : `${seat}号`;
+      }
+
+      function playerFullName(seat) {
+        return seat === mySeat ? 'kimigame1' : `玩家${String(seat).padStart(2, '0')}`;
+      }
+
+      function playerState(seat) {
+        if (seat === 6 && playerCount >= 6) return 'dead';
+        if (seat === activeSeat()) return 'active';
+        return 'alive';
+      }
+
+      function activeSeat() {
+        if (currentPhase === 'day') return Math.min(3, playerCount);
+        if (currentPhase === 'vote') return Math.min(7, playerCount);
+        if (currentPhase === 'wolf') return Math.min(2, playerCount);
+        return 1;
+      }
+
+      function canCurrentUserAct(phase) {
+        if (phase.id === 'guard') return myRole === 'guard';
+        if (phase.id === 'wolf') return myRole === 'werewolf';
+        if (phase.id === 'witch-save' || phase.id === 'witch-poison') return myRole === 'witch';
+        if (phase.id === 'seer') return myRole === 'seer';
+        if (phase.id === 'day') return activeSeat() === mySeat;
+        if (phase.id === 'vote' || phase.id === 'tie') return playerState(mySeat) !== 'dead';
+        if (phase.id === 'end') return true;
+        return false;
+      }
+
+      function canSelectTarget(phase) {
+        return canCurrentUserAct(phase) && ['guard', 'wolf', 'witch-poison', 'seer', 'vote', 'tie'].includes(phase.id);
+      }
+
+      function actionLabel(phase) {
+        if (phase.id === 'seer') return '确认查验';
+        if (phase.id === 'guard') return '确认守护';
+        if (phase.id === 'wolf') return '确认击杀票';
+        if (phase.id === 'witch-poison') return '确认毒杀';
+        if (phase.id === 'vote' || phase.id === 'tie') return '确认投票';
+        return phase.primary || '确认';
+      }
+
+      function selectableSeats(phase) {
+        if (!canSelectTarget(phase)) return [];
+        const seats = [];
+        const candidates = phase.allowedTargets || Array.from({ length: playerCount }, (_, index) => index + 1);
+        for (const seat of candidates) {
+          if (seat > playerCount) continue;
+          if (seat === mySeat) continue;
+          if (playerState(seat) === 'dead') continue;
+          if (phase.id === 'seer' && checkedBySeer.has(seat)) continue;
+          seats.push(seat);
+        }
+        return seats;
+      }
+
+      function confirmCopy(phase, seat) {
+        const name = `${seat}号`;
+        if (phase.id === 'guard') return `确认要守护 ${name} 玩家吗？`;
+        if (phase.id === 'wolf') return `确认将击杀票投给 ${name} 玩家吗？`;
+        if (phase.id === 'witch-poison') return `确认要对 ${name} 玩家使用毒药吗？`;
+        if (phase.id === 'seer') return `确认要查验 ${name} 玩家吗？`;
+        if (phase.id === 'vote' || phase.id === 'tie') return `确认投票驱逐 ${name} 玩家吗？`;
+        return `确认选择 ${name} 玩家吗？`;
+      }
+
+      function renderSeats() {
+        const room = document.getElementById('room');
+        room.style.display = 'grid';
+        const left = [];
+        const right = [];
+        const leftCount = Math.ceil(playerCount / 2);
+
+        for (let seat = 1; seat <= playerCount; seat += 1) {
+          const state = playerState(seat);
+          const occupied = currentPhase === 'lobby' ? occupiedSeats.has(seat) : true;
+          const isEmpty = !occupied;
+          const phase = phases.find((item) => item.id === currentPhase) || phases[0];
+          const selectable = !isEmpty && selectableSeats(phase).includes(seat);
+          const selected = selectedTarget === seat;
+          const item = `
+            <div class="seat ${isEmpty ? 'empty' : ''} ${selectable ? 'selectable' : ''} ${!isEmpty && state === 'dead' ? 'dead' : ''} ${!isEmpty && state === 'active' ? 'active' : ''} ${selected ? 'active' : ''}"
+              data-full-name="${isEmpty ? `${seat}号空位` : playerFullName(seat)}"
+              onclick="${isEmpty ? `joinSeat(${seat})` : selectable ? `selectTarget(${seat})` : `openProfile(${seat})`}">
+              <div class="avatar">${isEmpty ? '+' : seat}</div>
+              <div>
+                <div class="seat-name">${isEmpty ? `${seat}号` : playerName(seat)}</div>
+                <div class="seat-meta">${isEmpty ? '空位' : `${seat}号 · ${state === 'dead' ? '阵亡' : '存活'}`}</div>
+              </div>
+            </div>
+          `;
+          if (seat <= leftCount) {
+            left.push(item);
+          } else {
+            right.push(item);
+          }
+        }
+        document.getElementById('left-seats').innerHTML = left.join('');
+        document.getElementById('right-seats').innerHTML = right.join('');
+      }
+
+      function setPhase(id) {
+        currentPhase = id;
+        selectedTarget = null;
+        const phase = phases.find((item) => item.id === id) || phases[0];
+        document.body.classList.toggle('phase-lobby', phase.id === 'lobby');
+        document.documentElement.style.setProperty('--accent', phase.accent);
+        document.getElementById('timer').textContent = phase.timer;
+        document.getElementById('phase-kicker').textContent = phase.kicker;
+        document.getElementById('phase-title').textContent = phase.title;
+        document.getElementById('phase-copy').textContent = phase.copy;
+        document.getElementById('primary-action').textContent = phase.primary;
+        document.getElementById('secondary-action').textContent = phase.secondary;
+        document.getElementById('action-bar').classList.add('hidden');
+        document.getElementById('log-peek').classList.toggle('hidden', phase.id === 'lobby');
+        document.getElementById('primary-action').onclick = null;
+        document.getElementById('secondary-action').onclick = null;
+        document.getElementById('target-row').innerHTML = phase.id === 'lobby'
+          ? '<button class="stage-start" onclick="startGameFromLobby()">开始游戏</button>'
+          : phase.id === 'deal'
+            ? '<button class="stage-confirm deal-confirm" onclick="confirmRoleCard()">确认身份</button>'
+          : renderStageActions(phase);
+        document.getElementById('role-card-entry').classList.toggle('visible', roleCardConfirmed && phase.id !== 'lobby');
+        if (phase.id === 'deal' && !roleCardConfirmed) {
+          document.body.classList.add('role-card-open');
+        }
+        document.getElementById('log-grid').innerHTML = phase.logs.map(([type, text]) => `
+          <div class="log-item">
+            <div class="log-type">${type}</div>
+            <div><div class="log-text">${text}</div><div class="log-time">当前阶段</div></div>
+          </div>
+        `).join('');
+        renderPhaseButtons();
+        updateBreadcrumb();
+        renderSeats();
+      }
+
+      function setPlayerCount(count) {
+        playerCount = count;
+        occupiedSeats = new Set([...occupiedSeats].filter((seat) => seat <= playerCount));
+        if (mySeat > playerCount) {
+          mySeat = 1;
+          occupiedSeats.add(1);
+        }
+        renderPlayerCountButtons();
+        updateBreadcrumb();
+        renderSeats();
+      }
+
+      function joinSeat(seat) {
+        occupiedSeats.delete(mySeat);
+        mySeat = seat;
+        occupiedSeats.add(seat);
+        renderSeats();
+      }
+
+      function fillAiSeat() {
+        for (let seat = 1; seat <= playerCount; seat += 1) {
+          if (!occupiedSeats.has(seat)) {
+            occupiedSeats.add(seat);
+            renderSeats();
+            return;
+          }
+        }
+      }
+
+      function renderStageActions(phase) {
+        if (!canCurrentUserAct(phase)) {
+          return '<div class="target-chip">等待中</div>';
+        }
+
+        if (canSelectTarget(phase)) {
+          if (selectedTarget) {
+            return `
+              <div class="target-confirm">
+                <div class="target-confirm-avatar" onclick="clearTarget()">${selectedTarget}</div>
+                <div class="target-confirm-name">${selectedTarget}号</div>
+                <div class="target-confirm-copy">${confirmCopy(phase, selectedTarget)}</div>
+                <button class="stage-confirm">${actionLabel(phase)}</button>
+              </div>
+            `;
+          }
+          const options = selectableSeats(phase)
+            .map((seat) => `<option value="${seat}">${seat}号 · ${playerFullName(seat)}</option>`)
+            .join('');
+          return `
+            <select class="target-select" id="target-select" onchange="selectTarget(Number(this.value))">
+              <option value="">选择玩家</option>
+              ${options}
+            </select>
+          `;
+        }
+
+        return `
+          <button class="stage-confirm">${phase.primary}</button>
+          <button class="stage-skip">${phase.secondary}</button>
+        `;
+      }
+
+      function selectTarget(seat) {
+        selectedTarget = seat;
+        const phase = phases.find((item) => item.id === currentPhase) || phases[0];
+        document.getElementById('phase-kicker').textContent = '确认目标';
+        document.getElementById('phase-title').textContent = '';
+        document.getElementById('phase-copy').textContent = '';
+        document.getElementById('target-row').innerHTML = renderStageActions(phase);
+        renderSeats();
+      }
+
+      function clearTarget() {
+        selectedTarget = null;
+        const phase = phases.find((item) => item.id === currentPhase) || phases[0];
+        document.getElementById('phase-kicker').textContent = phase.kicker;
+        document.getElementById('phase-title').textContent = phase.title;
+        document.getElementById('phase-copy').textContent = phase.copy;
+        document.getElementById('target-row').innerHTML = renderStageActions(phase);
+        renderSeats();
+      }
+
+      function startGameFromLobby() {
+        if (occupiedSeats.size < playerCount) {
+          document.getElementById('start-copy').textContent = `当前 ${occupiedSeats.size}/${playerCount} 人，可以补 AI 玩家后开始，也可以继续等待真实玩家加入。`;
+          document.body.classList.add('start-open');
+          return;
+        }
+        setPhase('deal');
+      }
+
+      function closeStartDialog() {
+        document.body.classList.remove('start-open');
+      }
+
+      function fillAiAndDeal() {
+        for (let seat = 1; seat <= playerCount; seat += 1) {
+          occupiedSeats.add(seat);
+        }
+        document.body.classList.remove('start-open');
+        setPhase('deal');
+      }
+
+      function openRoleCard() {
+        document.body.classList.add('role-card-open');
+      }
+
+      function confirmRoleCard() {
+        roleCardConfirmed = true;
+        document.body.classList.remove('role-card-open');
+        document.getElementById('role-card-entry').classList.add('visible');
+        if (currentPhase === 'deal') {
+          setPhase('night');
+        }
+      }
+
+      function updateBreadcrumb() {
+        const phase = phases.find((item) => item.id === currentPhase) || phases[0];
+        document.getElementById('phase-crumb').textContent = phase.label;
+        const countCrumb = document.querySelector('.breadcrumb span:nth-child(3)');
+        if (countCrumb) countCrumb.textContent = `${playerCount}人局`;
+      }
+
+      function renderPlayerCountButtons() {
+        document.getElementById('player-counts').innerHTML = [6, 7, 8, 9, 10, 11, 12]
+          .map((count) => `<button class="${count === playerCount ? 'active' : ''}" onclick="setPlayerCount(${count})">${count}人</button>`)
+          .join('');
+      }
+
+      function renderPhaseButtons() {
+        const buttons = phases
+          .map((phase) => `<button class="${phase.id === currentPhase ? 'active' : ''}" onclick="setPhase('${phase.id}')">${phase.label}</button>`)
+          .join('');
+        document.getElementById('phase-buttons').innerHTML = buttons;
+        document.getElementById('phase-strip').innerHTML = buttons;
+      }
+
+      function setRole(role) {
+        myRole = role;
+        renderRoleButtons();
+        setPhase(currentPhase);
+      }
+
+      function renderRoleButtons() {
+        const roles = [
+          ['villager', '村民'],
+          ['guard', '守卫'],
+          ['werewolf', '狼人'],
+          ['witch', '女巫'],
+          ['seer', '预言家']
+        ];
+        document.getElementById('role-buttons').innerHTML = roles
+          .map(([role, label]) => `<button class="${role === myRole ? 'active' : ''}" onclick="setRole('${role}')">${label}</button>`)
+          .join('');
+      }
+
+      function toggleLogs() {
+        document.body.classList.toggle('logs-open');
+      }
+
+      const logButton = document.getElementById('log-peek');
+      let logDrag = null;
+
+      logButton.addEventListener('pointerdown', (event) => {
+        if (logButton.classList.contains('hidden')) return;
+        logDrag = {
+          startX: event.clientX,
+          startY: event.clientY,
+          moved: false,
+          width: logButton.offsetWidth,
+          height: logButton.offsetHeight
+        };
+        logButton.classList.add('dragging');
+        logButton.setPointerCapture(event.pointerId);
+      });
+
+      logButton.addEventListener('pointermove', (event) => {
+        if (!logDrag) return;
+        const dx = event.clientX - logDrag.startX;
+        const dy = event.clientY - logDrag.startY;
+        if (Math.abs(dx) + Math.abs(dy) > 4) logDrag.moved = true;
+        const x = Math.max(8, Math.min(window.innerWidth - logDrag.width - 8, event.clientX - logDrag.width / 2));
+        const y = Math.max(8, Math.min(window.innerHeight - logDrag.height - 8, event.clientY - logDrag.height / 2));
+        logButton.style.left = `${x}px`;
+        logButton.style.top = `${y}px`;
+        logButton.style.right = 'auto';
+        logButton.style.bottom = 'auto';
+        logButton.style.transform = 'none';
+      });
+
+      logButton.addEventListener('pointerup', (event) => {
+        if (!logDrag) return;
+        logButton.classList.remove('dragging');
+        logButton.releasePointerCapture(event.pointerId);
+        if (!logDrag.moved) toggleLogs();
+        logDrag = null;
+      });
+
+      function togglePreview() {
+        document.body.classList.toggle('preview-open');
+      }
+
+      function openProfile(seat) {
+        const state = playerState(seat);
+        document.getElementById('profile-avatar').textContent = seat;
+        document.getElementById('profile-name').textContent = playerFullName(seat);
+        document.getElementById('profile-meta').textContent = `${seat}号位 · ${state === 'dead' ? '阵亡' : '存活'}`;
+        document.getElementById('profile-seat').textContent = `${seat}号`;
+        document.getElementById('profile-state').textContent = state === 'dead' ? '阵亡' : '存活';
+        document.getElementById('profile-kind').textContent = seat === mySeat ? '你' : '玩家';
+        document.body.classList.add('profile-open');
+      }
+
+      function closeProfile() {
+        document.body.classList.remove('profile-open');
+      }
+
+      function closeOverlays() {
+        document.body.classList.remove('logs-open', 'profile-open', 'start-open', 'role-card-open');
+      }
+
+      window.addEventListener('resize', renderSeats);
+      renderPlayerCountButtons();
+      renderRoleButtons();
+      setPhase(currentPhase);
+    </script>
+  </body>
+</html>

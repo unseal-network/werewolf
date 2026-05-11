@@ -31,7 +31,7 @@ const targetPlayerSchema = {
 export function buildAgentTurnTools(
   input: BuildAgentTurnToolsInput
 ): Record<string, ToolDeclaration> {
-  if (input.phase === "day_vote") {
+  if (input.phase === "day_vote" || input.phase === "tie_vote") {
     return {
       submitVote: {
         description: "Vote to exile one living player other than yourself.",
@@ -44,7 +44,7 @@ export function buildAgentTurnTools(
     };
   }
 
-  if (input.phase === "day_speak") {
+  if (input.phase === "day_speak" || input.phase === "tie_speech") {
     return {
       saySpeech: {
         description: "Say your public speech for the current turn.",

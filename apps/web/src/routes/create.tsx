@@ -1,88 +1,116 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createApiClient } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 
-export function CreateGamePage() {
-  const [title, setTitle] = useState("狼人杀");
-  const [sourceMatrixRoomId, setSourceMatrixRoomId] =
-    useState("!room:example.com");
-  const [targetPlayerCount, setTargetPlayerCount] = useState(6);
-  const [matrixToken, setMatrixToken] = useState(
-    localStorage.getItem("matrixToken") ?? "matrix-token-alice"
+const DEMO_TOKEN = "syt_a2ltaWdhbWUx_WEnXKgiFtirbEiSPTMwU_2p1YIY";
+
+export function CreateGamePage({
+  initialError,
+}: {
+  initialError?: string | undefined;
+} = {}) {
+  const { t, locale, setLocale } = useI18n();
+  const [title, setTitle] = useState(t("create.gameTitleDefault"));
+  const defaultRoom = import.meta.env.VITE_DEMO_ROOM ?? "!FWTlpFYoOXfndnfReT:keepsecret.io";
+  const [sourceMatrixRoomId, setSourceMatrixRoomId] = useState(
+    () => localStorage.getItem("lastSourceMatrixRoomId") ?? defaultRoom
   );
-  const [createdUrl, setCreatedUrl] = useState("");
-  const [error, setError] = useState("");
+  const targetPlayerCount = 12;
+  const [language, setLanguage] = useState<"zh-CN" | "en">("zh-CN");
+  const [error, setError] = useState(initialError ?? "");
 
   const client = useMemo(
     () =>
       createApiClient({
         baseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000",
-        getMatrixToken: () => matrixToken,
+        getMatrixToken: () => DEMO_TOKEN,
       }),
-    [matrixToken]
+    []
   );
+
+  useEffect(() => {
+    setTitle((current) => {
+      if (current === "" || current === "狼人杀" || current === "Werewolf Room") {
+        return t("create.gameTitleDefault");
+      }
+      return current;
+    });
+  }, [t]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
-    localStorage.setItem("matrixToken", matrixToken);
+    if (sourceMatrixRoomId) {
+      localStorage.setItem("lastSourceMatrixRoomId", sourceMatrixRoomId);
+    }
 
     try {
       const result = await client.createGame({
         sourceMatrixRoomId,
         title,
         targetPlayerCount,
+        language,
         timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
         allowedSourceMatrixRoomIds: [],
       });
-      setCreatedUrl(
-        `${window.location.pathname}?gameRoomId=${result.gameRoomId}`
-      );
+      const url = `${window.location.pathname}?gameRoomId=${result.gameRoomId}`;
+      window.location.href = url;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     }
   }
 
   return (
-    <section style={{ margin: "0 auto", maxWidth: 920, padding: 24 }}>
-      <form
-        onSubmit={submit}
-        style={{
-          display: "grid",
-          gap: 16,
-          maxWidth: 560,
-        }}
-      >
-        <h1 style={{ fontSize: 40, margin: "24px 0 8px" }}>Werewolf</h1>
-        <label style={{ display: "grid", gap: 6 }}>
-          Matrix Token
-          <input value={matrixToken} onChange={(event) => setMatrixToken(event.target.value)} />
-        </label>
-        <label style={{ display: "grid", gap: 6 }}>
-          Title
-          <input value={title} onChange={(event) => setTitle(event.target.value)} />
-        </label>
-        <label style={{ display: "grid", gap: 6 }}>
-          Source Matrix Room
-          <input value={sourceMatrixRoomId} onChange={(event) => setSourceMatrixRoomId(event.target.value)} />
-        </label>
-        <label style={{ display: "grid", gap: 6 }}>
-          Players
-          <input
-            type="number"
-            min={6}
-            max={12}
-            value={targetPlayerCount}
-            onChange={(event) => setTargetPlayerCount(Number(event.target.value))}
-          />
-        </label>
-        <button type="submit">Create Game</button>
-        {createdUrl ? (
-          <a href={createdUrl} style={{ color: "#86d7ff" }}>
-            Open game room
-          </a>
-        ) : null}
-        {error ? <p style={{ color: "#ffb4a9" }}>{error}</p> : null}
-      </form>
+    <section className="create-page">
+      <div className="create-card">
+        <header className="create-header">
+          <h1>{t("create.title")}</h1>
+          <div className="locale-switcher inline" role="group" aria-label={t("common.languageLabel")}>
+            <button
+              type="button"
+              className={locale === "zh-CN" ? "active" : ""}
+              onClick={() => setLocale("zh-CN")}
+            >
+              中
+            </button>
+            <button
+              type="button"
+              className={locale === "en" ? "active" : ""}
+              onClick={() => setLocale("en")}
+            >
+              EN
+            </button>
+          </div>
+        </header>
+        <form onSubmit={submit} className="create-form">
+          <label>
+            {t("create.gameTitle")}
+            <input value={title} onChange={(event) => setTitle(event.target.value)} />
+          </label>
+          <label>
+            {t("create.sourceRoom")}
+            <input
+              value={sourceMatrixRoomId}
+              onChange={(event) => setSourceMatrixRoomId(event.target.value)}
+              placeholder="!room:example.com"
+            />
+          </label>
+          <label>
+            {t("create.language")}
+            <select
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as "zh-CN" | "en")}
+            >
+              <option value="zh-CN">{t("create.languageZh")}</option>
+              <option value="en">{t("create.languageEn")}</option>
+            </select>
+          </label>
+          <button type="submit" className="action-primary">
+            {t("create.submit")}
+          </button>
+          {error ? <p className="create-error">{error}</p> : null}
+        </form>
+      </div>
     </section>
   );
 }

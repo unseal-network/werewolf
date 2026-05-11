@@ -4,7 +4,8 @@ import { playerKindSchema, roomStatusSchema } from "./domain";
 export const createGameRequestSchema = z.object({
   sourceMatrixRoomId: z.string().min(1),
   title: z.string().min(1).max(80),
-  targetPlayerCount: z.number().int().min(6).max(12),
+  targetPlayerCount: z.number().int().min(6).max(12).optional(),
+  language: z.enum(["zh-CN", "en"]).default("zh-CN"),
   timing: z.object({
     nightActionSeconds: z.number().int().min(10).max(300).default(45),
     speechSeconds: z.number().int().min(10).max(300).default(60),

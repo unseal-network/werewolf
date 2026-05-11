@@ -13,25 +13,157 @@
         margin: 0;
         padding: 24px;
       }
-      pre {
+      .timeline {
+        display: grid;
+        gap: 10px;
+        max-width: 1180px;
+      }
+      .entry {
         background: #202226;
         border: 1px solid #393d44;
-        padding: 16px;
+        border-left: 5px solid #59606d;
+        border-radius: 8px;
+        padding: 10px 12px;
+        line-height: 1.45;
         white-space: pre-wrap;
+      }
+      .meta { border-left-color: #7e8798; color: #d8dde8; }
+      .phase { border-left-color: #75b7ff; background: #1d2630; }
+      .agent { border-left-color: #b794f4; background: #241f2d; }
+      .speech { border-left-color: #76e4b2; background: #1b2824; }
+      .action { border-left-color: #ff9f68; background: #2b211d; }
+      .vote { border-left-color: #ffd166; background: #2d281a; }
+      .result { border-left-color: #9be28f; background: #202a20; }
+      .wait { border-left-color: #8b949e; color: #aeb6c2; background: #1b1d21; }
+      .error { border-left-color: #ff6b6b; background: #2b1d1f; }
+      .headline {
+        color: #ffffff;
+        font-weight: 800;
+        margin-top: 18px;
       }
     </style>
   </head>
   <body>
     <h1>Werewolf Runtime Verification</h1>
-    <pre id="out">Running...</pre>
+    <div id="out" class="timeline"><div class="entry meta">Running...</div></div>
     <script type="module">
       const out = document.getElementById("out");
-      const config = JSON.parse(decodeURIComponent(location.hash.slice(1)));
+      const config = location.hash
+        ? JSON.parse(decodeURIComponent(location.hash.slice(1)))
+        : await fetch("/verify-config.local.json").then((response) =>
+            response.json()
+          );
       const api = config.api ?? "http://localhost:3000";
       const roomId = config.roomId ?? "!FWTlpFYoOXfndnfReT:keepsecret.io";
+      const targetPlayerCount = config.targetPlayerCount ?? 6;
+      const queryLanguage = new URLSearchParams(location.search).get("lang");
+      const language =
+        queryLanguage === "en" || queryLanguage === "zh-CN"
+          ? queryLanguage
+          : config.language ?? "zh-CN";
+      const tokens = config.tokens.slice(0, targetPlayerCount);
+      const players = new Map();
+      const roles = new Map();
+      const latestToolByPlayer = new Map();
 
       function log(...args) {
-        out.textContent += `${args.join(" ")}\n`;
+        appendLine(args.join(" "), "meta");
+      }
+
+      function appendLine(text, kind = "meta") {
+        const row = document.createElement("div");
+        row.className = `entry ${kind}`;
+        row.textContent = text;
+        out.appendChild(row);
+        row.scrollIntoView({ block: "nearest" });
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function playerName(playerId) {
+        const player = players.get(playerId);
+        const role = roles.get(playerId);
+        if (!player) return playerId ?? "none";
+        return role
+          ? `${player.displayName}(${player.id}, ${role})`
+          : `${player.displayName}(${player.id})`;
+      }
+
+      function actionLine(action) {
+        if (!action) return "unknown action";
+        if (action.kind === "passAction") {
+          return `${playerName(action.actorPlayerId)} passed`;
+        }
+        return `${playerName(action.actorPlayerId)} -> ${action.kind} -> ${playerName(action.targetPlayerId)}`;
+      }
+
+      function describeEvent(event) {
+        if (event.type === "agent_llm_requested") {
+          return { kind: "agent", text: `🤖 Agent request: ${playerName(event.subjectId)} phase=${event.payload.phase}` };
+        }
+        if (event.type === "agent_llm_completed") {
+          latestToolByPlayer.set(event.subjectId, event.payload.toolName ?? "text");
+          return { kind: "agent", text: `🧰 Agent tool-call: ${playerName(event.subjectId)} tool=${event.payload.toolName ?? "text"}` };
+        }
+        if (event.type === "agent_turn_failed") {
+          return { kind: "error", text: `⚠️ Agent deadline/failure: ${playerName(event.subjectId)} error=${event.payload.error}` };
+        }
+        if (event.type === "night_action_submitted") {
+          return { kind: "action", text: `🗡️ Runtime accepted night action: ${actionLine(event.payload.action)} (from tool=${latestToolByPlayer.get(event.actorId) ?? "unknown"})` };
+        }
+        if (event.type === "wolf_vote_submitted") {
+          return { kind: "vote", text: `🗳️ Wolf vote: ${playerName(event.actorId)} -> ${playerName(event.subjectId)} (from tool=${latestToolByPlayer.get(event.actorId) ?? "unknown"})` };
+        }
+        if (event.type === "wolf_vote_resolved") {
+          return { kind: "vote", text: `🧮 Wolf vote resolved: tally=${JSON.stringify(event.payload.tally)} target=${playerName(event.payload.targetPlayerId)} tied=${(event.payload.tiedPlayerIds ?? []).map(playerName).join(", ") || "none"} valid=${event.payload.valid}` };
+        }
+        if (event.type === "seer_result_revealed") {
+          return { kind: "action", text: `🔮 Seer private result: ${playerName(event.payload.seerPlayerId)} inspected ${playerName(event.payload.inspectedPlayerId)} => ${event.payload.alignment}` };
+        }
+        if (event.type === "night_resolved") {
+          return { kind: "result", text: [
+            "✅ Night resolution:",
+            `wolfTarget=${playerName(event.payload.wolfTarget)}`,
+            `guardTarget=${playerName(event.payload.guardTarget)}`,
+            `healTarget=${playerName(event.payload.healTarget)}`,
+            `guardAndHealConflict=${event.payload.guardAndHealConflict ? "yes" : "no"}`,
+            `poisonTarget=${playerName(event.payload.poisonTarget)}`,
+            `eliminated=${(event.payload.eliminatedPlayerIds ?? []).map(playerName).join(", ") || "none"}`,
+          ].join(" ") };
+        }
+        if (event.type === "speech_submitted") {
+          return { kind: "speech", text: `💬 ${playerName(event.actorId)}: ${event.payload.speech}` };
+        }
+        if (event.type === "vote_submitted") {
+          return { kind: "vote", text: `🗳️ Exile vote: ${playerName(event.actorId)} -> ${playerName(event.subjectId)} (from tool=${latestToolByPlayer.get(event.actorId) ?? "unknown"})` };
+        }
+        if (event.type === "phase_closed") {
+          return { kind: "result", text: `✅ Vote tally: ${JSON.stringify(event.payload.tally)} exiled=${playerName(event.payload.exiledPlayerId)} tied=${(event.payload.tiedPlayerIds ?? []).map(playerName).join(", ") || "none"}` };
+        }
+        if (event.type === "player_eliminated") {
+          return { kind: "result", text: `☠️ Eliminated: ${playerName(event.subjectId)} reason=${event.payload.reason}` };
+        }
+        if (event.type === "phase_started") {
+          return { kind: "phase", text: `🌙 Phase -> ${event.payload.phase} deadlineAt=${event.payload.deadlineAt ?? "none"}` };
+        }
+        if (event.type === "game_ended") {
+          return { kind: "result", text: `🏁 Game ended: winner=${event.payload.winner}` };
+        }
+        return null;
+      }
+
+      function logTick(index, phase, events) {
+        appendLine("", "meta");
+        const eventPhase =
+          events.find((event) => typeof event.payload?.phase === "string")
+            ?.payload.phase ?? phase;
+        appendLine(`🌙 tick ${index + 1}: ran phase=${eventPhase}; next projection.phase=${phase}`, "phase");
+        for (const event of events) {
+          const item = describeEvent(event);
+          if (item) appendLine(item.text, item.kind);
+        }
       }
 
       async function request(path, token, init = {}) {
@@ -52,7 +184,7 @@
       }
 
       try {
-        out.textContent = "";
+        out.innerHTML = "";
         const whoami = await fetch(
           "https://keepsecret.io/_matrix/client/v3/account/whoami",
           { headers: { authorization: `Bearer ${config.tokens[0]}` } }
@@ -64,7 +196,8 @@
           body: JSON.stringify({
             sourceMatrixRoomId: roomId,
             title: "Browser Real Runtime Verification",
-            targetPlayerCount: 6,
+            targetPlayerCount,
+            language,
             timing: {
               nightActionSeconds: 45,
               speechSeconds: 60,
@@ -76,12 +209,13 @@
         });
         log("create", created.gameRoomId, created.card.sourceMatrixRoomId);
 
-        for (const [index, token] of config.tokens.entries()) {
+        for (const [index, token] of tokens.entries()) {
           const joined = await request(
             `/games/${created.gameRoomId}/join`,
             token,
             { method: "POST" }
           );
+          players.set(joined.player.id, joined.player);
           log("join", index + 1, joined.player.displayName, joined.player.id);
         }
 
@@ -90,10 +224,22 @@
           config.tokens[0],
           { method: "POST" }
         );
+        for (const state of started.privateStates) {
+          roles.set(state.playerId, state.role);
+        }
         log("start", started.status, started.projection.phase);
+        log("language", language);
+        log(
+          "roles",
+          started.privateStates
+            .map((state) => `${playerName(state.playerId)}=${state.role}`)
+            .join(", ")
+        );
+        log("");
+        log("Proof chain: AgentRuntime tool-call -> GameRuntime accepted event -> GameRuntime resolution");
 
         let finalProjection = started.projection;
-        for (let index = 0; index < 30; index += 1) {
+        for (let index = 0; index < (config.maxTicks ?? 80); index += 1) {
           const tick = await request(
             `/games/${created.gameRoomId}/runtime/tick`,
             config.tokens[0],
@@ -101,18 +247,23 @@
               method: "POST",
               body: JSON.stringify({
                 agentApiKey: config.agentApiKey,
+                agentTimeoutMs: config.agentTimeoutMs ?? 15000,
                 agentApiBaseUrl:
                   "https://un-server.dev-excel-alt.pagepeek.org/api",
               }),
             }
           );
           finalProjection = tick.projection;
-          log(
-            "tick",
-            index + 1,
-            tick.projection.phase,
-            tick.events.map((event) => event.type).join(",")
-          );
+          if (tick.events.length === 0) {
+            appendLine(
+              `⏳ waiting: phase=${tick.projection.phase} deadlineAt=${tick.projection.deadlineAt}`,
+              "wait"
+            );
+            await sleep(1000);
+            index -= 1;
+            continue;
+          }
+          logTick(index, tick.projection.phase, tick.events);
           if (tick.done) break;
         }
 

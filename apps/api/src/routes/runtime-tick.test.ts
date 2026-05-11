@@ -47,7 +47,54 @@ describe("runtime tick API", () => {
     const app = createApp({
       ...createTestDeps(),
       async runAgentTurn(input) {
-        return `${input.displayName} speaks during ${input.phase}.`;
+        if (input.phase === "day_speak" || input.phase === "tie_speech") {
+          return {
+            text: `${input.displayName} speaks during ${input.phase}.`,
+            toolName: "saySpeech",
+            input: { speech: `${input.displayName} speaks during ${input.phase}.` },
+          };
+        }
+        if ("saySpeech" in input.tools) {
+          return {
+            text: `${input.displayName} discusses during ${input.phase}.`,
+            toolName: "saySpeech",
+            input: { speech: `${input.displayName} discusses during ${input.phase}.` },
+          };
+        }
+        const promptedTarget = input.prompt.match(/(?:on|targets are:|Suggested target:) (player_\d+)/)?.[1];
+        if (input.phase === "night_guard") {
+          return {
+            text: "",
+            toolName: "guardProtect",
+            input: { targetPlayerId: promptedTarget },
+          };
+        }
+        if (input.phase === "night_wolf") {
+          return {
+            text: "",
+            toolName: "wolfKill",
+            input: { targetPlayerId: promptedTarget },
+          };
+        }
+        if (input.phase === "night_witch_heal" || input.phase === "night_witch_poison") {
+          return { text: "", toolName: "passAction", input: {} };
+        }
+        if (input.phase === "night_seer") {
+          return {
+            text: "",
+            toolName: "seerInspect",
+            input: { targetPlayerId: promptedTarget },
+          };
+        }
+        if (input.phase === "day_vote" || input.phase === "tie_vote") {
+          const target = input.prompt.match(/submitVote on (player_\d+)/)?.[1];
+          return {
+            text: "",
+            toolName: "submitVote",
+            input: { targetPlayerId: target },
+          };
+        }
+        return { text: `${input.displayName} passes.`, toolName: "passAction", input: {} };
       },
     });
     const gameRoomId = await createStartedGame(app);
@@ -64,7 +111,7 @@ describe("runtime tick API", () => {
       const body = (await tick.json()) as {
         done: boolean;
         projection: { winner: string | null };
-        events: Array<{ type: string }>;
+        events: Array<{ type: string; payload?: { toolName?: string; action?: { kind?: string } } }>;
       };
       done = body.done;
       winner = body.projection.winner;
@@ -74,6 +121,11 @@ describe("runtime tick API", () => {
     expect(done).toBe(true);
     expect(winner).toBe("good");
     expect(eventTypes).toContain("night_action_submitted");
+    expect(eventTypes).toContain("wolf_vote_submitted");
+    expect(eventTypes).toContain("wolf_vote_resolved");
+    expect(eventTypes).toContain("seer_result_revealed");
+    expect(eventTypes).toContain("agent_llm_requested");
+    expect(eventTypes).toContain("agent_llm_completed");
     expect(eventTypes).toContain("night_resolved");
     expect(eventTypes).toContain("speech_submitted");
     expect(eventTypes).toContain("vote_submitted");

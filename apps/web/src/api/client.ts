@@ -1,3 +1,11 @@
+type PlayerKind = "user" | "agent";
+
+type RoomStatus = "created" | "waiting" | "active" | "paused" | "ended";
+
+type RoleId = "werewolf" | "seer" | "witch" | "guard" | "villager";
+
+type PlayerRoleState = "wolf" | "good";
+
 export interface ApiClientOptions {
   baseUrl: string;
   getMatrixToken(): string;
@@ -14,8 +22,13 @@ export interface CreatedGame {
 export interface JoinedPlayer {
   player: {
     id: string;
+    userId?: string;
     displayName: string;
-    status: string;
+    seatNo: number;
+    kind: PlayerKind;
+    ready: boolean;
+    onlineState: "online" | "offline";
+    leftAt: string | null;
   };
 }
 
@@ -34,10 +47,99 @@ export interface RuntimeTickDto {
   status: string;
   done: boolean;
   projection: {
+    gameRoomId: string;
+    status: RoomStatus;
     phase: string;
+    day: number;
+    deadlineAt: string | null;
+    currentSpeakerPlayerId: string | null;
     winner: "wolf" | "good" | null;
+    alivePlayerIds: string[];
+    version: number;
   };
   events: GameEventDto[];
+}
+
+export interface RoomPlayer {
+  id: string;
+  userId?: string;
+  agentId?: string;
+  displayName: string;
+  seatNo: number;
+  kind: PlayerKind;
+  ready: boolean;
+  onlineState: "online" | "offline";
+  leftAt: string | null;
+}
+
+export interface RoomProjection {
+  gameRoomId: string;
+  status: RoomStatus;
+  phase: string | null;
+  day: number;
+  deadlineAt: string | null;
+  currentSpeakerPlayerId: string | null;
+  winner: "wolf" | "good" | null;
+  alivePlayerIds: string[];
+  version: number;
+}
+
+export interface PlayerPrivateState {
+  playerId: string;
+  role: RoleId;
+  team: PlayerRoleState;
+  alive: boolean;
+  knownTeammatePlayerIds: string[];
+  witchItems?: {
+    healAvailable: boolean;
+    poisonAvailable: boolean;
+  };
+}
+
+export interface GameRoom {
+  id: string;
+  title: string;
+  status: RoomStatus;
+  targetPlayerCount: number;
+  creatorUserId: string;
+  language: "zh-CN" | "en";
+  timing?: {
+    nightActionSeconds: number;
+    speechSeconds: number;
+    voteSeconds: number;
+  };
+  createdFromMatrixRoomId: string;
+  allowedSourceMatrixRoomIds: string[];
+  players: RoomPlayer[];
+  projection: RoomProjection | null;
+  sourceMatrixRoomId?: string;
+}
+
+export interface GetGameResponse {
+  room: GameRoom;
+  projection: RoomProjection | null;
+  privateStates: PlayerPrivateState[];
+  events: GameEventDto[];
+}
+
+export interface MatrixWhoAmI {
+  user_id?: string;
+  display_name?: string;
+}
+
+export interface AgentCandidate {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  userType: string;
+  membership: string;
+  alreadyJoined: boolean;
+}
+
+export interface AgentCandidatesResponse {
+  agents: AgentCandidate[];
+  total: number;
+  roomId: string;
 }
 
 export function createApiClient(options: ApiClientOptions) {
@@ -70,8 +172,27 @@ export function createApiClient(options: ApiClientOptions) {
         method: "POST",
       });
     },
+    leaveGame(gameRoomId: string) {
+      return request<{ player: RoomPlayer }>(`/games/${gameRoomId}/leave`, {
+        method: "POST",
+      });
+    },
+    swapSeat(gameRoomId: string, seatNo: number) {
+      return request<{ player: RoomPlayer; swappedWith: RoomPlayer | null }>(
+        `/games/${gameRoomId}/seat`,
+        {
+          method: "POST",
+          body: JSON.stringify({ seatNo }),
+        }
+      );
+    },
     startGame(gameRoomId: string) {
-      return request<{ status: string }>(`/games/${gameRoomId}/start`, {
+      return request<{
+        status: string;
+        projection: RoomProjection;
+        privateStates: PlayerPrivateState[];
+        events: GameEventDto[];
+      }>(`/games/${gameRoomId}/start`, {
         method: "POST",
       });
     },
@@ -85,13 +206,67 @@ export function createApiClient(options: ApiClientOptions) {
       });
     },
     getGame(gameRoomId: string) {
+      return request<GetGameResponse>(`/games/${gameRoomId}`);
+    },
+    listAgentCandidates(gameRoomId: string) {
+      return request<AgentCandidatesResponse>(
+        `/games/${gameRoomId}/agent-candidates`
+      );
+    },
+    addAgentPlayer(gameRoomId: string, agentUserId: string, displayName?: string) {
+      return request<{ player: RoomPlayer }>(`/games/${gameRoomId}/agents`, {
+        method: "POST",
+        body: JSON.stringify({ agentUserId, displayName }),
+      });
+    },
+    removePlayer(gameRoomId: string, playerId: string) {
+      return request<{ player: RoomPlayer }>(
+        `/games/${gameRoomId}/players/${encodeURIComponent(playerId)}`,
+        { method: "DELETE" }
+      );
+    },
+    submitAction(
+      gameRoomId: string,
+      body: {
+        kind: "speech" | "speechComplete" | "vote" | "nightAction" | "pass";
+        targetPlayerId?: string;
+        speech?: string;
+      }
+    ) {
+      return request<{ success: boolean; event?: GameEventDto }>(
+        `/games/${gameRoomId}/actions`,
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        }
+      );
+    },
+    getLivekitToken(gameRoomId: string) {
       return request<{
-        projection: RuntimeTickDto["projection"] | null;
-        events: GameEventDto[];
-      }>(`/games/${gameRoomId}`);
+        token: string;
+        serverUrl: string;
+        room: string;
+        identity: string;
+      }>(`/games/${gameRoomId}/livekit-token`, {
+        method: "POST",
+      });
     },
     subscribeUrl(gameRoomId: string) {
       return `${options.baseUrl}/games/${gameRoomId}/subscribe`;
+    },
+    async whoAmI(matrixServerBase: string): Promise<MatrixWhoAmI> {
+      const response = await fetch(
+        `${matrixServerBase}/_matrix/client/v3/account/whoami`,
+        {
+          headers: {
+            authorization: `Bearer ${options.getMatrixToken()}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Matrix whoami failed: HTTP ${response.status}`);
+      }
+      return (await response.json()) as MatrixWhoAmI;
     },
   };
 }

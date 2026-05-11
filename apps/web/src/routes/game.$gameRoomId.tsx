@@ -1,168 +1,1274 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  createApiClient,
-  type GameEventDto,
-  type JoinedPlayer,
-} from "../api/client";
-import { GameTable } from "../components/GameTable";
-import { PrivatePanel } from "../components/PrivatePanel";
-import { WaitingRoom } from "../components/WaitingRoom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createApiClient, type GameEventDto, type GameRoom, type RoomPlayer, type PlayerPrivateState, type RoomProjection } from "../api/client";
+import { GameRoomShell } from "../components/GameRoomShell";
+import { CenterStage, type ActionMode, type ConfirmMode } from "../components/CenterStage";
+import { TimelineCapsule } from "../components/TimelineCapsule";
+import { RoleCardLayer } from "../components/RoleCardLayer";
+import { UserInfoPanel } from "../components/UserInfoPanel";
+import { StartDialog } from "../components/StartDialog";
+import { AgentPicker } from "../components/AgentPicker";
+import { VoiceRoomProvider } from "../components/VoiceRoom";
+import type { AgentCandidate } from "../api/client";
+import { getPhaseAnimationCue } from "../animation/phaseCatalog";
+import { useT } from "../i18n/I18nProvider";
+import type { SceneId } from "../components/GameRoomShell";
+import type { EngineGameState } from "../engine/GameEngine";
+
+interface PhaseDressing {
+  scene: SceneId;
+  accent: string;
+  kickerKey: string;
+  copyKey: string;
+  confirmMode: ConfirmMode;
+}
+
+const PHASE_DRESSING: Record<string, PhaseDressing> = {
+  lobby: { scene: "lobby", accent: "#435cff", kickerKey: "stage.kicker.lobby", copyKey: "", confirmMode: "vote" },
+  deal: { scene: "deal", accent: "#7357d9", kickerKey: "stage.kicker.deal", copyKey: "", confirmMode: "vote" },
+  guard: { scene: "night", accent: "#2c8cff", kickerKey: "stage.kicker.guard", copyKey: "", confirmMode: "guard" },
+  wolf: { scene: "night", accent: "#c43d4d", kickerKey: "stage.kicker.wolf", copyKey: "", confirmMode: "wolf" },
+  "witch-save": { scene: "night", accent: "#28a86d", kickerKey: "stage.kicker.witchHeal", copyKey: "", confirmMode: "witch-save" },
+  "witch-poison": { scene: "night", accent: "#7751d9", kickerKey: "stage.kicker.witchPoison", copyKey: "", confirmMode: "witch-poison" },
+  seer: { scene: "night", accent: "#1d95b8", kickerKey: "stage.kicker.seer", copyKey: "", confirmMode: "seer" },
+  night: { scene: "night", accent: "#2c8cff", kickerKey: "stage.kicker.nightResolution", copyKey: "", confirmMode: "vote" },
+  day: { scene: "day", accent: "#d58b21", kickerKey: "stage.kicker.daySpeak", copyKey: "", confirmMode: "vote" },
+  dayResolution: { scene: "day", accent: "#d58b21", kickerKey: "stage.kicker.dayResolution", copyKey: "", confirmMode: "vote" },
+  vote: { scene: "vote", accent: "#d84848", kickerKey: "stage.kicker.dayVote", copyKey: "", confirmMode: "vote" },
+  tie: { scene: "tie", accent: "#b554d9", kickerKey: "stage.kicker.tieVote", copyKey: "", confirmMode: "vote" },
+  end: { scene: "end", accent: "#13a36c", kickerKey: "stage.kicker.end", copyKey: "", confirmMode: "vote" },
+};
+
+interface UserSeatState {
+  seatNo: number;
+  playerId: string | undefined;
+  displayName: string | undefined;
+  isEmpty: boolean;
+  kind: RoomPlayer["kind"] | undefined;
+  isDead: boolean;
+  isCurrentUser: boolean;
+  isActionTarget: boolean;
+  isSelected: boolean;
+  isCurrentSpeaker?: boolean;
+  isWolfTeammate?: boolean;
+}
+
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+
+function matrixServerBaseFromToken(token: string): string {
+  if (token.includes(":")) {
+    const atMatch = token.match(/@[^:]+:([^:]+)$/);
+    if (atMatch) {
+      return `https://${atMatch[1]}`;
+    }
+  }
+  const mxMatch = token.match(/\.([A-Za-z0-9.-]+)(?::\w+)?$/);
+  if (mxMatch) {
+    return `https://${mxMatch[1]}`;
+  }
+  return "https://keepsecret.io";
+}
+
+function stripPayloadFromEvent(raw: string): string {
+  if (raw.startsWith("data:")) {
+    return raw.slice(5).trim();
+  }
+  return raw;
+}
+
+function parseSseEvent(raw: string): GameEventDto | undefined {
+  if (!raw.trim()) return undefined;
+  try {
+    const candidate = JSON.parse(raw) as unknown;
+    if (!candidate || typeof candidate !== "object") {
+      return undefined;
+    }
+    if ("event" in candidate) {
+      const wrapped = (candidate as { event?: unknown }).event;
+      if (
+        wrapped &&
+        typeof wrapped === "object" &&
+        "id" in wrapped &&
+        "type" in wrapped
+      ) {
+        return wrapped as GameEventDto;
+      }
+    }
+    if ("id" in candidate && "type" in candidate) {
+      return candidate as GameEventDto;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Event types that reshape the public projection (phase / alive / status /
+ * speaker queue). When one of these arrives via SSE we refetch the snapshot
+ * once so the seat ring, phase rail and deadline timer stay in sync. All
+ * other events are append-only data driven by the events array.
+ */
+const PROJECTION_REFRESH_EVENT_TYPES = new Set<string>([
+  "game_started",
+  "phase_started",
+  "phase_closed",
+  "night_resolved",
+  "player_eliminated",
+  "player_seat_changed",
+  "game_ended",
+  "speech_submitted",
+  "vote_submitted",
+  "wolf_vote_resolved",
+]);
+
+/**
+ * Mirror server-side filterEventsForUser logic — the SSE channel sends all
+ * events for the room, the client drops ones it shouldn't see.
+ */
+function sseEventVisibleToMe(
+  event: GameEventDto,
+  myPrivateState: PlayerPrivateState | undefined
+): boolean {
+  if (event.visibility === "public") return true;
+  if (event.visibility === "runtime") return false;
+  if (event.visibility === "private:team:wolf") {
+    return myPrivateState?.team === "wolf";
+  }
+  if (event.visibility.startsWith("private:user:")) {
+    return event.visibility === `private:user:${myPrivateState?.playerId}`;
+  }
+  return false;
+}
+
+interface PhaseUiSpec {
+  phaseId: ReturnType<typeof getPhaseAnimationCue>["phaseId"];
+  labelKey: string;
+  rawLabel?: string;
+  actionMode: ActionMode;
+  canRunRuntime: boolean;
+  canProgress: boolean;
+  showTimeline: boolean;
+  showRoleCard: boolean;
+}
+
+function mapServerPhaseToUi(phase: string | null): PhaseUiSpec {
+  if (!phase) {
+    const cue = getPhaseAnimationCue("lobby");
+    return {
+      phaseId: cue.phaseId,
+      labelKey: "phase.lobby",
+      actionMode: "lobby",
+      canRunRuntime: false,
+      canProgress: false,
+      showTimeline: cue.allowTimeline,
+      showRoleCard: cue.showRoleCard,
+    };
+  }
+
+  switch (phase) {
+    case "role_assignment":
+      return {
+        phaseId: "deal",
+        labelKey: "phase.deal",
+        actionMode: "deal",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("deal").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("deal").showRoleCard,
+      };
+    case "night_guard":
+      return {
+        phaseId: "guard",
+        labelKey: "phase.guard",
+        actionMode: "night",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("guard").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("guard").showRoleCard,
+      };
+    case "night_wolf":
+      return {
+        phaseId: "wolf",
+        labelKey: "phase.wolf",
+        actionMode: "night",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("wolf").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("wolf").showRoleCard,
+      };
+    case "night_witch_heal":
+      return {
+        phaseId: "witch-save",
+        labelKey: "phase.witchHeal",
+        actionMode: "night",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("witch-save").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("witch-save").showRoleCard,
+      };
+    case "night_witch_poison":
+      return {
+        phaseId: "witch-poison",
+        labelKey: "phase.witchPoison",
+        actionMode: "night",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("witch-poison").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("witch-poison").showRoleCard,
+      };
+    case "night_seer":
+      return {
+        phaseId: "seer",
+        labelKey: "phase.seer",
+        actionMode: "night",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("seer").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("seer").showRoleCard,
+      };
+    case "night_resolution":
+      return {
+        phaseId: "night",
+        labelKey: "phase.nightResolution",
+        actionMode: "night",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("night").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("night").showRoleCard,
+      };
+    case "day_speak":
+      return {
+        phaseId: "day",
+        labelKey: "phase.daySpeak",
+        actionMode: "day",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("day").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("day").showRoleCard,
+      };
+    case "day_vote":
+      return {
+        phaseId: "vote",
+        labelKey: "phase.dayVote",
+        actionMode: "vote",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("vote").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("vote").showRoleCard,
+      };
+    case "tie_speech":
+      return {
+        phaseId: "day",
+        labelKey: "phase.tieSpeech",
+        actionMode: "day",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("day").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("day").showRoleCard,
+      };
+    case "tie_vote":
+      return {
+        phaseId: "tie",
+        labelKey: "phase.tieVote",
+        actionMode: "tie",
+        canRunRuntime: true,
+        canProgress: true,
+        showTimeline: getPhaseAnimationCue("tie").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("tie").showRoleCard,
+      };
+    case "day_resolution":
+      return {
+        phaseId: "dayResolution",
+        labelKey: "phase.dayResolution",
+        actionMode: "waiting",
+        canRunRuntime: true,
+        canProgress: false,
+        showTimeline: getPhaseAnimationCue("dayResolution").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("dayResolution").showRoleCard,
+      };
+    case "post_game":
+      return {
+        phaseId: "end",
+        labelKey: "phase.end",
+        actionMode: "end",
+        canRunRuntime: false,
+        canProgress: false,
+        showTimeline: getPhaseAnimationCue("end").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("end").showRoleCard,
+      };
+    default:
+      return {
+        phaseId: "lobby",
+        labelKey: "phase.lobby",
+        rawLabel: phase,
+        actionMode: "waiting",
+        canRunRuntime: false,
+        canProgress: false,
+        showTimeline: getPhaseAnimationCue("lobby").allowTimeline,
+        showRoleCard: getPhaseAnimationCue("lobby").showRoleCard,
+      };
+  }
+}
+
+function uniqueSeatOrder(players: RoomPlayer[]): RoomPlayer[] {
+  const bySeat = new Map<number, RoomPlayer>();
+  for (const player of players) {
+    if (player.leftAt) {
+      continue;
+    }
+    if (!bySeat.has(player.seatNo)) {
+      bySeat.set(player.seatNo, player);
+    }
+  }
+  return Array.from(bySeat.values());
+}
+
+function buildSeatView(
+  room: GameRoom | null,
+  targetPlayerCount: number,
+  currentPlayerId: string | undefined,
+  selectedTargetId: string | null,
+  legalTargetIds: Set<string>,
+  currentSpeakerPlayerId: string | undefined,
+  knownTeammatePlayerIds: Set<string> = new Set()
+): UserSeatState[] {
+  if (!room) {
+    return Array.from({ length: targetPlayerCount }, (_, index) => ({
+      seatNo: index + 1,
+      isEmpty: true,
+      isDead: false,
+      isCurrentUser: false,
+      isActionTarget: false,
+      isSelected: false,
+      isCurrentSpeaker: false,
+      isWolfTeammate: false,
+      playerId: undefined,
+      displayName: undefined,
+      kind: undefined,
+    }));
+  }
+
+  const alive = new Set(room.projection?.alivePlayerIds ?? []);
+  const isGameActive = room.projection !== null;
+  const active = uniqueSeatOrder(room.players);
+  const seats: UserSeatState[] = [];
+
+  for (let seatNo = 1; seatNo <= targetPlayerCount; seatNo += 1) {
+    const player = active.find((candidate) => candidate.seatNo === seatNo);
+    const playerId = player?.id;
+    seats.push({
+      seatNo,
+      playerId,
+      displayName: player?.displayName,
+      kind: player?.kind,
+      isEmpty: !player,
+      isDead: isGameActive && player ? !alive.has(player.id) : false,
+      isCurrentUser: player?.id === currentPlayerId,
+      isActionTarget: Boolean(playerId && legalTargetIds.has(playerId)),
+      isSelected: playerId === selectedTargetId,
+      isCurrentSpeaker: Boolean(playerId && currentSpeakerPlayerId && playerId === currentSpeakerPlayerId),
+      isWolfTeammate: Boolean(playerId && knownTeammatePlayerIds.has(playerId)),
+    });
+  }
+
+  return seats;
+}
+
+function parseTieCandidateIds(events: GameEventDto[]): string[] {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (!event || event.type !== "phase_closed") continue;
+    const tiedPlayerIds = event.payload?.tiedPlayerIds;
+    if (Array.isArray(tiedPlayerIds)) {
+      return tiedPlayerIds.filter((value): value is string => typeof value === "string");
+    }
+  }
+  return [];
+}
+
+function parseSeerCheckedIds(events: GameEventDto[], seerId?: string): Set<string> {
+  const checked = new Set<string>();
+  for (const event of events) {
+    if (event.type !== "seer_result_revealed") continue;
+    if (seerId && event.actorId && event.actorId !== seerId) continue;
+    const inspectedPlayerId = event.payload?.inspectedPlayerId;
+    if (typeof inspectedPlayerId === "string") {
+      checked.add(inspectedPlayerId);
+    }
+  }
+  return checked;
+}
+
+function parseCurrentSpeakerSeat(
+  players: RoomPlayer[],
+  projection: RoomProjection | null
+): number | undefined {
+  const speaker = projection?.currentSpeakerPlayerId;
+  if (!speaker) return undefined;
+  const player = players.find((candidate) => candidate.id === speaker);
+  return player?.seatNo;
+}
+
+const DEMO_TOKEN = "syt_a2ltaWdhbWUx_WEnXKgiFtirbEiSPTMwU_2p1YIY";
+const DEMO_USER_ID = "@kimigame1:keepsecret.io";
+const DEMO_DISPLAY_NAME = "kimi game 1";
 
 export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
-  const [matrixToken, setMatrixToken] = useState(
-    localStorage.getItem("matrixToken") ?? "matrix-token-alice"
+  const t = useT();
+  const matrixToken = DEMO_TOKEN;
+  const matrixUserId = DEMO_USER_ID;
+  const matrixDisplayName = DEMO_DISPLAY_NAME;
+  const [room, setRoom] = useState<GameRoom | null>(null);
+  const [projection, setProjection] = useState<RoomProjection | null>(null);
+  const [privateStates, setPrivateStates] = useState<PlayerPrivateState[]>([]);
+  const [events, setEvents] = useState<GameEventDto[]>([]);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
+  const [runtimeInProgress, setRuntimeInProgress] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showFillPrompt, setShowFillPrompt] = useState(false);
+  const [showAgentPicker, setShowAgentPicker] = useState(false);
+  const [agentCandidates, setAgentCandidates] = useState<AgentCandidate[]>([]);
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | undefined>(undefined);
+  const [agentSourceRoomId, setAgentSourceRoomId] = useState<string | undefined>(undefined);
+  const [viewingSeatNo, setViewingSeatNo] = useState<number | null>(null);
+  const [speechDraft, setSpeechDraft] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const [livekitToken, setLivekitToken] = useState<string | null>(null);
+  const [livekitServerUrl, setLivekitServerUrl] = useState<string | null>(null);
+  // Tick once per second so countdown text re-renders smoothly between SSE
+  // events. The projection's deadlineAt is absolute, so we just need to
+  // recompute (now - deadlineAt) on a steady cadence.
+  const [nowTick, setNowTick] = useState(0);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const pollTimerRef = useRef<number | null>(null);
+  const autoTickPhaseRef = useRef<string>("");
+  const isDevMode = useMemo(
+    () => new URLSearchParams(window.location.search).get("dev") === "1",
+    []
   );
-  const [players, setPlayers] = useState<JoinedPlayer["player"][]>([]);
-  const [status, setStatus] = useState("waiting");
-  const [events, setEvents] = useState<string[]>([]);
-  const [timeline, setTimeline] = useState<GameEventDto[]>([]);
-  const [bulkTokens, setBulkTokens] = useState(
-    localStorage.getItem("matrixTokens") ?? matrixToken
-  );
-  const [agentApiKey, setAgentApiKey] = useState(
-    localStorage.getItem("agentApiKey") ?? ""
-  );
-  const [winner, setWinner] = useState("");
-  const [error, setError] = useState("");
 
   const client = useMemo(
     () =>
       createApiClient({
-        baseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000",
-        getMatrixToken: () => matrixToken,
+        baseUrl: apiBaseUrl,
+        getMatrixToken: () => DEMO_TOKEN,
       }),
-    [matrixToken]
+    []
   );
 
-  useEffect(() => {
-    const source = new EventSource(client.subscribeUrl(gameRoomId));
-    source.onmessage = (event) => {
-      setEvents((existing) => [event.data, ...existing].slice(0, 20));
-    };
-    return () => source.close();
+  const refreshGame = useCallback(async () => {
+    try {
+      const result = await client.getGame(gameRoomId);
+      setRoom(result.room);
+      setProjection(result.projection);
+      setPrivateStates(result.privateStates);
+      setEvents((current) => {
+        const seen = new Set(current.map((event) => event.id));
+        const next = result.events.filter((event) => !seen.has(event.id));
+        const total = [...current, ...next];
+        return total.length <= 260 ? total : total.slice(-260);
+      });
+      return result;
+    } catch (error) {
+      // Silently keep retrying; surface only meaningful changes via setErrorMessage when a user
+      // action triggers a request directly.
+      void error;
+      return null;
+    }
   }, [client, gameRoomId]);
 
-  async function join() {
-    setError("");
-    localStorage.setItem("matrixToken", matrixToken);
-    try {
-      const result = await client.joinGame(gameRoomId);
-      setPlayers((existing) =>
-        existing.some((player) => player.id === result.player.id)
-          ? existing
-          : [...existing, result.player]
+  const connectSSE = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+    const source = new EventSource(client.subscribeUrl(gameRoomId));
+    source.onmessage = (event) => {
+      const parsed = parseSseEvent(stripPayloadFromEvent(event.data));
+      if (!parsed) return;
+      // Append the event directly to local state, filtered by visibility
+      // and de-duped against existing events. This replaces the previous
+      // "refreshGame on every SSE message" approach that effectively turned
+      // SSE into a notification-only channel — now SSE IS the event stream.
+      const visible = sseEventVisibleToMe(parsed, myPrivateStateRef.current);
+      if (visible) {
+        setEvents((current) => {
+          if (current.some((e) => e.id === parsed.id)) return current;
+          const next = [...current, parsed];
+          return next.length <= 260 ? next : next.slice(-260);
+        });
+      }
+      // Projection-shaping events still need a snapshot refresh so the seat
+      // ring / phase rail update. Everything else (speeches, votes, agent
+      // turn logs) is fully driven by the events array.
+      if (PROJECTION_REFRESH_EVENT_TYPES.has(parsed.type)) {
+        void refreshGame();
+      }
+    };
+    source.onerror = () => {
+      source.close();
+      eventSourceRef.current = null;
+    };
+    eventSourceRef.current = source;
+  }, [client, gameRoomId, refreshGame]);
+
+  useEffect(() => {
+    autoTickPhaseRef.current = "";
+  }, [gameRoomId]);
+
+  useEffect(() => {
+    let mounted = true;
+    void refreshGame().then(() => {
+      if (mounted) {
+        connectSSE();
+      }
+    });
+    return () => {
+      mounted = false;
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
+    };
+  }, [refreshGame, connectSSE]);
+
+  useEffect(() => {
+    if (!room || !matrixUserId) return;
+    if (
+      projection?.status !== "waiting" &&
+      projection?.status !== "created" &&
+      projection !== null
+    ) {
+      return;
+    }
+    const alreadyIn = room.players.some(
+      (player) => player.userId === matrixUserId && !player.leftAt
+    );
+    if (alreadyIn) return;
+    const activeCount = room.players.filter((player) => !player.leftAt).length;
+    if (activeCount >= room.targetPlayerCount) return;
+    void client
+      .joinGame(gameRoomId)
+      .then(() => refreshGame())
+      .catch(() => {});
+  }, [room, matrixUserId, projection?.status, client, gameRoomId, refreshGame]);
+
+  // Seat layout grows from 6 (lobby default) up to the room's max as more
+  // players join. Capped at targetPlayerCount (12) so we never show more
+  // seats than the room allows.
+  const activeSeatCount =
+    room?.players.filter((player) => !player.leftAt).length ?? 0;
+  const targetCount = Math.min(
+    Math.max(6, activeSeatCount),
+    room?.targetPlayerCount ?? 12
+  );
+  const myPlayer = useMemo(
+    () => room?.players.find((player) => player.userId === matrixUserId && !player.leftAt),
+    [room, matrixUserId]
+  );
+  const myPrivateState = useMemo(
+    () => privateStates.find((state) => state.playerId === myPlayer?.id),
+    [myPlayer?.id, privateStates]
+  );
+  // Mirror myPrivateState into a ref so the long-lived SSE handler (created
+  // once per gameRoomId) can read it without forcing a reconnect every time
+  // the value changes.
+  const myPrivateStateRef = useRef<PlayerPrivateState | undefined>(undefined);
+  useEffect(() => {
+    myPrivateStateRef.current = myPrivateState;
+  }, [myPrivateState]);
+  const isCreator = room?.creatorUserId === matrixUserId;
+
+  // Fetch LiveKit token once the player is in the room. Token is reused for
+  // the whole session; the VoiceRoomProvider handles connect/disconnect.
+  //
+  // Keying the effect on `myPlayer?.id` (a stable string) rather than the
+  // whole `myPlayer` object is critical — `myPlayer` is recomputed via
+  // useMemo whenever `room` changes (which happens on every SSE-triggered
+  // refresh), and re-fetching would create a new JWT every time, which in
+  // turn would cause VoiceRoomProvider to tear down and re-establish the
+  // LiveKit connection. With the stable id, we fetch once per game session.
+  const myPlayerId = myPlayer?.id;
+  useEffect(() => {
+    if (!myPlayerId) {
+      setLivekitToken(null);
+      setLivekitServerUrl(null);
+      return;
+    }
+    let cancelled = false;
+    void client
+      .getLivekitToken(gameRoomId)
+      .then((res) => {
+        if (cancelled) return;
+        setLivekitToken(res.token);
+        setLivekitServerUrl(res.serverUrl);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.warn("[LiveKit] token fetch failed:", err);
+        setLivekitToken(null);
+        setLivekitServerUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [myPlayerId, client, gameRoomId]);
+
+  // Drive a 1Hz tick so the countdown re-renders even when no SSE event
+  // arrives. Only active when a deadline exists, to avoid useless renders
+  // in the lobby / end states.
+  useEffect(() => {
+    if (!projection?.deadlineAt) return;
+    const id = window.setInterval(() => setNowTick((v) => v + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [projection?.deadlineAt]);
+
+  const uiProjection = useMemo(() => {
+    const spec = mapServerPhaseToUi(projection?.phase ?? null);
+    const label = spec.rawLabel ?? t(spec.labelKey, { day: projection?.day ?? 1 });
+    return { ...spec, label };
+  }, [projection?.phase, projection?.day, t]);
+
+  const tieCandidates = useMemo(() => parseTieCandidateIds(events), [events]);
+  const seerChecked = useMemo(
+    () => parseSeerCheckedIds(events, myPlayer?.id),
+    [events, myPlayer?.id]
+  );
+  const currentSpeakerSeatNo = useMemo(
+    () => parseCurrentSpeakerSeat(room?.players ?? [], projection),
+    [projection, room?.players]
+  );
+
+  const legalTargetIds = useMemo(() => {
+    const alive = new Set(projection?.alivePlayerIds ?? []);
+    const out = new Set<string>();
+    const isCreatorRunning = projection?.status === "active" || projection?.status === "paused";
+    if (!room || !isCreatorRunning || !myPlayer) {
+      return out;
+    }
+    if (projection?.phase === "day_vote") {
+      for (const playerId of alive) {
+        out.add(playerId);
+      }
+      return out;
+    }
+    if (projection?.phase === "tie_vote") {
+      for (const playerId of tieCandidates) {
+        out.add(playerId);
+      }
+      return out;
+    }
+    if (projection?.phase === "night_guard" && myPrivateState?.role === "guard") {
+      for (const player of room.players) {
+        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
+          out.add(player.id);
+        }
+      }
+      return out;
+    }
+    if (projection?.phase === "night_wolf" && myPrivateState?.role === "werewolf") {
+      for (const player of room.players) {
+        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
+          out.add(player.id);
+        }
+      }
+      return out;
+    }
+    if (projection?.phase === "night_witch_heal" && myPrivateState?.role === "witch") {
+      if (!myPrivateState.witchItems?.healAvailable) {
+        return out;
+      }
+      for (const player of room.players) {
+        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
+          out.add(player.id);
+        }
+      }
+      return out;
+    }
+    if (projection?.phase === "night_witch_poison" && myPrivateState?.role === "witch") {
+      if (!myPrivateState.witchItems?.poisonAvailable) {
+        return out;
+      }
+      for (const player of room.players) {
+        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
+          out.add(player.id);
+        }
+      }
+      return out;
+    }
+    if (projection?.phase === "night_seer" && myPrivateState?.role === "seer") {
+      for (const player of room.players) {
+        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id && !seerChecked.has(player.id)) {
+          out.add(player.id);
+        }
+      }
+      return out;
+    }
+    return out;
+  }, [myPlayer, room, projection, seerChecked, myPrivateState]);
+
+  const knownTeammateIds = useMemo(() => {
+    const ids = myPrivateState?.knownTeammatePlayerIds ?? [];
+    return new Set(ids.filter((id): id is string => typeof id === "string"));
+  }, [myPrivateState?.knownTeammatePlayerIds]);
+
+  const seatView = useMemo(
+    () =>
+      buildSeatView(
+        room,
+        targetCount,
+        myPlayer?.id,
+        selectedTargetId,
+        legalTargetIds,
+        projection?.currentSpeakerPlayerId ?? undefined,
+        knownTeammateIds
+      ),
+    [
+      myPlayer?.id,
+      targetCount,
+      room,
+      legalTargetIds,
+      selectedTargetId,
+      projection?.currentSpeakerPlayerId,
+      knownTeammateIds,
+    ]
+  );
+  const viewingSeat = useMemo(
+    () => seatView.find((seat) => seat.seatNo === viewingSeatNo) ?? null,
+    [seatView, viewingSeatNo]
+  );
+
+  const hasEnoughPlayers = activeSeatCount >= 6;
+
+  const candidateSeats = useMemo(
+    () =>
+      Array.from(legalTargetIds)
+        .map((playerId) => room?.players.find((player) => player.id === playerId))
+        .filter((player): player is RoomPlayer => Boolean(player))
+        .map((player) => ({
+          seatNo: player.seatNo,
+          playerId: player.id,
+          displayName: player.displayName,
+        })),
+    [legalTargetIds, room?.players]
+  );
+
+  const actionCanRun = isCreator && uiProjection.canProgress;
+  const statusText = useMemo(() => {
+    if (errorMessage) return errorMessage;
+    if (!room) return t("common.loadingRoom");
+    if (uiProjection.phaseId === "lobby" && !isCreator) {
+      return t("stage.statusWaiting", { phase: projection?.phase ?? "waiting" });
+    }
+    if (projection?.deadlineAt) {
+      const leftMs = new Date(projection.deadlineAt).getTime() - Date.now();
+      if (Number.isFinite(leftMs) && leftMs > 0) {
+        return t("stage.statusCountdown", { seconds: Math.floor(leftMs / 1000) });
+      }
+    }
+    return uiProjection.label;
+  }, [errorMessage, isCreator, projection, room, uiProjection.label, uiProjection.phaseId, t, nowTick]);
+
+  const showRuntimeProgress = uiProjection.canRunRuntime && actionCanRun && isDevMode;
+
+  // Auto-advance is now handled server-side. Frontend just polls for state updates.
+
+  const canStart =
+    Boolean(isCreator) &&
+    uiProjection.actionMode === "lobby" &&
+    (projection?.status === "waiting" ||
+      projection?.status === "created" ||
+      projection === null);
+
+  const dressing = useMemo<PhaseDressing>(() => {
+    return PHASE_DRESSING[uiProjection.phaseId] ?? PHASE_DRESSING.lobby!;
+  }, [uiProjection.phaseId]);
+
+  const isMyTurnToSpeak = useMemo(() => {
+    if (!myPlayer) return false;
+    if (uiProjection.phaseId !== "day") return false;
+    return projection?.currentSpeakerPlayerId === myPlayer.id;
+  }, [myPlayer, uiProjection.phaseId, projection?.currentSpeakerPlayerId]);
+
+  const hasActedThisPhase = useMemo(() => {
+    if (!myPlayer || !projection || !projection.phase) return false;
+    const phase = projection.phase;
+    const day = projection.day;
+    if (phase === "day_speak" || phase === "tie_speech") {
+      return projection.currentSpeakerPlayerId !== myPlayer.id;
+    }
+    if (phase === "day_vote" || phase === "tie_vote") {
+      return events.some(
+        (e) =>
+          e.type === "vote_submitted" &&
+          e.actorId === myPlayer.id &&
+          Number(e.payload?.day) === day
       );
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
     }
-  }
+    const nightPhases = [
+      "night_guard",
+      "night_wolf",
+      "night_witch_heal",
+      "night_witch_poison",
+      "night_seer",
+    ];
+    if (nightPhases.includes(phase)) {
+      return events.some(
+        (e) =>
+          e.type === "night_action_submitted" &&
+          e.actorId === myPlayer.id &&
+          String(e.payload?.phase) === phase &&
+          Number(e.payload?.day) === day
+      );
+    }
+    return false;
+  }, [events, myPlayer, projection]);
 
-  async function start() {
-    setError("");
+  const canCurrentUserAct = useMemo(() => {
+    if (!myPlayer) return false;
+    if (uiProjection.actionMode === "lobby" || uiProjection.actionMode === "deal" || uiProjection.actionMode === "end" || uiProjection.actionMode === "waiting") {
+      return false;
+    }
+    if (hasActedThisPhase) return false;
+    if (legalTargetIds.size > 0) return true;
+    if (isMyTurnToSpeak) return true;
+    return false;
+  }, [myPlayer, uiProjection.actionMode, legalTargetIds.size, isMyTurnToSpeak, hasActedThisPhase]);
+
+  const privateResultCopy = useMemo(() => {
+    if (!myPlayer || !myPrivateState || !projection) return "";
+    const phase = projection.phase;
+    const currentDay = projection.day;
+    if (phase !== "night_resolution" && phase !== "day_speak" && phase !== "day_vote") return "";
+
+    const currentDayEvents = events.filter((e) => Number(e.payload?.day) === currentDay);
+
+    // Find the most recent seer_result_revealed for this player
+    const seerResult = [...currentDayEvents].reverse().find(
+      (e) => e.type === "seer_result_revealed" && e.payload?.seerPlayerId === myPlayer.id
+    );
+    if (seerResult) {
+      const inspectedId = String(seerResult.payload?.inspectedPlayerId ?? "");
+      const inspectedSeat = room?.players.find((p) => p.id === inspectedId)?.seatNo ?? 0;
+      const alignment = String(seerResult.payload?.alignment ?? "good");
+      return t("stage.privateResult.seer", {
+        seat: inspectedSeat,
+        alignment: t(`alignment.${alignment}`),
+      });
+    }
+
+    // Find witch_kill_revealed for witch
+    if (myPrivateState.role === "witch") {
+      const witchKill = [...currentDayEvents].reverse().find(
+        (e) => e.type === "witch_kill_revealed"
+      );
+      if (witchKill) {
+        const targetId = String(witchKill.payload?.targetPlayerId ?? "");
+        const targetSeat = room?.players.find((p) => p.id === targetId)?.seatNo ?? 0;
+        return t("stage.privateResult.witch", { seat: targetSeat });
+      }
+    }
+
+    // Find guardProtect from night_action_submitted (now private:user)
+    if (myPrivateState.role === "guard") {
+      const guardAction = [...currentDayEvents].reverse().find(
+        (e) => e.type === "night_action_submitted" && e.actorId === myPlayer.id
+      );
+      if (guardAction) {
+        const targetId = String((guardAction.payload?.action as Record<string, unknown>)?.targetPlayerId ?? "");
+        const targetSeat = room?.players.find((p) => p.id === targetId)?.seatNo ?? 0;
+        return t("stage.privateResult.guard", { seat: targetSeat });
+      }
+    }
+
+    return "";
+  }, [events, myPlayer, myPrivateState, projection, room?.players, t]);
+
+  async function joinGame() {
+    setErrorMessage("");
     try {
-      const result = await client.startGame(gameRoomId);
-      setStatus(result.status);
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      const joined = await client.joinGame(gameRoomId);
+      setRoom((current) => {
+        if (!current) return current;
+        const players = current.players.filter(
+          (player) => !(player.userId === joined.player.userId && player.leftAt)
+        );
+        const next = players.find((player) => player.id === joined.player.id);
+        if (next) {
+          next.leftAt = null;
+          next.onlineState = "online";
+          return { ...current, players: [...players] };
+        }
+        return { ...current, players: [...players, joined.player] };
+      });
+      await refreshGame();
+      return joined;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      return null;
     }
   }
 
-  async function joinAll() {
-    setError("");
-    const tokens = bulkTokens.split(/\s+/).filter(Boolean);
-    localStorage.setItem("matrixTokens", tokens.join("\n"));
-    const joined: JoinedPlayer["player"][] = [];
-    for (const token of tokens) {
-      const scopedClient = createApiClient({
-        baseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000",
-        getMatrixToken: () => token,
-      });
-      const result = await scopedClient.joinGame(gameRoomId);
-      joined.push(result.player);
+  async function leaveCurrentSeat() {
+    if (!myPlayer) return;
+    try {
+      await client.leaveGame(gameRoomId);
+      setSelectedTargetId(null);
+      await refreshGame();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
     }
-    setPlayers(joined);
   }
 
-  async function runRuntimeToEnd() {
-    setError("");
-    localStorage.setItem("agentApiKey", agentApiKey);
-    const collected: GameEventDto[] = [];
-    for (let index = 0; index < 30; index += 1) {
-      const result = await client.runRuntimeTick(gameRoomId, {
-        agentApiKey,
-        agentApiBaseUrl: "https://un-server.dev-excel-alt.pagepeek.org/api",
-      });
-      collected.push(...result.events);
-      setStatus(result.projection.phase);
-      setWinner(result.projection.winner ?? "");
-      setTimeline([...collected]);
-      if (result.done) return;
+  async function swapToSeat(seatNo: number) {
+    if (!myPlayer) return;
+    setErrorMessage("");
+    try {
+      await client.swapSeat(gameRoomId, seatNo);
+      await refreshGame();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
     }
-    setError("Runtime did not finish within 30 ticks");
   }
+
+  async function startGameNow() {
+    setErrorMessage("");
+    try {
+      const started = await client.startGame(gameRoomId);
+      setProjection(started.projection);
+      setPrivateStates(started.privateStates);
+      setEvents((current) => [...current.slice(-260), ...started.events]);
+      return started;
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  }
+
+  const refreshAgentCandidates = useCallback(async () => {
+    setAgentLoading(true);
+    setAgentError(undefined);
+    try {
+      const result = await client.listAgentCandidates(gameRoomId);
+      setAgentCandidates(result.agents);
+      setAgentSourceRoomId(result.roomId);
+    } catch (error) {
+      setAgentError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAgentLoading(false);
+    }
+  }, [client, gameRoomId]);
+
+  async function addAgentToSeat(agent: AgentCandidate) {
+    try {
+      await client.addAgentPlayer(gameRoomId, agent.userId, agent.displayName);
+      await refreshGame();
+      await refreshAgentCandidates();
+    } catch (error) {
+      setAgentError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function handleStartIntent() {
+    if (!room) return;
+    if (hasEnoughPlayers) {
+      await startGameNow();
+      return;
+    }
+    setShowFillPrompt(true);
+    void refreshAgentCandidates();
+  }
+
+  // Game advancement is now handled server-side after each action.
+
+  function onSeatClick(seatNo: number) {
+    const seat = seatView.find((candidate) => candidate.seatNo === seatNo);
+    if (!seat) return;
+    if (viewingSeatNo === seatNo) {
+      setViewingSeatNo(null);
+      return;
+    }
+
+    if (!seat.isEmpty && seat.isActionTarget && myPlayer) {
+      if (!seat.playerId) return;
+      const targetId = seat.playerId;
+      setSelectedTargetId((previous) => (previous === targetId ? null : targetId));
+      setViewingSeatNo(null);
+      return;
+    }
+
+    // Lobby = room exists and game hasn't started. Use room.status (not
+    // projection?.status) because projection is null until startGame runs.
+    const isLobby =
+      !!room && (room.status === "waiting" || room.status === "created");
+
+    if (seat.isEmpty) {
+      if (!isLobby) return;
+      if (!myPlayer) {
+        // First click — auto-join as the user. Server picks seat number,
+        // then a follow-up swapSeat could move them to the clicked spot.
+        void joinGame().then((joined) => {
+          if (joined && joined.player.seatNo !== seatNo) {
+            void swapToSeat(seatNo);
+          }
+        });
+        setViewingSeatNo(null);
+      } else {
+        // Already in the room — request to move into that empty seat.
+        // Adding agents is handled by the "+ Add AI" button in CenterStage.
+        void swapToSeat(seatNo);
+        setViewingSeatNo(null);
+      }
+      return;
+    }
+
+    if (seat.isCurrentUser && isLobby) {
+      void leaveCurrentSeat();
+      setViewingSeatNo(null);
+      return;
+    }
+
+    // Lobby: clicking another occupied seat → swap identities (the seat
+    // number itself stays put; only WHO sits there changes).
+    if (isLobby && myPlayer && !seat.isCurrentUser) {
+      void swapToSeat(seatNo);
+      setViewingSeatNo(null);
+      return;
+    }
+
+    setViewingSeatNo(seatNo);
+  }
+
+  function onTargetSelect(playerId: string) {
+    if (!legalTargetIds.has(playerId)) return;
+    setSelectedTargetId(playerId);
+  }
+
+  function onClearTarget() {
+    setSelectedTargetId(null);
+  }
+
+  async function onConfirmTarget() {
+    if (!selectedTargetId || !myPlayer) return;
+    setErrorMessage("");
+    setActionLoading(true);
+    try {
+      const phase = projection?.phase;
+      const kind: "nightAction" | "vote" =
+        phase === "day_vote" || phase === "tie_vote" ? "vote" : "nightAction";
+      await client.submitAction(gameRoomId, { kind, targetPlayerId: selectedTargetId });
+      setSelectedTargetId(null);
+      await refreshGame();
+      // Server auto-advances after action
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function onSpeak(speech?: string) {
+    if (!myPlayer) return;
+    setErrorMessage("");
+    setActionLoading(true);
+    try {
+      const text = (speech ?? speechDraft).trim();
+      if (!text) {
+        await client.submitAction(gameRoomId, { kind: "pass" });
+      } else {
+        await client.submitAction(gameRoomId, { kind: "speech", speech: text });
+      }
+      setSpeechDraft("");
+      await refreshGame();
+      // Server auto-advances after action
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function onSkip() {
+    if (!myPlayer) return;
+    setErrorMessage("");
+    setActionLoading(true);
+    try {
+      await client.submitAction(gameRoomId, { kind: "pass" });
+      setSelectedTargetId(null);
+      setSpeechDraft("");
+      await refreshGame();
+      // Server auto-advances after action
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function onSpeechComplete() {
+    if (!myPlayer) return;
+    setErrorMessage("");
+    setActionLoading(true);
+    try {
+      await client.submitAction(gameRoomId, { kind: "speechComplete" });
+      setSpeechDraft("");
+      await refreshGame();
+      // Server auto-advances after action
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  function onFillAiStart() {
+    setShowFillPrompt(false);
+    setShowAgentPicker(true);
+    void refreshAgentCandidates();
+  }
+
+  function goHome() {
+    const params = new URLSearchParams(window.location.search);
+    params.delete("gameRoomId");
+    const next = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, "", next);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
+  function onWaitStart() {
+    setShowFillPrompt(false);
+  }
+
+  function onAgentPickerClose() {
+    setShowAgentPicker(false);
+  }
+
+  async function onAgentPickerStartNow() {
+    setShowAgentPicker(false);
+    await startGameNow();
+  }
+
+  const winnerText = projection?.winner
+    ? projection.winner === "wolf"
+      ? t("stage.winnerWolf")
+      : t("stage.winnerVillage")
+    : "";
+
+  const engineGameState: EngineGameState = useMemo(
+    () => ({
+      scene: dressing.scene,
+      phase: projection?.phase ?? null,
+      seats: seatView.map((seat) => ({
+        seatNo: seat.seatNo,
+        playerId: seat.playerId ?? ``,
+        displayName: seat.displayName ?? ``,
+        isEmpty: seat.isEmpty,
+        isDead: seat.isDead,
+        isCurrentUser: seat.isCurrentUser,
+        isSelected: seat.isSelected,
+        isLegalTarget: seat.isActionTarget,
+        isWolfTeammate: !!seat.isWolfTeammate,
+      })),
+      selectedTargetId: selectedTargetId ?? null,
+    }),
+    [dressing.scene, projection?.phase, seatView, selectedTargetId]
+  );
 
   return (
-    <section style={{ padding: 24, display: "grid", gap: 16 }}>
-      <header>
-        <h1 style={{ margin: 0 }}>Game Room</h1>
-        <p style={{ color: "#cfc7b8" }}>{gameRoomId}</p>
-      </header>
-      <label style={{ display: "grid", gap: 6, maxWidth: 520 }}>
-        Matrix Token
-        <input value={matrixToken} onChange={(event) => setMatrixToken(event.target.value)} />
-      </label>
-      <label style={{ display: "grid", gap: 6, maxWidth: 520 }}>
-        Matrix Tokens
-        <textarea rows={6} value={bulkTokens} onChange={(event) => setBulkTokens(event.target.value)} />
-      </label>
-      <label style={{ display: "grid", gap: 6, maxWidth: 520 }}>
-        Agent API Key
-        <input value={agentApiKey} onChange={(event) => setAgentApiKey(event.target.value)} />
-      </label>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        <button type="button" onClick={join}>
-          Join
-        </button>
-        <button type="button" onClick={joinAll}>
-          Join Tokens
-        </button>
-        <button type="button" onClick={start}>
-          Start
-        </button>
-        <button type="button" onClick={runRuntimeToEnd}>
-          Run Runtime
-        </button>
-      </div>
-      {error ? <p style={{ color: "#ffb4a9" }}>{error}</p> : null}
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))" }}>
-        <WaitingRoom players={players} />
-        <GameTable phase={status} deadlineAt={null} />
-        <PrivatePanel />
-      </div>
-      {winner ? <p>Winner: {winner}</p> : null}
-      <section>
-        <h2>Timeline</h2>
-        <ol>
-          {timeline.map((event) => (
-            <li key={event.id}>
-              <strong>{event.seq}. {event.type}</strong>
-              {event.actorId ? ` actor=${event.actorId}` : ""}
-              {event.subjectId ? ` subject=${event.subjectId}` : ""}
-              <pre style={{ whiteSpace: "pre-wrap" }}>
-                {JSON.stringify(event.payload, null, 2)}
-              </pre>
-            </li>
-          ))}
-        </ol>
-      </section>
-      <section>
-        <h2>Events</h2>
-        <ul>
-          {events.map((event, index) => (
-            <li key={`${event}-${index}`}>{event}</li>
-          ))}
-        </ul>
-      </section>
-    </section>
+    <VoiceRoomProvider serverUrl={livekitServerUrl} token={livekitToken}>
+      <GameRoomShell
+        engineGameState={engineGameState}
+        title={room?.title ?? t("app.title")}
+        roomCode={gameRoomId}
+        sourceMatrixRoomId={room?.createdFromMatrixRoomId}
+        playerCount={activeSeatCount}
+        targetPlayerCount={targetCount}
+        phaseLabel={uiProjection.label}
+        scene={dressing.scene}
+        accent={dressing.accent}
+        seats={seatView}
+        seatCount={targetCount}
+        onSeatClick={onSeatClick}
+        onHomeClick={goHome}
+        isLoading={runtimeInProgress}
+        center={
+          <CenterStage
+            kicker={t(dressing.kickerKey)}
+            title={uiProjection.label}
+            copy={privateResultCopy || (dressing.copyKey ? t(dressing.copyKey) : "")}
+            actionMode={uiProjection.actionMode}
+            confirmMode={dressing.confirmMode}
+            legalTargets={candidateSeats}
+            selectedTargetId={selectedTargetId ?? null}
+            isCreator={Boolean(isCreator)}
+            canStart={canStart}
+            canProgress={showRuntimeProgress}
+            canCurrentUserAct={canCurrentUserAct}
+            winnerText={winnerText}
+            statusText={statusText}
+            currentSpeakerSeatNo={currentSpeakerSeatNo ?? 0}
+            isMyTurnToSpeak={isMyTurnToSpeak}
+            speechInput={speechDraft}
+            actionLoading={actionLoading}
+            onStart={handleStartIntent}
+            onAddAgent={onFillAiStart}
+            canAddAgent={
+              !!room &&
+              (room.status === "waiting" || room.status === "created") &&
+              activeSeatCount < (room.targetPlayerCount ?? 12)
+            }
+            onTargetSelect={onTargetSelect}
+            onClearTarget={onClearTarget}
+            onConfirmTarget={onConfirmTarget}
+            onSpeak={onSpeak}
+            onSpeechChange={setSpeechDraft}
+            onSpeechComplete={onSpeechComplete}
+            onSkip={onSkip}
+          />
+        }
+        timeline={
+          <TimelineCapsule
+            enabled={uiProjection.showTimeline}
+            events={events}
+            players={room?.players ?? []}
+            myPlayerId={myPlayer?.id}
+          />
+        }
+        roleCardEntry={
+          <RoleCardLayer
+            roleId={myPrivateState?.role}
+            ownerName={myPlayer?.displayName ?? matrixDisplayName}
+            enabled={uiProjection.showRoleCard}
+          />
+        }
+        overlays={
+          <>
+            <UserInfoPanel seat={viewingSeat} onClose={() => setViewingSeatNo(null)} />
+            <StartDialog
+              open={showFillPrompt}
+              filled={activeSeatCount}
+              target={targetCount}
+              onFillAi={onFillAiStart}
+              onWait={onWaitStart}
+            />
+            <AgentPicker
+              open={showAgentPicker}
+              loading={agentLoading}
+              agents={agentCandidates}
+              errorMessage={agentError}
+              sourceRoomId={agentSourceRoomId}
+              remainingSeats={Math.max(
+                (room?.targetPlayerCount ?? 12) - activeSeatCount,
+                0
+              )}
+              onAdd={addAgentToSeat}
+              onRefresh={refreshAgentCandidates}
+              onStartNow={onAgentPickerStartNow}
+              onClose={onAgentPickerClose}
+            />
+          </>
+        }
+      />
+    </VoiceRoomProvider>
   );
 }

@@ -7,3 +7,9 @@ dist
 .env
 .env.*
 coverage
+.gstack/
+apps/web/public/verify-config.local.json
+tmp-screens/
+*.heapsnapshot
+livekit.yaml
+
