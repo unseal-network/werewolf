@@ -10,6 +10,9 @@ function normalizeBasePath(value: string | undefined): string {
 export default defineConfig({
   base: normalizeBasePath(process.env.VITE_APP_BASE_PATH ?? process.env.BASE_PATH),
   plugins: [react()],
+  server: {
+    allowedHosts: ["keepsecret.io"],
+  },
   preview: {
     allowedHosts: ["keepsecret.io"],
   },
