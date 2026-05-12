@@ -3522,6 +3522,7 @@ body {
   right: 24px !important;
   top: 92px !important;
   bottom: 92px !important;
+  z-index: 130 !important;
   width: min(380px, calc(100vw - 48px)) !important;
   height: auto !important;
   transform: translateX(24px) scale(0.98) !important;
@@ -3533,10 +3534,11 @@ body {
 }
 
 .timeline-backdrop.show {
-  opacity: 0;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  z-index: 120 !important;
+  opacity: 1;
+  background: rgba(4, 3, 12, 0.42);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 
 @media (max-width: 640px) {
@@ -3606,7 +3608,11 @@ body {
 .game-room-root[data-visual-runtime="true"] .visual-role-engine.role-reveal-active {
   pointer-events: auto;
   opacity: 1;
-  z-index: 60;
+  z-index: 1000;
+}
+
+.game-room-root[data-visual-runtime="true"] .visual-role-engine.role-reveal-active + .dom-ui-layer {
+  pointer-events: none;
 }
 
 .visual-topbar {

@@ -122,7 +122,7 @@ function mapSceneIdToSceneKey(scene: SceneId): string | null {
     case "lobby":
       return "LobbyScene";
     case "deal":
-      return "LobbyScene";
+      return "NightScene";
     case "night":
       return "NightScene";
     case "day":
