@@ -57,7 +57,12 @@ function wolfRoom(phase: "night_wolf" | "day_speak"): {
       status: "active",
       targetPlayerCount: 6,
       language: "zh-CN",
-      timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      timing: {
+        nightActionSeconds: 45,
+        speechSeconds: 60,
+        voteSeconds: 30,
+        agentSpeechRate: 1.5,
+      },
       createdFromMatrixRoomId: "!source:example.com",
       allowedSourceMatrixRoomIds: [],
       agentSourceMatrixRoomId: "!source:example.com",

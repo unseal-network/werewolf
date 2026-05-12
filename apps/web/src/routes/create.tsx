@@ -29,6 +29,7 @@ export function CreateGamePage({
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomSelectValue, setRoomSelectValue] = useState(sourceMatrixRoomId);
   const targetPlayerCount = 12;
+  const [agentSpeechRate, setAgentSpeechRate] = useState(1.5);
   const [language, setLanguage] = useState<"zh-CN" | "en">("zh-CN");
   const [error, setError] = useState(initialError ?? "");
 
@@ -142,7 +143,12 @@ export function CreateGamePage({
         title,
         targetPlayerCount,
         language,
-        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+        timing: {
+          nightActionSeconds: 45,
+          speechSeconds: 60,
+          voteSeconds: 30,
+          agentSpeechRate,
+        },
         allowedSourceMatrixRoomIds: [],
       });
       const url = `${window.location.pathname}?gameRoomId=${result.gameRoomId}`;
@@ -230,6 +236,19 @@ export function CreateGamePage({
             >
               <option value="zh-CN">{t("create.languageZh")}</option>
               <option value="en">{t("create.languageEn")}</option>
+            </select>
+          </label>
+          <label>
+            {t("create.agentSpeechRate")}
+            <select
+              value={String(agentSpeechRate)}
+              onChange={(event) => setAgentSpeechRate(Number(event.target.value))}
+            >
+              <option value="1">{t("create.agentSpeechRate1")}</option>
+              <option value="1.25">{t("create.agentSpeechRate125")}</option>
+              <option value="1.5">{t("create.agentSpeechRate15")}</option>
+              <option value="1.75">{t("create.agentSpeechRate175")}</option>
+              <option value="2">{t("create.agentSpeechRate2")}</option>
             </select>
           </label>
           <button type="submit" className="action-primary">

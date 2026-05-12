@@ -2067,7 +2067,11 @@ export class InMemoryGameService {
       const voiceAgent = this.voiceAgents.get(room.id);
       if (voiceAgent) {
         try {
-          await voiceAgent.speak(speech, playerId);
+          await voiceAgent.speak(
+            speech,
+            playerId,
+            room.timing.agentSpeechRate ?? 1.5
+          );
         } catch (err) {
           console.error("[VoiceAgent] speak failed:", err);
         }

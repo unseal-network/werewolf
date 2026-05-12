@@ -15,6 +15,7 @@ import {
 import { AccessToken } from "livekit-server-sdk";
 import { SttWebSocketClient } from "./stt-client";
 import { TtsWebSocketClient, type TtsOutputFormat } from "./tts-client";
+import { resamplePcmForPlaybackRate } from "./voice-audio";
 
 const STT_TARGET_SAMPLE_RATE = 16000;
 const TTS_OUTPUT_FORMAT: TtsOutputFormat = "pcm_16000";
@@ -265,8 +266,14 @@ export class VoiceAgentService {
    * `playerId` selects the Unseal agent_id for TTS (per-player voice); when
    * omitted the registry's fallback agent_id is used.
    */
-  async speak(text: string, playerId?: string | null): Promise<void> {
-    const next = this.speakQueue.then(() => this.speakImpl(text, playerId));
+  async speak(
+    text: string,
+    playerId?: string | null,
+    playbackRate = 1
+  ): Promise<void> {
+    const next = this.speakQueue.then(() =>
+      this.speakImpl(text, playerId, playbackRate)
+    );
     this.speakQueue = next.catch(() => undefined);
     return next;
   }
@@ -280,8 +287,12 @@ export class VoiceAgentService {
    */
   private static readonly SPEAK_HARD_TIMEOUT_MS = 90_000;
 
-  private async speakImpl(text: string, playerId?: string | null): Promise<void> {
-    const inner = this.speakImplInner(text, playerId);
+  private async speakImpl(
+    text: string,
+    playerId?: string | null,
+    playbackRate = 1
+  ): Promise<void> {
+    const inner = this.speakImplInner(text, playerId, playbackRate);
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<void>((resolve) => {
       timeoutId = setTimeout(() => {
@@ -300,7 +311,8 @@ export class VoiceAgentService {
 
   private async speakImplInner(
     text: string,
-    playerId?: string | null
+    playerId?: string | null,
+    playbackRate = 1
   ): Promise<void> {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -337,11 +349,12 @@ export class VoiceAgentService {
         for (let i = 0; i < int16Length; i += 1) {
           int16[i] = chunk.readInt16LE(i * Int16Array.BYTES_PER_ELEMENT);
         }
+        const playbackSamples = resamplePcmForPlaybackRate(int16, playbackRate);
         captureChain = captureChain
           .then(async () => {
-            const cap = this.publishTtsPcm(int16, rate);
+            const cap = this.publishTtsPcm(playbackSamples, rate);
             if (cap && (await cap)) {
-              publishedSamples += int16Length;
+              publishedSamples += playbackSamples.length;
             }
           })
           .catch(() => undefined);

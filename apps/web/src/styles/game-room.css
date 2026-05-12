@@ -2246,6 +2246,25 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+.game-room-root[data-scene="end"] .phase-card {
+  border: 1px solid rgba(19, 163, 108, 0.36);
+  background:
+    linear-gradient(180deg, rgba(21, 25, 36, 0.96), rgba(10, 12, 19, 0.94)) !important;
+  color: #f4f7ff;
+}
+
+.game-room-root[data-scene="end"] .phase-title {
+  color: #f4f7ff;
+}
+
+.game-room-root[data-scene="end"] .phase-kicker {
+  color: #f1d58a;
+}
+
+.game-room-root[data-scene="end"] .phase-copy {
+  color: #41d890 !important;
+}
+
 .game-room-root[data-scene="lobby"] .phase-title,
 .phase-title {
   color: var(--wolf-text);

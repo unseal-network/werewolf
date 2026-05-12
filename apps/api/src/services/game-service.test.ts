@@ -189,6 +189,7 @@ describe("InMemoryGameService rules", () => {
     const room = games.snapshot(gameRoomId);
     const agentSpeaker = room.players[0]!;
     const humanSpeaker = room.players[1]!;
+    const expectedPlaybackRate = 1.75;
     let resolveSpeak: () => void = () => undefined;
     let speakStarted = false;
     const speakDone = new Promise<void>((resolve) => {
@@ -197,7 +198,8 @@ describe("InMemoryGameService rules", () => {
 
     games.setVoiceAgents({
       get: () => ({
-        speak: () => {
+        speak: (_text: string, _playerId?: string | null, playbackRate?: number) => {
+          expect(playbackRate).toBe(expectedPlaybackRate);
           speakStarted = true;
           return speakDone;
         },
@@ -211,6 +213,7 @@ describe("InMemoryGameService rules", () => {
       currentSpeakerPlayerId: agentSpeaker.id,
       deadlineAt: new Date(Date.now() + 60_000).toISOString(),
     };
+    room.timing.agentSpeechRate = expectedPlaybackRate;
     room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
 
     const advance = games.advanceGame(gameRoomId, async (input) => ({

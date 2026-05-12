@@ -10,6 +10,7 @@ export const createGameRequestSchema = z.object({
     nightActionSeconds: z.number().int().min(10).max(300).default(45),
     speechSeconds: z.number().int().min(10).max(300).default(60),
     voteSeconds: z.number().int().min(10).max(300).default(30),
+    agentSpeechRate: z.number().min(0.75).max(2).default(1.5),
   }),
   allowedSourceMatrixRoomIds: z.array(z.string().min(1)).default([]),
   agentSourceMatrixRoomId: z.string().min(1).optional(),

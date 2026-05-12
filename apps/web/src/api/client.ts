@@ -107,6 +107,7 @@ export interface GameRoom {
     nightActionSeconds: number;
     speechSeconds: number;
     voteSeconds: number;
+    agentSpeechRate?: number;
   };
   createdFromMatrixRoomId: string;
   allowedSourceMatrixRoomIds: string[];
