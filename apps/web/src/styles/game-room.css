@@ -3868,6 +3868,29 @@ body {
   -webkit-backdrop-filter: blur(18px);
 }
 
+.visual-error-toast {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + clamp(82px, 12dvh, 112px));
+  z-index: 140;
+  width: min(calc(100vw - 32px), 560px);
+  transform: translateX(-50%);
+  border-radius: 14px;
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  background:
+    linear-gradient(180deg, rgba(80, 18, 28, 0.94), rgba(30, 9, 18, 0.92));
+  color: #fee2e2;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.34);
+  padding: 10px 14px;
+  font-size: clamp(12px, 1.8vw, 14px);
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
 .visual-runtime-root .phase-card.phase-card-lobby .target-row:has(.stage-start:only-child) {
   grid-template-columns: minmax(0, 1fr);
 }

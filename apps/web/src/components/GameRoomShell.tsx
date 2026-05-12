@@ -30,6 +30,7 @@ interface GameRoomShellProps {
   onRoleCardClose?: () => void;
   onHomeClick?: () => void;
   isLoading?: boolean;
+  errorMessage?: string | undefined;
 }
 
 function useCountdown(deadlineAt: string | null | undefined) {
@@ -115,6 +116,7 @@ export function GameRoomShell({
   onRoleCardClose,
   onHomeClick,
   isLoading,
+  errorMessage,
 }: GameRoomShellProps) {
   const { t, locale, setLocale } = useI18n();
   const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
@@ -208,6 +210,12 @@ export function GameRoomShell({
             </div>
           </div>
         </header>
+
+        {errorMessage ? (
+          <div className="visual-error-toast" role="alert" aria-live="polite">
+            {errorMessage}
+          </div>
+        ) : null}
 
         {roleCardEntry}
 

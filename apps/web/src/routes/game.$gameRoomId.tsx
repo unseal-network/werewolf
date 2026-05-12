@@ -910,7 +910,6 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   const actionCanRun = isCreator && uiProjection.canProgress;
   const statusText = useMemo(() => {
-    if (errorMessage) return errorMessage;
     if (!room) return t("common.loadingRoom");
     if (uiProjection.phaseId === "lobby" && !isCreator) {
       return t("stage.statusWaiting", { phase: projection?.phase ?? "waiting" });
@@ -922,7 +921,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       }
     }
     return uiProjection.label;
-  }, [errorMessage, isCreator, projection, room, uiProjection.label, uiProjection.phaseId, t, nowTick]);
+  }, [isCreator, projection, room, uiProjection.label, uiProjection.phaseId, t, nowTick]);
 
   const showRuntimeProgress = uiProjection.canRunRuntime && actionCanRun && isDevMode;
 
@@ -1427,6 +1426,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         onSeatClick={onSeatClick}
         onHomeClick={goHome}
         isLoading={runtimeInProgress}
+        errorMessage={errorMessage || undefined}
         center={
           <CenterStage
             kicker={t(dressing.kickerKey)}
