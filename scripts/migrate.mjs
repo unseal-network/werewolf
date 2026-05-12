@@ -1,12 +1,14 @@
 import { readdir, readFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
-import postgres from "postgres";
 
 const root = process.cwd();
 const migrationsDir = path.join(root, "packages/db/drizzle");
 const databaseUrl =
   process.env.DATABASE_URL ?? "postgres://postgres:postgres@localhost:5432/werewolf";
+const dbRequire = createRequire(path.join(root, "packages/db/package.json"));
+const { default: postgres } = await import(dbRequire.resolve("postgres"));
 
 const sql = postgres(databaseUrl, {
   max: 1,
