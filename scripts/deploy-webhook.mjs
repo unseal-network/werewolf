@@ -49,7 +49,9 @@ const releaseLock = await acquireLock();
 try {
   console.log(`[deploy] Starting ${new Date().toISOString()} in ${root}`);
   await run("git", ["pull", "--ff-only", remote, branch]);
-  console.log("[deploy] Skipping install/build/migrate; deploy is pull-and-restart only");
+  await run("pnpm", ["install", "--frozen-lockfile"]);
+  await run("pnpm", ["migrate"]);
+  console.log("[deploy] Skipping build; deploy is pull-install-migrate-restart only");
   await run("pm2", ["restart", "werewolf-web", "--update-env"]);
   await run("pm2", ["save"]);
 } finally {
