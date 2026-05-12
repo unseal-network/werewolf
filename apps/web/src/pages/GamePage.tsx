@@ -7,6 +7,7 @@ import { MagicCircle } from '../components/MagicCircle'
 import { PhaseOverlay } from '../components/PhaseOverlay'
 import { AdminModal } from '../components/AdminModal'
 import { WaitingRoomView } from '../components/WaitingRoomView'
+import { EventLog } from '../components/EventLog'
 import { VoiceRoomProvider } from '../components/VoiceRoom'
 import { useGameSSE } from '../hooks/useGameSSE'
 import type { GameRoom, RoomProjection, RoomPlayer, PlayerPrivateState, GameEventDto, AgentCandidate } from '../api/client'
@@ -38,7 +39,7 @@ interface GamePageProps {
 }
 
 export function GamePage({
-  gameRoomId: _gameRoomId, userId, isAdmin, room, projection, privateStates,
+  gameRoomId: _gameRoomId, userId, isAdmin, room, projection, privateStates, events,
   livekitToken, livekitServerUrl, subscribeUrl,
   agents, agentsLoading, onStart, onSelectSeat, onReady, onLoadAgents, onAddAgent,
   onRefresh, onAction, onBackToLobby, iframeMessage,
@@ -196,13 +197,15 @@ export function GamePage({
           <div style={{
             position: 'absolute', inset: 0, zIndex: 10,
             display: 'flex', gap: 4,
-            padding: compact ? '10px 6px 14px' : '12px 8px 16px',
+            padding: compact ? '8px 6px 10px' : '10px 8px 12px',
+            alignItems: 'flex-start',   // 靠上对齐
+            paddingTop: compact ? 8 : 12,
           }}>
             {/* Left column */}
             <div style={{
               width: colWidth, flexShrink: 0,
               display: 'flex', flexDirection: 'column',
-              justifyContent: 'center',
+              justifyContent: 'flex-start',
               gap: compact ? 3 : 4,
             }}>
               {leftPlayers.map(p => (
@@ -219,7 +222,7 @@ export function GamePage({
             </div>
 
             {/* Center island */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start' }}>
               <CenterIsland
                 myRole={myRole}
                 speakerName={speakerName}
@@ -233,7 +236,7 @@ export function GamePage({
             <div style={{
               width: colWidth, flexShrink: 0,
               display: 'flex', flexDirection: 'column',
-              justifyContent: 'space-evenly',
+              justifyContent: 'flex-start',
               gap: compact ? 3 : 4,
             }}>
               {rightPlayers.map(p => (
@@ -248,6 +251,11 @@ export function GamePage({
                 />
               ))}
             </div>
+          </div>
+
+          {/* 左下角日志面板 */}
+          <div style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 20 }}>
+            <EventLog events={events} players={room.players} />
           </div>
         </div>
 
