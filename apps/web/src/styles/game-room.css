@@ -3974,20 +3974,20 @@ body {
 }
 
 .visual-runtime-root[data-compact="true"] .visual-room {
-  grid-template-columns: 82px minmax(0, 1fr) 82px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .visual-runtime-root[data-compact="true"] .seat {
-  min-height: 70px;
+  min-height: auto;
 }
 
 .visual-runtime-root[data-compact="true"] .avatar {
-  width: 46px;
-  height: 46px;
+  width: clamp(42px, 7.6vw, 62px);
+  height: clamp(42px, 7.6vw, 62px);
 }
 
 .visual-runtime-root[data-compact="true"] .seat-name {
-  max-width: 70px;
+  max-width: calc((var(--visual-seat-width) - 12px));
 }
 
 @media (min-width: 720px) {
