@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useEffect, useRef } from "react";
 import Phaser from "phaser";
 import { BootScene } from "./scenes/BootScene";

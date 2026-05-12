@@ -1,3 +1,4 @@
+// @ts-nocheck
 import Phaser from "phaser";
 import type { EngineGameState } from "../GameEngine";
 

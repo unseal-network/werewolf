@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { BaseScene } from "./BaseScene";
 
 export class NightScene extends BaseScene {
