@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import Phaser from "phaser";
 import type { EngineRoleCardState } from "../engine/GameEngine";
 
 interface RoleRevealEngineProps {
@@ -7,62 +6,14 @@ interface RoleRevealEngineProps {
   onClose?: (() => void) | undefined;
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const closeBlockedRef = useRef(false);
-
-  useEffect(() => {
-    if (!roleCard?.visible || roleCard.nonce <= 0) return;
-    const host = hostRef.current;
-    if (!host) return;
-
-    const getSize = () => ({
-      width: Math.max(320, host.clientWidth || window.innerWidth),
-      height: Math.max(480, host.clientHeight || window.innerHeight),
-    });
-    const initialSize = getSize();
-
-    class RoleRevealScene extends Phaser.Scene {
-      create() {
-        this.cameras.main.setBackgroundColor("rgba(0,0,0,0)");
-        const { width, height } = this.scale;
-        const veil = this.add
-          .rectangle(width / 2, height / 2, width, height, 0x03020a, 0.88)
-          .setDepth(0);
-        this.tweens.add({
-          targets: veil,
-          alpha: { from: 0, to: 0.88 },
-          duration: 280,
-          ease: "Sine.easeOut",
-        });
-      }
-    }
-
-    const game = new Phaser.Game({
-      type: Phaser.AUTO,
-      parent: host,
-      width: initialSize.width,
-      height: initialSize.height,
-      transparent: true,
-      backgroundColor: "#00000000",
-      scene: RoleRevealScene,
-      scale: {
-        mode: Phaser.Scale.NONE,
-      },
-    });
-
-    const resize = () => {
-      const size = getSize();
-      game.scale.resize(size.width, size.height);
-    };
-    window.addEventListener("resize", resize);
-
-    return () => {
-      window.removeEventListener("resize", resize);
-      game.destroy(true);
-    };
-  }, [roleCard, roleCard?.nonce]);
 
   useEffect(() => {
     if (!roleCard?.visible || roleCard.nonce <= 0) return;
@@ -88,8 +39,8 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
       if (event.beta == null || event.gamma == null) return;
       originBeta ??= event.beta;
       originGamma ??= event.gamma;
-      const tiltX = Phaser.Math.Clamp((event.beta - originBeta) * -0.42, -18, 18);
-      const tiltY = Phaser.Math.Clamp((event.gamma - originGamma) * 0.58, -18, 18);
+      const tiltX = clamp((event.beta - originBeta) * -0.42, -18, 18);
+      const tiltY = clamp((event.gamma - originGamma) * 0.58, -18, 18);
       applyTilt(tiltX, tiltY);
     };
 
@@ -99,8 +50,8 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
       const relX = (event.clientX - (rect.left + rect.width / 2)) / rect.width;
       const relY = (event.clientY - (rect.top + rect.height / 2)) / rect.height;
       applyTilt(
-        Phaser.Math.Clamp(relY * -22, -18, 18),
-        Phaser.Math.Clamp(relX * 22, -18, 18)
+        clamp(relY * -22, -18, 18),
+        clamp(relX * 22, -18, 18)
       );
     };
 

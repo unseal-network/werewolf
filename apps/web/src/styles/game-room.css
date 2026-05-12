@@ -3665,16 +3665,9 @@ body {
   z-index: 1600;
   overflow: hidden;
   cursor: pointer;
-  background: transparent;
+  background: rgba(3, 2, 10, 0.88);
   perspective: 1200px;
   touch-action: manipulation;
-}
-
-.role-reveal-engine canvas {
-  display: block;
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
 }
 
 .role-reveal-card3d {
@@ -3738,7 +3731,7 @@ body {
 }
 
 .role-reveal-card3d-front {
-  transform: rotateX(180deg);
+  transform: rotateY(180deg);
 }
 
 .role-reveal-card3d-glare {
@@ -3746,14 +3739,11 @@ body {
   inset: 0;
   z-index: 4;
   border-radius: clamp(14px, 3vw, 22px);
-  background:
-    radial-gradient(circle at var(--card-glare-x) var(--card-glare-y), rgba(255, 255, 255, 0.34), rgba(255, 232, 154, 0.16) 18%, transparent 36%),
-    linear-gradient(112deg, transparent 25%, rgba(255, 255, 255, 0.58) 45%, rgba(255, 235, 157, 0.24) 50%, transparent 66%);
+  background: radial-gradient(circle at var(--card-glare-x) var(--card-glare-y), rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08) 18%, transparent 34%);
   mix-blend-mode: screen;
-  opacity: 0.72;
+  opacity: 0.36;
   transform: translateZ(28px);
   pointer-events: none;
-  animation: roleCard3dShine 900ms ease-out 1450ms both;
 }
 
 @keyframes roleCard3dDealIn {
@@ -3775,40 +3765,15 @@ body {
   }
 }
 
-@keyframes roleCard3dFlipUp {
+@keyframes roleCard3dFlipSide {
   0%, 34% {
-    transform: rotateX(0deg);
+    transform: rotateY(0deg);
   }
   68% {
-    transform: rotateX(196deg) scale(1.035);
+    transform: rotateY(196deg) scale(1.035);
   }
   100% {
-    transform: rotateX(180deg) scale(1);
-  }
-}
-
-@keyframes roleCard3dGlow {
-  from {
-    opacity: 0.74;
-    transform: translateZ(-80px) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: translateZ(-80px) scale(1.06);
-  }
-}
-
-@keyframes roleCard3dShine {
-  0% {
-    opacity: 0;
-    transform: translate3d(-56%, 0, 28px) rotate(10deg);
-  }
-  24% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 0.72;
-    transform: translate3d(0, 0, 28px) rotate(0deg);
+    transform: rotateY(180deg) scale(1);
   }
 }
 
@@ -3821,7 +3786,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .role-reveal-card3d,
   .role-reveal-card3d-inner,
-  .role-reveal-card3d-glow,
   .role-reveal-card3d-glare {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
