@@ -3577,6 +3577,11 @@ body {
 }
 
 .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
+  --visual-shell-width: min(calc(100vw - clamp(20px, 5vw, 56px)), 760px);
+  --visual-seat-width: clamp(72px, 13.5vw, 112px);
+  --visual-center-track: clamp(184px, 38vw, 300px);
+  --visual-center-card-width: clamp(184px, 38vw, 300px);
+  --visual-board-gap: clamp(8px, 2vw, 18px);
   position: relative;
   z-index: 2;
   min-height: 100dvh;
@@ -3600,14 +3605,21 @@ body {
   flex-shrink: 0;
   position: relative;
   z-index: 20;
+  width: var(--visual-shell-width);
   display: grid;
-  grid-template-columns: 36px 38px minmax(0, 1fr) auto;
+  grid-template-columns: clamp(36px, 6vw, 44px) clamp(36px, 6vw, 44px) minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  min-height: 74px;
-  padding: calc(env(safe-area-inset-top) + 12px) 16px 10px;
-  background: rgba(0, 0, 0, 0.48);
+  gap: clamp(8px, 1.8vw, 12px);
+  min-height: clamp(66px, 9dvh, 82px);
+  margin: clamp(10px, 2dvh, 18px) auto 0;
+  padding: calc(env(safe-area-inset-top) + clamp(8px, 1.4dvh, 12px)) clamp(12px, 2.2vw, 18px) clamp(8px, 1.2dvh, 12px);
+  background:
+    linear-gradient(180deg, rgba(14, 10, 32, 0.88), rgba(8, 5, 22, 0.72)),
+    rgba(0, 0, 0, 0.42);
   border-bottom: 1px solid rgba(139, 92, 246, 0.22);
+  border: 1px solid rgba(139, 92, 246, 0.20);
+  border-radius: clamp(16px, 2.4vw, 22px);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
@@ -3615,9 +3627,9 @@ body {
 .visual-nav-button,
 .visual-phase-mark,
 .visual-countdown {
-  width: 34px;
-  height: 34px;
-  border-radius: 11px;
+  width: clamp(34px, 6vw, 44px);
+  height: clamp(34px, 6vw, 44px);
+  border-radius: clamp(11px, 1.8vw, 14px);
   display: grid;
   place-items: center;
 }
@@ -3632,9 +3644,9 @@ body {
 
 .visual-phase-mark {
   border: 1px solid rgba(139, 92, 246, 0.42);
-  background: rgba(109, 40, 217, 0.25);
+  background: linear-gradient(145deg, rgba(109, 40, 217, 0.42), rgba(42, 18, 92, 0.76));
   color: #ffd166;
-  font-size: 15px;
+  font-size: clamp(15px, 2.4vw, 20px);
   font-weight: 900;
 }
 
@@ -3644,7 +3656,7 @@ body {
 
 .visual-room-title {
   color: #f8fafc;
-  font-size: 14px;
+  font-size: clamp(14px, 2.2vw, 20px);
   font-weight: 900;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3655,7 +3667,7 @@ body {
 .visual-room-source {
   margin-top: 2px;
   color: #64748b;
-  font-size: 10px;
+  font-size: clamp(10px, 1.45vw, 14px);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3695,18 +3707,21 @@ body {
   position: relative;
   z-index: 10;
   display: flex;
+  align-items: flex-start;
+  justify-content: center;
   overflow: hidden;
 }
 
 .visual-room {
-  flex: 1;
+  width: var(--visual-shell-width);
+  flex: 0 1 var(--visual-shell-width);
   min-width: 0;
   position: relative;
   display: grid;
-  grid-template-columns: minmax(76px, 92px) minmax(0, 220px) minmax(76px, 92px);
+  grid-template-columns: var(--visual-seat-width) var(--visual-center-track) var(--visual-seat-width);
   justify-content: center;
-  gap: 8px;
-  padding: 10px 10px 92px;
+  gap: var(--visual-board-gap);
+  padding: clamp(14px, 2.2dvh, 28px) 0 92px;
   align-items: flex-start;
 }
 
@@ -3716,7 +3731,7 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: clamp(8px, 1.4dvh, 14px);
 }
 
 .visual-center {
@@ -3726,14 +3741,14 @@ body {
   align-self: flex-start;
   display: flex;
   justify-content: center;
-  padding-top: 6px;
+  padding-top: clamp(8px, 1.4dvh, 16px);
 }
 
 .visual-magic-circle {
   position: absolute;
   left: 50%;
-  top: 8%;
-  width: min(52vh, 74vw);
+  top: clamp(34px, 7dvh, 78px);
+  width: min(66dvh, calc(var(--visual-shell-width) * 0.86));
   aspect-ratio: 1;
   transform: translateX(-50%);
   border-radius: 999px;
@@ -3741,25 +3756,31 @@ body {
   background:
     repeating-radial-gradient(circle, transparent 0 18%, rgba(139, 92, 246, 0.18) 18.4% 18.8%, transparent 19.2% 31%),
     radial-gradient(circle, rgba(139, 92, 246, 0.10), transparent 62%);
-  opacity: 0.72;
+  opacity: 0.58;
 }
 
 .visual-runtime-root .phase-card {
   width: 100%;
-  max-width: 280px;
-  padding: 22px 20px;
-  border-radius: 18px;
-  border: 1px solid rgba(139, 92, 246, 0.24);
-  background: rgba(10, 6, 26, 0.78);
+  max-width: var(--visual-center-card-width);
+  min-height: clamp(220px, 35dvh, 300px);
+  align-content: center;
+  padding: clamp(18px, 3vw, 28px);
+  border-radius: clamp(20px, 3vw, 28px);
+  border: 1px solid rgba(255, 209, 102, 0.18);
+  background:
+    linear-gradient(180deg, rgba(28, 33, 48, 0.88), rgba(12, 13, 24, 0.82)),
+    rgba(10, 6, 26, 0.78);
   color: #e2e8f0;
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.36);
+  box-shadow:
+    0 28px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 
 .visual-runtime-root .phase-title {
   margin: 0;
-  font-size: 28px;
+  font-size: clamp(24px, 4.2vw, 40px);
   color: #f8fafc;
 }
 
@@ -3781,8 +3802,8 @@ body {
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px;
-  margin-top: 26px;
+  gap: clamp(10px, 1.6dvh, 14px);
+  margin-top: clamp(22px, 4dvh, 34px);
 }
 
 .visual-runtime-root .stage-start,
@@ -3798,25 +3819,25 @@ body {
 
 .visual-runtime-root .stage-start,
 .visual-runtime-root .stage-confirm {
-  height: 60px;
-  padding: 0 14px;
+  height: clamp(54px, 7.2dvh, 72px);
+  padding: 0 clamp(12px, 2vw, 18px);
   color: #0f1118;
   background: linear-gradient(180deg, #f3d982 0%, #d8b95d 100%);
   border: 1px solid rgba(255, 230, 150, 0.65);
   box-shadow: 0 18px 34px rgba(0, 0, 0, 0.22);
-  font-size: 17px;
+  font-size: clamp(15px, 2.35vw, 22px);
 }
 
 .visual-runtime-root .stage-skip,
 .visual-runtime-root .target-chip {
-  min-height: 52px;
+  min-height: clamp(46px, 6.4dvh, 62px);
   height: auto;
   padding: 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.035));
   color: #f1f5f9;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  font-size: 15px;
+  font-size: clamp(13px, 2vw, 18px);
 }
 
 .visual-runtime-root .stage-start:hover,
@@ -3826,43 +3847,49 @@ body {
 
 .visual-runtime-root .seat {
   width: 100%;
-  min-height: 82px;
+  min-height: clamp(74px, 11dvh, 118px);
+  aspect-ratio: 1 / 1.02;
   grid-template-columns: 1fr;
   justify-items: center;
-  align-content: start;
-  gap: 6px;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.035);
-  box-shadow: none;
-  padding: 5px 3px 7px;
+  align-content: center;
+  gap: clamp(4px, 0.8dvh, 8px);
+  border-radius: clamp(16px, 2.6vw, 24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.018)),
+    rgba(9, 6, 28, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 16px 34px rgba(0, 0, 0, 0.18);
+  padding: clamp(6px, 1vw, 10px);
 }
 
 .visual-runtime-root .seat.active,
 .visual-runtime-root .seat.selected {
-  background: rgba(109, 40, 217, 0.16);
-  border-color: rgba(139, 92, 246, 0.42);
+  background:
+    linear-gradient(180deg, rgba(109, 40, 217, 0.28), rgba(56, 24, 116, 0.20)),
+    rgba(255, 255, 255, 0.04);
+  border-color: rgba(139, 92, 246, 0.70);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.20), 0 20px 42px rgba(43, 20, 92, 0.32);
 }
 
 .visual-runtime-root .avatar {
-  width: 52px;
-  height: 52px;
+  width: clamp(42px, 7.6vw, 68px);
+  height: clamp(42px, 7.6vw, 68px);
   border-radius: 999px;
-  border: 2px solid color-mix(in srgb, var(--seat-role-color, #8b5cf6) 42%, rgba(255, 255, 255, 0.18));
+  border: clamp(2px, 0.36vw, 4px) solid color-mix(in srgb, var(--seat-role-color, #8b5cf6) 58%, rgba(255, 255, 255, 0.18));
   background: rgba(255, 255, 255, 0.06);
   color: #94a3b8;
 }
 
 .visual-runtime-root .seat.empty .avatar {
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(255, 255, 255, 0.035);
   outline: none;
   color: rgba(255, 255, 255, 0.35);
 }
 
 .visual-runtime-root .seat-name {
-  max-width: 78px;
-  color: #94a3b8;
-  font-size: 10px;
+  max-width: calc(var(--visual-seat-width) - 12px);
+  color: #cbd5e1;
+  font-size: clamp(10px, 1.7vw, 14px);
   line-height: 1.25;
 }
 
@@ -3889,36 +3916,39 @@ body {
 }
 
 @media (min-width: 720px) {
-  .visual-topbar {
-    margin: 14px auto 0;
-    width: min(100% - 48px, 760px);
-    border: 1px solid rgba(139, 92, 246, 0.22);
-    border-radius: 16px;
-    padding: 12px 16px 10px;
+  .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
+    --visual-shell-width: min(calc(100vw - 48px), 780px);
+    --visual-seat-width: clamp(100px, 14vw, 132px);
+    --visual-center-track: clamp(260px, 38vw, 330px);
+    --visual-center-card-width: clamp(260px, 38vw, 330px);
   }
 
-  .visual-room {
-    grid-template-columns: minmax(104px, 124px) minmax(260px, 320px) minmax(104px, 124px);
-    justify-content: center;
-    gap: 18px;
-    padding: 18px 18px 92px;
+  .visual-topbar {
+    border-radius: 22px;
   }
 
   .visual-center {
-    padding-top: 8px;
-  }
-
-  .visual-runtime-root .phase-card {
-    max-width: 320px;
-    min-height: 300px;
-    align-content: center;
+    padding-top: clamp(8px, 1.2dvh, 14px);
   }
 }
 
 @media (max-width: 420px) {
+  .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
+    --visual-shell-width: calc(100vw - 12px);
+    --visual-seat-width: clamp(64px, 18vw, 72px);
+    --visual-center-track: minmax(0, 1fr);
+    --visual-center-card-width: 100%;
+    --visual-board-gap: 6px;
+  }
+
   .visual-topbar {
-    grid-template-columns: 34px 34px minmax(0, 1fr) auto;
+    grid-template-columns: 34px 34px minmax(0, 1fr) 34px;
     gap: 8px;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    width: 100%;
+    margin-top: 0;
     padding-left: 12px;
     padding-right: 12px;
   }
@@ -3928,14 +3958,14 @@ body {
   }
 
   .visual-room {
-    grid-template-columns: 70px minmax(0, 1fr) 70px;
-    padding-left: 6px;
-    padding-right: 6px;
-    gap: 6px;
+    grid-template-columns: var(--visual-seat-width) minmax(0, 1fr) var(--visual-seat-width);
+    padding-left: 0;
+    padding-right: 0;
   }
 
   .visual-runtime-root .phase-card {
-    max-width: 190px;
+    max-width: 100%;
+    min-height: 218px;
     padding: 18px 12px;
   }
 
