@@ -3709,7 +3709,13 @@ body {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.visual-game::-webkit-scrollbar {
+  display: none;
 }
 
 .visual-room {
@@ -3720,29 +3726,38 @@ body {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
-  gap: clamp(14px, 2.4dvh, 26px);
+  gap: 0;
   padding: clamp(14px, 2.2dvh, 28px) 0 92px;
   align-items: start;
 }
 
 .visual-seat-grid {
   position: relative;
-  z-index: 2;
+  z-index: 3;
   width: min(100%, calc(var(--visual-seat-width) * var(--visual-seat-columns) + var(--visual-board-gap) * (var(--visual-seat-columns) - 1)));
   display: grid;
   grid-template-columns: repeat(var(--visual-seat-columns), minmax(0, 1fr));
   gap: var(--visual-board-gap);
+  margin-top: clamp(18px, 3dvh, 34px);
+  padding-top: clamp(156px, 20dvh, 214px);
 }
 
 .visual-center {
-  position: relative;
-  z-index: 2;
+  position: sticky;
+  top: clamp(8px, 1.4dvh, 14px);
+  z-index: 8;
   width: min(100%, var(--visual-center-card-width));
   min-width: min(100%, var(--visual-center-card-width));
   align-self: flex-start;
   display: flex;
   justify-content: center;
-  padding-top: clamp(8px, 1.4dvh, 16px);
+  padding-top: 0;
+  margin-bottom: calc(-1 * clamp(198px, 31dvh, 286px));
+  pointer-events: none;
+}
+
+.visual-center > * {
+  pointer-events: auto;
 }
 
 .visual-magic-circle {
@@ -4005,6 +4020,10 @@ body {
 
   .visual-room {
     gap: 22px;
+  }
+
+  .visual-seat-grid {
+    padding-top: 144px;
   }
 
   .visual-runtime-root .phase-card {
