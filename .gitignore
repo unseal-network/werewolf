@@ -13,3 +13,4 @@ tmp-screens/
 *.heapsnapshot
 livekit.yaml
 
+.claude/
