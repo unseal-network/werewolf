@@ -3577,11 +3577,11 @@ body {
 }
 
 .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
-  --visual-shell-width: min(calc(100vw - clamp(20px, 5vw, 56px)), 760px);
-  --visual-seat-columns: 3;
-  --visual-seat-width: clamp(82px, 18vw, 128px);
-  --visual-center-card-width: clamp(230px, 46vw, 300px);
-  --visual-board-gap: clamp(12px, 2.2vw, 18px);
+  --visual-shell-width: min(calc(100vw - clamp(18px, 5vw, 64px)), 1120px);
+  --visual-seat-columns: 2;
+  --visual-seat-width: clamp(132px, 42vw, 172px);
+  --visual-center-card-width: clamp(236px, 62vw, 340px);
+  --visual-board-gap: clamp(14px, 4vw, 22px);
   position: relative;
   z-index: 2;
   min-height: 100dvh;
@@ -3727,7 +3727,7 @@ body {
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: 0;
-  padding: clamp(14px, 2.2dvh, 28px) 0 92px;
+  padding: clamp(14px, 2.2dvh, 28px) 0 clamp(116px, 18dvh, 150px);
   align-items: start;
 }
 
@@ -3738,21 +3738,20 @@ body {
   display: grid;
   grid-template-columns: repeat(var(--visual-seat-columns), minmax(0, 1fr));
   gap: var(--visual-board-gap);
-  margin-top: clamp(18px, 3dvh, 34px);
-  padding-top: clamp(156px, 20dvh, 214px);
+  margin-top: clamp(10px, 2.2dvh, 26px);
+  padding-top: 0;
 }
 
 .visual-center {
-  position: sticky;
-  top: clamp(8px, 1.4dvh, 14px);
-  z-index: 8;
-  width: min(100%, var(--visual-center-card-width));
-  min-width: min(100%, var(--visual-center-card-width));
-  align-self: flex-start;
+  position: fixed;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 30;
+  width: min(calc(100vw - 28px), var(--visual-center-card-width));
+  min-width: min(calc(100vw - 28px), var(--visual-center-card-width));
   display: flex;
   justify-content: center;
-  padding-top: 0;
-  margin-bottom: calc(-1 * clamp(198px, 31dvh, 286px));
   pointer-events: none;
 }
 
@@ -3792,6 +3791,43 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+.visual-runtime-root .phase-card.phase-card-lobby {
+  min-height: auto;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.visual-runtime-root .phase-card.phase-card-lobby .stage-identity,
+.visual-runtime-root .phase-card.phase-card-lobby .phase-title,
+.visual-runtime-root .phase-card.phase-card-lobby .phase-copy {
+  display: none;
+}
+
+.visual-runtime-root .phase-card.phase-card-lobby .target-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(52px, 13vw, 62px);
+  align-items: center;
+  gap: clamp(10px, 2.6vw, 14px);
+  margin: 0;
+  padding: clamp(8px, 1.4dvh, 10px);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  background: rgba(9, 8, 22, 0.76);
+  box-shadow: 0 22px 54px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.visual-runtime-root .phase-card.phase-card-lobby .target-row:has(.stage-start:only-child) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .visual-runtime-root .phase-title {
@@ -3845,6 +3881,17 @@ body {
   font-size: clamp(15px, 2.35vw, 22px);
 }
 
+.visual-runtime-root .phase-card.phase-card-lobby .stage-start {
+  height: clamp(54px, 7dvh, 64px);
+  border-radius: 999px;
+  font-size: clamp(17px, 4.2vw, 22px);
+}
+
+.visual-runtime-root .phase-card.phase-card-lobby .stage-start:disabled {
+  opacity: 1;
+  cursor: default;
+}
+
 .visual-runtime-root .stage-skip,
 .visual-runtime-root .target-chip {
   min-height: clamp(46px, 6.4dvh, 62px);
@@ -3855,6 +3902,17 @@ body {
   color: #f1f5f9;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
   font-size: clamp(13px, 2vw, 18px);
+}
+
+.visual-runtime-root .stage-add-player {
+  width: clamp(52px, 13vw, 62px);
+  height: clamp(52px, 13vw, 62px);
+  min-height: 0;
+  padding: 0;
+  border-radius: 999px;
+  font-size: clamp(26px, 6vw, 34px);
+  line-height: 1;
+  font-weight: 900;
 }
 
 .visual-runtime-root .stage-start:hover,
@@ -3934,28 +3992,25 @@ body {
 
 @media (min-width: 720px) {
   .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
-    --visual-shell-width: min(calc(100vw - 48px), 780px);
+    --visual-shell-width: min(calc(100vw - 56px), 1020px);
     --visual-seat-columns: 3;
-    --visual-seat-width: clamp(112px, 16vw, 150px);
-    --visual-center-card-width: clamp(260px, 38vw, 330px);
+    --visual-seat-width: clamp(150px, 24vw, 190px);
+    --visual-center-card-width: clamp(300px, 42vw, 392px);
   }
 
   .visual-topbar {
     border-radius: 22px;
   }
 
-  .visual-center {
-    padding-top: clamp(8px, 1.2dvh, 14px);
-  }
 }
 
 @media (max-width: 420px) {
   .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
     --visual-shell-width: calc(100vw - 12px);
-    --visual-seat-columns: 3;
-    --visual-seat-width: clamp(70px, 29vw, 112px);
-    --visual-center-card-width: clamp(220px, 62vw, 248px);
-    --visual-board-gap: 6px;
+    --visual-seat-columns: 2;
+    --visual-seat-width: clamp(132px, 44vw, 166px);
+    --visual-center-card-width: clamp(252px, 86vw, 330px);
+    --visual-board-gap: clamp(12px, 4vw, 16px);
   }
 
   .visual-topbar {
@@ -4012,10 +4067,10 @@ body {
 
 @media (min-width: 960px) and (orientation: landscape) {
   .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
-    --visual-shell-width: min(calc(100vw - 56px), 880px);
-    --visual-seat-columns: 6;
-    --visual-seat-width: clamp(104px, 10vw, 128px);
-    --visual-center-card-width: clamp(280px, 30vw, 360px);
+    --visual-shell-width: min(calc(100vw - 72px), 1160px);
+    --visual-seat-columns: 4;
+    --visual-seat-width: clamp(156px, 16vw, 206px);
+    --visual-center-card-width: clamp(320px, 34vw, 420px);
   }
 
   .visual-room {
@@ -4023,10 +4078,19 @@ body {
   }
 
   .visual-seat-grid {
-    padding-top: 144px;
+    padding-top: 0;
   }
 
   .visual-runtime-root .phase-card {
     min-height: 260px;
+  }
+}
+
+@media (min-width: 1280px) and (orientation: landscape) {
+  .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
+    --visual-shell-width: min(calc(100vw - 96px), 1240px);
+    --visual-seat-columns: 6;
+    --visual-seat-width: clamp(142px, 12vw, 182px);
+    --visual-board-gap: clamp(16px, 1.5vw, 24px);
   }
 }

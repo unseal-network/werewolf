@@ -149,26 +149,29 @@ export function CenterStage({
 
   // Lobby: only the start button + status copy
   if (actionMode === "lobby") {
+    const primaryLabel = isCreator ? t("stage.startButton") : t("stage.readyButton");
     return (
-      <article className="phase-card">
+      <article className="phase-card phase-card-lobby">
         {identity}
         <div className="phase-title">{title}</div>
         {statusText ? <div className="phase-copy">{statusText}</div> : null}
         <div className="target-row">
-          {canStart ? (
-            <button type="button" className="stage-start" onClick={onStart}>
-              {t("stage.startButton")}
-            </button>
-          ) : (
-            <div className="target-chip">{t("stage.prompt.lobby")}</div>
-          )}
+          <button
+            type="button"
+            className="stage-start"
+            onClick={isCreator ? onStart : undefined}
+            disabled={!isCreator}
+          >
+            {primaryLabel}
+          </button>
           {isCreator && onAddAgent && canAddAgent ? (
             <button
               type="button"
-              className="stage-skip"
+              className="stage-skip stage-add-player"
               onClick={onAddAgent}
+              aria-label={t("stage.addAgentButton")}
             >
-              {t("stage.addAgentButton")}
+              +
             </button>
           ) : null}
         </div>
