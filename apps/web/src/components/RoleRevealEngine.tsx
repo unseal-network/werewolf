@@ -26,90 +26,16 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
     class RoleRevealScene extends Phaser.Scene {
       create() {
         this.cameras.main.setBackgroundColor("rgba(0,0,0,0)");
-        this.buildReveal();
-      }
-
-      private buildReveal() {
         const { width, height } = this.scale;
-        const centerX = width / 2;
-        const centerY = height / 2;
-
         const veil = this.add
-          .rectangle(centerX, centerY, width, height, 0x03020a, 0.92)
+          .rectangle(width / 2, height / 2, width, height, 0x03020a, 0.88)
           .setDepth(0);
         this.tweens.add({
           targets: veil,
-          alpha: { from: 0, to: 0.92 },
+          alpha: { from: 0, to: 0.88 },
           duration: 280,
           ease: "Sine.easeOut",
         });
-
-        this.makeSparkTexture();
-        this.add.particles(0, 0, "role-reveal-spark", {
-          x: { min: 0, max: width },
-          y: { min: 0, max: height },
-          lifespan: { min: 1600, max: 3600 },
-          speedY: { min: -18, max: -4 },
-          speedX: { min: -8, max: 8 },
-          quantity: 2,
-          frequency: 90,
-          scale: { start: 0.9, end: 0 },
-          alpha: { start: 0.9, end: 0 },
-          tint: [0xf8d97e, 0xb8a5ff, 0xffffff],
-          blendMode: Phaser.BlendModes.ADD,
-        }).setDepth(1);
-
-        const aura = this.add.graphics().setDepth(2);
-        aura.fillStyle(0xf5d57d, 0.12);
-        aura.fillCircle(centerX, centerY, Math.min(width, height) * 0.34);
-        aura.fillStyle(0x8b5cf6, 0.10);
-        aura.fillCircle(centerX, centerY, Math.min(width, height) * 0.44);
-        this.tweens.add({
-          targets: aura,
-          scale: { from: 0.92, to: 1.06 },
-          alpha: { from: 0.72, to: 1 },
-          duration: 1800,
-          yoyo: true,
-          repeat: -1,
-          ease: "Sine.easeInOut",
-        });
-
-        this.addOrbit(centerX, centerY, Math.min(width, height) * 0.43, 2600, 0xf3d982);
-        this.addOrbit(centerX, centerY, Math.min(width, height) * 0.31, 1900, 0xa78bfa, true);
-      }
-
-      private addOrbit(
-        x: number,
-        y: number,
-        radius: number,
-        duration: number,
-        color: number,
-        reverse = false
-      ) {
-        const orbit = this.add.container(x, y).setDepth(3);
-        const ring = this.add.graphics();
-        ring.lineStyle(1, color, 0.30);
-        ring.strokeEllipse(0, 0, radius * 2, radius * 0.64);
-        ring.lineStyle(2, color, 0.20);
-        ring.beginPath();
-        ring.arc(0, 0, radius, Phaser.Math.DegToRad(12), Phaser.Math.DegToRad(82));
-        ring.strokePath();
-        orbit.add(ring);
-        this.tweens.add({
-          targets: orbit,
-          angle: reverse ? -360 : 360,
-          duration,
-          repeat: -1,
-          ease: "Linear",
-        });
-      }
-
-      private makeSparkTexture() {
-        const g = this.add.graphics();
-        g.fillStyle(0xffffff, 1);
-        g.fillCircle(4, 4, 4);
-        g.generateTexture("role-reveal-spark", 8, 8);
-        g.destroy();
       }
     }
 

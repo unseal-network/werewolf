@@ -3701,19 +3701,16 @@ body {
   position: absolute;
   inset: -14%;
   border-radius: 999px;
-  background:
-    radial-gradient(ellipse at 50% 52%, rgba(255, 232, 161, 0.28), transparent 44%),
-    radial-gradient(ellipse at 50% 52%, rgba(139, 92, 246, 0.20), transparent 68%);
-  filter: blur(6px);
+  background: radial-gradient(ellipse at 50% 52%, rgba(139, 92, 246, 0.20), transparent 68%);
+  filter: blur(10px);
   transform: translateZ(-80px);
-  animation: roleCard3dGlow 1600ms ease-in-out infinite alternate;
 }
 
 .role-reveal-card3d-inner {
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  animation: roleCard3dFlipUp 1180ms cubic-bezier(0.18, 0.82, 0.24, 1) 620ms both;
+  animation: roleCard3dFlipSide 1180ms cubic-bezier(0.18, 0.82, 0.24, 1) 620ms both;
 }
 
 .role-reveal-card3d-face {
