@@ -669,10 +669,11 @@ export class InMemoryGameService {
             action: { kind: "saySpeech", speech: action.speech },
             now,
       });
+      const [assigned] = this.assignAndAppendEvents(room, [event]);
       if (!isWolfDiscussion) {
         this.advanceSpeechSpeaker(room, playerId, now);
+        this.emitSpeechTurnStarted(room, playerId, now);
       }
-      const [assigned] = this.assignAndAppendEvents(room, [event]);
       this.resetPlayerTranscript(gameRoomId, playerId);
       void this.scheduleAdvance(gameRoomId);
       return assigned!;
@@ -707,8 +708,9 @@ export class InMemoryGameService {
         action: { kind: "saySpeech", speech: speechText },
         now,
       });
-      this.advanceSpeechSpeaker(room, playerId, now);
       const [assigned] = this.assignAndAppendEvents(room, [event]);
+      this.advanceSpeechSpeaker(room, playerId, now);
+      this.emitSpeechTurnStarted(room, playerId, now);
       void this.scheduleAdvance(gameRoomId);
       return assigned!;
     }
@@ -851,17 +853,18 @@ export class InMemoryGameService {
         if (room.projection.currentSpeakerPlayerId !== playerId) {
           throw new AppError("invalid_action", "Not your turn to speak", 400);
         }
-        this.advanceSpeechSpeaker(room, playerId, now);
-        this.assignAndAppendEvents(room, [
+        const [assigned] = this.assignAndAppendEvents(room, [
           {
             ...this.baseEvent(room, playerId, "public"),
             type: "speech_submitted",
             payload: { day: room.projection.day, speech: `${player.displayName} chose to remain silent.` },
           },
         ]);
+        this.advanceSpeechSpeaker(room, playerId, now);
+        this.emitSpeechTurnStarted(room, playerId, now);
         this.resetPlayerTranscript(gameRoomId, playerId);
         void this.scheduleAdvance(gameRoomId);
-        return room.events[room.events.length - 1]!;
+        return assigned!;
       }
       const nightPhases: GamePhase[] = [
         "night_guard",
@@ -2028,6 +2031,7 @@ export class InMemoryGameService {
       ]);
       this.resetPlayerTranscript(room.id, playerId);
       this.advanceSpeechSpeaker(room, playerId, now);
+      this.emitSpeechTurnStarted(room, playerId, now);
       return;
     }
 
@@ -2071,6 +2075,7 @@ export class InMemoryGameService {
     }
 
     this.advanceSpeechSpeaker(room, playerId, now);
+    this.emitSpeechTurnStarted(room, playerId, now);
   }
 
   private advanceSpeechSpeaker(
@@ -2092,6 +2097,29 @@ export class InMemoryGameService {
       deadlineAt: nextDeadlineAt,
       version: room.events.length + 1,
     };
+  }
+
+  private emitSpeechTurnStarted(
+    room: StoredGameRoom,
+    previousSpeakerPlayerId: string,
+    now: Date
+  ): void {
+    if (!room.projection?.currentSpeakerPlayerId) return;
+    this.assignAndAppendEvents(room, [
+      {
+        ...this.baseEvent(room, "runtime", "public"),
+        type: "turn_started",
+        subjectId: room.projection.currentSpeakerPlayerId,
+        payload: {
+          day: room.projection.day,
+          phase: room.projection.phase,
+          previousSpeakerPlayerId,
+          currentSpeakerPlayerId: room.projection.currentSpeakerPlayerId,
+          deadlineAt: room.projection.deadlineAt,
+        },
+        createdAt: now.toISOString(),
+      },
+    ]);
   }
 
   private markEliminated(room: StoredGameRoom, playerIds: string[]): void {

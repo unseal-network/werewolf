@@ -74,6 +74,14 @@ function formatEventWith(
         }),
       };
     }
+    if (event.type === "turn_started") {
+      return {
+        typeKey: "phase",
+        text: t("timeline.evt.turnStarted", {
+          subject: playerLabel(event.subjectId),
+        }),
+      };
+    }
     if (event.type === "speech_submitted") {
       return {
         typeKey: "speech",

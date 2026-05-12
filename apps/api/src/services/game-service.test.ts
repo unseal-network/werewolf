@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InMemoryGameService, type RuntimeAgentTurnInput } from "./game-service";
+import type { VoiceAgentRegistry } from "./voice-agent";
 
 const players = [
   ["@alice:example.com", "Alice"],
@@ -97,13 +98,19 @@ describe("InMemoryGameService rules", () => {
 
     expect(agentCalls).toBe(0);
     expect(room.projection.currentSpeakerPlayerId).toBe(nextSpeaker.id);
-    expect(room.events.at(-1)).toEqual(
+    expect(room.events).toContainEqual(
       expect.objectContaining({
         type: "speech_submitted",
         actorId: speaker.id,
         payload: expect.objectContaining({
           speech: `${speaker.displayName} chose to remain silent.`,
         }),
+      })
+    );
+    expect(room.events.at(-1)).toEqual(
+      expect.objectContaining({
+        type: "turn_started",
+        subjectId: nextSpeaker.id,
       })
     );
   });
@@ -128,6 +135,105 @@ describe("InMemoryGameService rules", () => {
     expect(room.projection.currentSpeakerPlayerId).toBe(nextSpeaker.id);
     expect(room.projection.deadlineAt).not.toBe(expiredDeadline);
     expect(new Date(room.projection.deadlineAt!).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("emits a public turn event after an agent finishes speaking", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async (input) => ({
+      text: `${input.displayName} has a short claim.`,
+      toolName: "saySpeech",
+      input: { speech: `${input.displayName} has a short claim.` },
+    }));
+
+    const speechEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      );
+    const turnEvent = [...room.events]
+      .reverse()
+      .find((event) => event.type === "turn_started");
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(speechEvent).toBeDefined();
+    expect(turnEvent).toEqual(
+      expect.objectContaining({
+        visibility: "public",
+        actorId: "runtime",
+        subjectId: humanSpeaker.id,
+        payload: expect.objectContaining({
+          previousSpeakerPlayerId: agentSpeaker.id,
+          currentSpeakerPlayerId: humanSpeaker.id,
+        }),
+      })
+    );
+    expect(turnEvent!.seq).toBeGreaterThan(speechEvent!.seq);
+  });
+
+  it("waits for agent TTS playout before completing the speech turn", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    let resolveSpeak: () => void = () => undefined;
+    let speakStarted = false;
+    const speakDone = new Promise<void>((resolve) => {
+      resolveSpeak = resolve;
+    });
+
+    games.setVoiceAgents({
+      get: () => ({
+        speak: () => {
+          speakStarted = true;
+          return speakDone;
+        },
+      }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    const advance = games.advanceGame(gameRoomId, async (input) => ({
+      text: `${input.displayName} has a short claim.`,
+      toolName: "saySpeech",
+      input: { speech: `${input.displayName} has a short claim.` },
+    }));
+
+    await vi.waitFor(() => expect(speakStarted).toBe(true));
+
+    expect(room.projection.currentSpeakerPlayerId).toBe(agentSpeaker.id);
+    expect(room.events.some((event) => event.type === "turn_started")).toBe(false);
+
+    resolveSpeak();
+    await advance;
+
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "turn_started",
+        subjectId: humanSpeaker.id,
+      })
+    );
   });
 
   it("does not advance when a stale deadline from an older phase fires", async () => {
