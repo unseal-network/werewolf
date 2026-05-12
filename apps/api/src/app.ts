@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { createEventsRoutes } from "./routes/events";
 import { createGamesRoutes, type GamesRouteDeps } from "./routes/games";
 import { createLivekitRoutes } from "./routes/livekit";
+import { createWebhookRoutes } from "./routes/webhook";
 import { SseBroker } from "./services/sse-broker";
 import type { GameStore } from "./services/game-store";
 
@@ -22,6 +23,7 @@ export function createApp(deps: AppDeps): Hono {
   }
   app.use("*", cors());
   app.route("/games", createGamesRoutes(deps));
+  app.route("/", createWebhookRoutes());
   app.route(
     "/games",
     createEventsRoutes({
