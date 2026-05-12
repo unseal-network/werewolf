@@ -429,6 +429,13 @@ export class InMemoryGameService {
     );
 
     if (occupant) {
+      if (occupant.kind !== "agent") {
+        throw new AppError(
+          "invalid_action",
+          "Cannot swap seats with another human player",
+          400
+        );
+      }
       // Swap identity DATA between the two slots. player.id / seatNo stay
       // pinned to their seat slot so player_N.seatNo == N still holds.
       const callerSnapshot = {

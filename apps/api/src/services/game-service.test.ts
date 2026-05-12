@@ -39,6 +39,50 @@ function passAgentTurn(input: RuntimeAgentTurnInput) {
 }
 
 describe("InMemoryGameService rules", () => {
+  it("does not let users swap seats with another human player", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+        allowedSourceMatrixRoomIds: [],
+      },
+      players[0][0]
+    );
+    games.join(room.id, players[0][0], players[0][1]);
+    games.join(room.id, players[1][0], players[1][1]);
+
+    expect(() => games.swapSeat(room.id, players[0][0], 2)).toThrow(
+      "Cannot swap seats with another human player"
+    );
+    expect(room.players.find((player) => player.userId === players[0][0])?.seatNo).toBe(1);
+    expect(room.players.find((player) => player.userId === players[1][0])?.seatNo).toBe(2);
+  });
+
+  it("lets users swap seats with agent players before the game starts", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+        allowedSourceMatrixRoomIds: [],
+      },
+      players[0][0]
+    );
+    games.join(room.id, players[0][0], players[0][1]);
+    games.addAgentPlayer(room.id, players[0][0], "@bot:example.com", "Bot");
+
+    const result = games.swapSeat(room.id, players[0][0], 2);
+
+    expect(result.player.userId).toBe(players[0][0]);
+    expect(result.player.seatNo).toBe(2);
+    expect(room.players.find((player) => player.seatNo === 1)?.agentId).toBe("@bot:example.com");
+  });
+
   it("reveals the wolf kill target to the witch before the heal phase action", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

@@ -1089,6 +1089,13 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   async function swapToSeat(seatNo: number) {
     if (!myPlayer) return;
+    const canSwapSeats =
+      !!room &&
+      (room.status === "waiting" || room.status === "created") &&
+      (projection === null ||
+        projection.status === "waiting" ||
+        projection.status === "created");
+    if (!canSwapSeats) return;
     setErrorMessage("");
     try {
       await client.swapSeat(gameRoomId, seatNo);
@@ -1173,9 +1180,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
 
     // Lobby = room exists and game hasn't started. Use room.status (not
-    // projection?.status) because projection is null until startGame runs.
+    // projection?.status) because projection is null until startGame runs,
+    // but require projection to still be lobby-like when it exists so stale
+    // room.status cannot send seat swaps after the game has started.
     const isLobby =
-      !!room && (room.status === "waiting" || room.status === "created");
+      !!room &&
+      (room.status === "waiting" || room.status === "created") &&
+      (projection === null ||
+        projection.status === "waiting" ||
+        projection.status === "created");
 
     if (seat.isEmpty) {
       if (!isLobby) return;
@@ -1203,9 +1216,9 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       return;
     }
 
-    // Lobby: clicking another occupied seat → swap identities (the seat
-    // number itself stays put; only WHO sits there changes).
-    if (isLobby && myPlayer && !seat.isCurrentUser) {
+    // Lobby: clicking an occupied agent seat swaps identities. Human seats
+    // open the profile only; the server enforces the same rule.
+    if (isLobby && myPlayer && !seat.isCurrentUser && seat.kind === "agent") {
       void swapToSeat(seatNo);
       setViewingSeatNo(null);
       return;
