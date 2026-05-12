@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
-import { FloatingRoomStatus } from "./FloatingRoomStatus";
-import { SeatTracksLayout } from "./SeatTracks";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useI18n } from "../i18n/I18nProvider";
+import { SeatAvatar } from "./SeatAvatar";
 import type { SeatData } from "./SeatAvatar";
 import { GameEngine, type EngineGameState } from "../engine/GameEngine";
 
@@ -13,6 +13,10 @@ interface GameRoomShellProps {
   playerCount: number;
   targetPlayerCount: number;
   phaseLabel: string;
+  rawPhase?: string | null | undefined;
+  day?: number | undefined;
+  deadlineAt?: string | null | undefined;
+  aliveCount?: number | undefined;
   scene: SceneId;
   accent: string;
   seats: SeatData[];
@@ -28,6 +32,67 @@ interface GameRoomShellProps {
   isLoading?: boolean;
 }
 
+function useCountdown(deadlineAt: string | null | undefined) {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!deadlineAt) {
+      setSeconds(0);
+      return;
+    }
+    const deadlineMs = new Date(deadlineAt).getTime();
+    if (!Number.isFinite(deadlineMs)) {
+      setSeconds(0);
+      return;
+    }
+    const tick = () => setSeconds(Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000)));
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, [deadlineAt]);
+  return seconds;
+}
+
+function phaseIcon(scene: SceneId) {
+  switch (scene) {
+    case "night":
+      return "🌙";
+    case "day":
+      return "☀️";
+    case "vote":
+      return "🗳";
+    case "tie":
+      return "⚖️";
+    case "deal":
+      return "🃏";
+    case "end":
+      return "🏁";
+    default:
+      return "M";
+  }
+}
+
+function VisualSeatColumn({
+  seats,
+  side,
+  onSeatClick,
+}: {
+  seats: SeatData[];
+  side: "left" | "right";
+  onSeatClick: (seatNo: number) => void;
+}) {
+  return (
+    <div className={`visual-seat-column ${side}`}>
+      {seats.map((seat) => (
+        <SeatAvatar
+          key={seat.seatNo}
+          seat={seat}
+          onClick={() => onSeatClick(seat.seatNo)}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function GameRoomShell({
   title,
   roomCode,
@@ -35,6 +100,10 @@ export function GameRoomShell({
   playerCount,
   targetPlayerCount,
   phaseLabel,
+  rawPhase,
+  day,
+  deadlineAt,
+  aliveCount,
   scene,
   accent,
   seats,
@@ -49,7 +118,23 @@ export function GameRoomShell({
   onHomeClick,
   isLoading,
 }: GameRoomShellProps) {
+  const { t, locale, setLocale } = useI18n();
   const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
+  const countdown = useCountdown(deadlineAt);
+  const danger = countdown > 0 && countdown <= 10;
+  const living = aliveCount ?? playerCount;
+  const activeSeats = useMemo(
+    () => seats.filter((seat) => seat.seatNo <= seatCount),
+    [seatCount, seats]
+  );
+  const occupied = useMemo(
+    () => activeSeats.filter((seat) => !seat.isEmpty),
+    [activeSeats]
+  );
+  const boardSeats = occupied.length > 0 ? occupied : activeSeats.slice(0, Math.min(seatCount, 12));
+  const leftSeats = boardSeats.filter((_, index) => index % 2 === 0);
+  const rightSeats = boardSeats.filter((_, index) => index % 2 === 1);
+  const compact = boardSeats.length >= 10;
   const rootStyle = {
     ["--accent" as string]: accent,
     ["--role-card-back-url" as string]: `url("${assetBase}/card-back.png")`,
@@ -57,19 +142,19 @@ export function GameRoomShell({
   const roleRevealActive = Boolean(engineGameState.roleCard?.visible);
   return (
     <main
-      className="game-room-root"
+      className="game-room-root visual-runtime-root"
       data-scene={scene}
+      data-visual-runtime="true"
+      data-compact={compact ? "true" : "false"}
       style={rootStyle}
     >
-      {/* Phaser game engine canvas layer */}
       <div
-        className={`game-engine-layer ${roleRevealActive ? "role-reveal-active" : ""}`}
+        className={`game-engine-layer visual-role-engine ${roleRevealActive ? "role-reveal-active" : ""}`}
         onClick={roleRevealActive ? onRoleCardClose : undefined}
       >
         <GameEngine gameState={engineGameState} onRoleCardClose={onRoleCardClose} />
       </div>
 
-      {/* DOM UI overlay layer */}
       <div className="dom-ui-layer">
         {isLoading ? (
           <div className="runtime-loading-bar" aria-live="polite">
@@ -78,28 +163,64 @@ export function GameRoomShell({
             </div>
           </div>
         ) : null}
-        <FloatingRoomStatus
-          roomTitle={title}
-          roomCode={roomCode}
-          sourceMatrixRoomId={sourceMatrixRoomId}
-          playerCount={playerCount}
-          targetPlayerCount={targetPlayerCount}
-          phaseLabel={phaseLabel}
-          onHomeClick={onHomeClick}
-        />
+
+        <header className="visual-topbar" aria-label="room-meta">
+          <button
+            type="button"
+            className="visual-nav-button"
+            onClick={onHomeClick}
+            aria-label={t("common.back")}
+          >
+            ←
+          </button>
+          <div className="visual-phase-mark" aria-hidden>
+            {phaseIcon(scene)}
+          </div>
+          <div className="visual-room-meta">
+            <div className="visual-room-title">{title}</div>
+            <div className="visual-room-subtitle">
+              {phaseLabel}
+              {day ? ` · 第 ${day} 天` : ""}
+              {" · "}
+              {living}/{targetPlayerCount || playerCount} 存活
+            </div>
+            {sourceMatrixRoomId ? (
+              <div className="visual-room-source">{roomCode}</div>
+            ) : null}
+          </div>
+          <div className="visual-top-actions">
+            <div className={`visual-countdown ${danger ? "danger" : ""}`}>
+              {deadlineAt ? (countdown > 0 ? countdown : "✓") : "—"}
+            </div>
+            <div className="locale-switcher visual-locale" role="group" aria-label={t("common.languageLabel")}>
+              <button
+                type="button"
+                className={locale === "zh-CN" ? "active" : ""}
+                onClick={() => setLocale("zh-CN")}
+                aria-pressed={locale === "zh-CN"}
+              >
+                中
+              </button>
+              <button
+                type="button"
+                className={locale === "en" ? "active" : ""}
+                onClick={() => setLocale("en")}
+                aria-pressed={locale === "en"}
+              >
+                EN
+              </button>
+            </div>
+          </div>
+        </header>
+
         {roleCardEntry}
 
-        <main className="game">
-          <section className="room">
-            <SeatTracksLayout
-              seats={seats}
-              seatCount={seatCount}
-              onSeatClick={onSeatClick}
-            />
-            <div className="table">
-              <div className="table-aura" aria-hidden />
-              <div className="table-center-frame">{center}</div>
-            </div>
+        <main className="visual-game">
+          <section className="visual-room">
+            <div className="visual-magic-circle" aria-hidden />
+            <VisualSeatColumn seats={leftSeats} side="left" onSeatClick={onSeatClick} />
+            <div className="visual-center">{center}</div>
+            <VisualSeatColumn seats={rightSeats} side="right" onSeatClick={onSeatClick} />
           </section>
         </main>
 

@@ -3546,3 +3546,355 @@ body {
     bottom: 16px !important;
   }
 }
+
+/* ------------------------------------------------------------------
+   Implement-web-runtime inspired shell. This intentionally bypasses the
+   previous table/Phaser-first layout while keeping the same data/actions.
+------------------------------------------------------------------ */
+
+.game-room-root[data-visual-runtime="true"] {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 50% 10%, rgba(109, 40, 217, 0.26), transparent 34%),
+    radial-gradient(circle at 85% 85%, rgba(255, 209, 102, 0.08), transparent 28%),
+    linear-gradient(160deg, #07041a 0%, #0d0825 40%, #120930 70%, #0a0618 100%);
+  color: #e2e8f0;
+  overflow: hidden;
+}
+
+.game-room-root[data-visual-runtime="true"][data-scene="day"],
+.game-room-root[data-visual-runtime="true"][data-scene="vote"],
+.game-room-root[data-visual-runtime="true"][data-scene="tie"] {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(245, 158, 11, 0.16), transparent 34%),
+    radial-gradient(circle at 82% 82%, rgba(139, 92, 246, 0.16), transparent 30%),
+    linear-gradient(160deg, #0c0a1a 0%, #1a1030 42%, #0e1525 72%, #080d18 100%);
+}
+
+.game-room-root[data-visual-runtime="true"]::before,
+.game-room-root[data-visual-runtime="true"]::after {
+  display: none;
+}
+
+.game-room-root[data-visual-runtime="true"] .dom-ui-layer {
+  position: relative;
+  z-index: 2;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.game-room-root[data-visual-runtime="true"] .visual-role-engine {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.game-room-root[data-visual-runtime="true"] .visual-role-engine.role-reveal-active {
+  pointer-events: auto;
+  opacity: 1;
+  z-index: 60;
+}
+
+.visual-topbar {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: 36px 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 74px;
+  padding: calc(env(safe-area-inset-top) + 12px) 16px 10px;
+  background: rgba(0, 0, 0, 0.48);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.22);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.visual-nav-button,
+.visual-phase-mark,
+.visual-countdown {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+}
+
+.visual-nav-button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.visual-phase-mark {
+  border: 1px solid rgba(139, 92, 246, 0.42);
+  background: rgba(109, 40, 217, 0.25);
+  color: #ffd166;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.visual-room-meta {
+  min-width: 0;
+}
+
+.visual-room-title {
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-room-subtitle,
+.visual-room-source {
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.visual-room-subtitle {
+  color: rgba(196, 181, 253, 0.74);
+}
+
+.visual-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.visual-countdown {
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  background: rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.visual-countdown.danger {
+  border-color: rgba(239, 68, 68, 0.42);
+  color: #ef4444;
+}
+
+.visual-locale {
+  position: static;
+}
+
+.visual-game {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  z-index: 10;
+  display: flex;
+  overflow: hidden;
+}
+
+.visual-room {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(82px, 96px) minmax(0, 1fr) minmax(82px, 96px);
+  gap: 4px;
+  padding: 10px 8px 92px;
+  align-items: flex-start;
+}
+
+.visual-seat-column {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.visual-center {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+  align-self: flex-start;
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.visual-magic-circle {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  width: min(52vh, 74vw);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  background:
+    repeating-radial-gradient(circle, transparent 0 18%, rgba(139, 92, 246, 0.18) 18.4% 18.8%, transparent 19.2% 31%),
+    radial-gradient(circle, rgba(139, 92, 246, 0.10), transparent 62%);
+  opacity: 0.72;
+}
+
+.visual-runtime-root .phase-card {
+  width: min(100%, 280px);
+  padding: 14px 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  background: rgba(10, 6, 26, 0.78);
+  color: #e2e8f0;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.36);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.visual-runtime-root .phase-title {
+  font-size: 24px;
+  color: #f8fafc;
+}
+
+.visual-runtime-root .phase-copy,
+.visual-runtime-root .phase-kicker {
+  color: #94a3b8;
+}
+
+.visual-runtime-root .stage-identity {
+  grid-template-columns: 50px minmax(0, 1fr) auto;
+}
+
+.visual-runtime-root .stage-role-token {
+  width: 50px;
+  height: 50px;
+}
+
+.visual-runtime-root .seat {
+  width: 100%;
+  min-height: 82px;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+  padding: 5px 3px 7px;
+}
+
+.visual-runtime-root .seat.active,
+.visual-runtime-root .seat.selected {
+  background: rgba(109, 40, 217, 0.16);
+  border-color: rgba(139, 92, 246, 0.42);
+}
+
+.visual-runtime-root .avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--seat-role-color, #8b5cf6) 42%, rgba(255, 255, 255, 0.18));
+  background: rgba(255, 255, 255, 0.06);
+  color: #94a3b8;
+}
+
+.visual-runtime-root .seat.empty .avatar {
+  background: rgba(255, 255, 255, 0.045);
+  outline: none;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.visual-runtime-root .seat-name {
+  max-width: 78px;
+  color: #94a3b8;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.visual-runtime-root .seat.active .seat-name,
+.visual-runtime-root .seat.selected .seat-name {
+  color: #c4b5fd;
+}
+
+.visual-runtime-root[data-compact="true"] .visual-room {
+  grid-template-columns: 82px minmax(0, 1fr) 82px;
+}
+
+.visual-runtime-root[data-compact="true"] .seat {
+  min-height: 70px;
+}
+
+.visual-runtime-root[data-compact="true"] .avatar {
+  width: 46px;
+  height: 46px;
+}
+
+.visual-runtime-root[data-compact="true"] .seat-name {
+  max-width: 70px;
+}
+
+@media (min-width: 720px) {
+  .visual-topbar {
+    margin: 18px 24px 0;
+    border: 1px solid rgba(139, 92, 246, 0.22);
+    border-radius: 16px;
+    padding-top: 12px;
+  }
+
+  .visual-room {
+    grid-template-columns: minmax(92px, 110px) minmax(320px, 460px) minmax(92px, 110px);
+    justify-content: center;
+    gap: 10px;
+    padding: 18px 18px 92px;
+  }
+
+  .visual-center {
+    padding-top: 32px;
+  }
+}
+
+@media (max-width: 420px) {
+  .visual-topbar {
+    grid-template-columns: 34px 34px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .visual-locale {
+    display: none;
+  }
+
+  .visual-room {
+    grid-template-columns: 76px minmax(0, 1fr) 76px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .visual-runtime-root .phase-card {
+    width: min(100%, 190px);
+    padding: 12px 10px;
+  }
+
+  .visual-runtime-root .phase-title {
+    font-size: 22px;
+  }
+
+  .visual-runtime-root .stage-identity {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .visual-runtime-root .stage-role-token {
+    width: 42px;
+    height: 42px;
+  }
+
+  .visual-runtime-root .stage-alive-dots {
+    display: none;
+  }
+}

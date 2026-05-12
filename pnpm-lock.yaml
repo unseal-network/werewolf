@@ -81,6 +81,16 @@ importers:
       vitest:
         specifier: ^4.0.0
         version: 4.1.5(@types/node@22.19.18)(vite@7.3.3(@types/node@22.19.18)(tsx@4.21.0))
+    optionalDependencies:
+      '@livekit/rtc-node-darwin-arm64':
+        specifier: 0.13.24
+        version: 0.13.24
+      '@livekit/rtc-node-darwin-x64':
+        specifier: 0.13.24
+        version: 0.13.24
+      '@livekit/rtc-node-linux-x64-gnu':
+        specifier: 0.13.24
+        version: 0.13.24
 
   apps/runtime-worker:
     dependencies:
@@ -819,11 +829,29 @@ packages:
     os: [win32]
 
   '@livekit/rtc-ffi-bindings@0.12.52':
-    resolution: {integrity: sha512-h2TF+C5qYJyoInshLwYxr6JDKNqjjaL/qzwF+tW2x9SeRF6oUxerVHmoY9NOuIkwiOOYmM4zSqNGbHxTZYWTuA==}
+    resolution: {integrity: sha512-3ag+l6cRmckkynR0fs/36MNNbXhOE6dv8MvataL/82PB4tjo0HfhQOu8Q9YDdu3K1ycpSjzmbaJO1872gGe0Ww==}
     engines: {node: '>= 18'}
 
+  '@livekit/rtc-node-darwin-arm64@0.13.24':
+    resolution: {integrity: sha512-gm5xOpGu6Rj/mNU2jEijcGhQGN2GdxV2dNYQm3NCKN7ow0BmMFZvXSCAWOWf+9oTutPXHnrc7EN1mt2v+lfqhA==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@livekit/rtc-node-darwin-x64@0.13.24':
+    resolution: {integrity: sha512-jZSK5lHDp7+u0jby7PEWMzbxc0F0nLx6FT3FVjuMlT13ZY6QWKDUUCFbfDOtbdhiOZJYc5A4SwvubY6woEJXTg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@livekit/rtc-node-linux-x64-gnu@0.13.24':
+    resolution: {integrity: sha512-vKOxzN/SsrtV8zIVwZCi31bZUhlb6RhJZ0NnY5MwKGSRFPi7Dwt8fmr0Vh0YmsY/p+4eZjKxvFmy7L3WVE54zw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
   '@livekit/rtc-node@0.13.24':
-    resolution: {integrity: sha512-06pF8YJlJk11R6J7kFXFpwV8etpbmCskoXFvwfwcDDixMqaP6qtS5srq3G23mDaRjx7ofz/PXg2GtiZbqNGT5A==}
+    resolution: {integrity: sha512-PsngGq9/lcwRGwAf5e9haop9XWLxz3CO+ztgRYK0goqJQYZqVPxjTCTGdZxZyQoAR5UPXhIeNgQtlkNqsjjO7A==}
     engines: {node: '>= 18'}
 
   '@livekit/typed-emitter@3.0.0':
@@ -2108,6 +2136,15 @@ snapshots:
       '@livekit/rtc-ffi-bindings-linux-arm64-gnu': 0.12.52
       '@livekit/rtc-ffi-bindings-linux-x64-gnu': 0.12.52
       '@livekit/rtc-ffi-bindings-win32-x64-msvc': 0.12.52
+
+  '@livekit/rtc-node-darwin-arm64@0.13.24':
+    optional: true
+
+  '@livekit/rtc-node-darwin-x64@0.13.24':
+    optional: true
+
+  '@livekit/rtc-node-linux-x64-gnu@0.13.24':
+    optional: true
 
   '@livekit/rtc-node@0.13.24':
     dependencies:

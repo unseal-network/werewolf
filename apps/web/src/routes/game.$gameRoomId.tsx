@@ -1403,6 +1403,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         playerCount={activeSeatCount}
         targetPlayerCount={targetCount}
         phaseLabel={uiProjection.label}
+        rawPhase={projection?.phase ?? null}
+        day={projection?.day}
+        deadlineAt={projection?.deadlineAt}
+        aliveCount={projection?.alivePlayerIds.length ?? activeSeatCount}
         scene={dressing.scene}
         accent={dressing.accent}
         seats={seatView}
