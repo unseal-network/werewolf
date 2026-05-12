@@ -127,6 +127,18 @@ export interface MatrixWhoAmI {
   display_name?: string;
 }
 
+export interface MatrixJoinedRooms {
+  joined_rooms: string[];
+}
+
+export interface MatrixRoomNameState {
+  name?: string;
+}
+
+export interface MatrixCanonicalAliasState {
+  alias?: string;
+}
+
 export interface AgentCandidate {
   userId: string;
   displayName: string;
@@ -252,7 +264,8 @@ export function createApiClient(options: ApiClientOptions) {
       });
     },
     subscribeUrl(gameRoomId: string) {
-      return `${options.baseUrl}/games/${gameRoomId}/subscribe`;
+      const token = encodeURIComponent(options.getMatrixToken());
+      return `${options.baseUrl}/games/${gameRoomId}/subscribe?access_token=${token}`;
     },
     async whoAmI(matrixServerBase: string): Promise<MatrixWhoAmI> {
       const response = await fetch(
@@ -267,6 +280,49 @@ export function createApiClient(options: ApiClientOptions) {
         throw new Error(`Matrix whoami failed: HTTP ${response.status}`);
       }
       return (await response.json()) as MatrixWhoAmI;
+    },
+    async joinedRooms(matrixServerBase: string): Promise<MatrixJoinedRooms> {
+      const response = await fetch(
+        `${matrixServerBase}/_matrix/client/v3/joined_rooms`,
+        {
+          headers: {
+            authorization: `Bearer ${options.getMatrixToken()}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`Matrix joined_rooms failed: HTTP ${response.status}`);
+      }
+      return (await response.json()) as MatrixJoinedRooms;
+    },
+    async roomDisplayName(
+      matrixServerBase: string,
+      roomId: string
+    ): Promise<string | null> {
+      const encodedRoomId = encodeURIComponent(roomId);
+      const stateBase = `${matrixServerBase}/_matrix/client/v3/rooms/${encodedRoomId}/state`;
+
+      const nameResponse = await fetch(`${stateBase}/m.room.name`, {
+        headers: {
+          authorization: `Bearer ${options.getMatrixToken()}`,
+        },
+      });
+      if (nameResponse.ok) {
+        const body = (await nameResponse.json()) as MatrixRoomNameState;
+        if (body.name?.trim()) return body.name.trim();
+      }
+
+      const aliasResponse = await fetch(`${stateBase}/m.room.canonical_alias`, {
+        headers: {
+          authorization: `Bearer ${options.getMatrixToken()}`,
+        },
+      });
+      if (aliasResponse.ok) {
+        const body = (await aliasResponse.json()) as MatrixCanonicalAliasState;
+        if (body.alias?.trim()) return body.alias.trim();
+      }
+
+      return null;
     },
   };
 }

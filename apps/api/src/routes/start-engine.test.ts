@@ -54,7 +54,6 @@ describe("start API engine integration", () => {
     expect(body.status).toBe("active");
     expect(body.events.map((event) => event.type)).toEqual([
       "game_started",
-      "roles_assigned",
       "phase_started",
     ]);
   });

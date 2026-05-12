@@ -1,3 +1,5 @@
+import { AppError } from "@werewolf/shared";
+
 export interface MatrixWhoami {
   user_id: string;
   device_id?: string;
@@ -19,7 +21,12 @@ export async function authenticateRequest(
 ): Promise<AuthenticatedUser> {
   const header = request.headers.get("authorization") ?? "";
   const match = header.match(/^Bearer\s+(.+)$/);
-  const token = match?.[1] ?? "demo";
+  const url = new URL(request.url);
+  const queryToken = url.searchParams.get("access_token") ?? undefined;
+  const token = match?.[1] ?? queryToken;
+  if (!token) {
+    throw new AppError("unauthorized", "Matrix bearer token is required", 401);
+  }
 
   const demoToken = process.env.DEMO_USER_TOKEN;
   if (demoToken && token === demoToken) {
@@ -39,12 +46,6 @@ export async function authenticateRequest(
       displayName: whoami.user_id,
     };
   } catch {
-    // Fallback to demo user when Matrix auth fails
-    const demoUserId = process.env.DEMO_USER_ID ?? "@kimigame1:keepsecret.io";
-    return {
-      id: demoUserId,
-      matrixUserId: demoUserId,
-      displayName: "kimi game 1",
-    };
+    throw new AppError("unauthorized", "Invalid Matrix bearer token", 401);
   }
 }

@@ -9,6 +9,7 @@ interface AgentPickerProps {
   errorMessage?: string | undefined;
   sourceRoomId?: string | undefined;
   remainingSeats: number;
+  canStartNow: boolean;
   onAdd: (agent: AgentCandidate) => Promise<void>;
   onRefresh: () => void;
   onStartNow?: () => void;
@@ -22,6 +23,7 @@ export function AgentPicker({
   errorMessage,
   sourceRoomId,
   remainingSeats,
+  canStartNow,
   onAdd,
   onRefresh,
   onStartNow,
@@ -128,7 +130,7 @@ export function AgentPicker({
               type="button"
               className="action primary"
               onClick={onStartNow}
-              disabled={remainingSeats > 0}
+              disabled={!canStartNow}
             >
               {t("agentPicker.startNow")}
             </button>

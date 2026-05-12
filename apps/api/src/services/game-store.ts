@@ -94,7 +94,7 @@ export class GameStore {
             seatNo: player.seatNo,
             ready: player.ready,
             onlineState: player.onlineState,
-            joinedAt: now,
+            joinedAt: player.joinedAt ? new Date(player.joinedAt) : now,
             leftAt: player.leftAt ? new Date(player.leftAt) : null,
           }))
         );
@@ -206,6 +206,140 @@ export class GameStore {
   }
 
   /**
+   * Persist a complete room snapshot and optional newly assigned events in one
+   * DB transaction. This is the durable boundary for the runtime: replay data
+   * and projection/private snapshots move forward together or not at all.
+   */
+  async saveSnapshot(room: StoredGameRoom, events: GameEvent[] = []): Promise<void> {
+    const now = new Date();
+    const deadline = room.projection?.deadlineAt
+      ? new Date(room.projection.deadlineAt)
+      : null;
+    const projectionPayload: PersistedProjectionPayload | null = room.projection
+      ? {
+          projection: room.projection,
+          runtime: {
+            speechQueue: room.speechQueue,
+            pendingNightActions: room.pendingNightActions,
+            pendingVotes: room.pendingVotes,
+            tiePlayerIds: room.tiePlayerIds,
+          },
+        }
+      : null;
+
+    await this.db.transaction(async (tx) => {
+      await tx
+        .insert(gameRooms)
+        .values({
+          id: room.id,
+          creatorUserId: room.creatorUserId,
+          status: room.status,
+          title: room.title,
+          targetPlayerCount: room.targetPlayerCount,
+          timing: room.timing,
+          createdFromMatrixRoomId: room.createdFromMatrixRoomId,
+          allowedSourceMatrixRoomIds: room.allowedSourceMatrixRoomIds,
+          agentSourceMatrixRoomId: room.agentSourceMatrixRoomId,
+          nextTickAt: deadline,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: gameRooms.id,
+          set: {
+            status: room.status,
+            title: room.title,
+            targetPlayerCount: room.targetPlayerCount,
+            timing: room.timing,
+            allowedSourceMatrixRoomIds: room.allowedSourceMatrixRoomIds,
+            agentSourceMatrixRoomId: room.agentSourceMatrixRoomId,
+            nextTickAt: deadline,
+            updatedAt: now,
+          },
+        });
+
+      await tx
+        .delete(gameRoomPlayers)
+        .where(eq(gameRoomPlayers.gameRoomId, room.id));
+      if (room.players.length > 0) {
+        await tx.insert(gameRoomPlayers).values(
+          room.players.map((player) => ({
+            id: `${room.id}:${player.id}`,
+            gameRoomId: room.id,
+            kind: player.kind,
+            userId: player.userId ?? null,
+            agentId: player.agentId ?? null,
+            displayName: player.displayName,
+            seatNo: player.seatNo,
+            ready: player.ready,
+            onlineState: player.onlineState,
+            joinedAt: player.joinedAt ? new Date(player.joinedAt) : now,
+            leftAt: player.leftAt ? new Date(player.leftAt) : null,
+          }))
+        );
+      }
+
+      if (projectionPayload && room.projection) {
+        await tx
+          .insert(roomProjection)
+          .values({
+            gameRoomId: room.id,
+            version: room.projection.version,
+            publicState: projectionPayload,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: roomProjection.gameRoomId,
+            set: {
+              version: room.projection.version,
+              publicState: projectionPayload,
+              updatedAt: now,
+            },
+          });
+      }
+
+      for (const state of room.privateStates) {
+        await tx
+          .insert(playerPrivateState)
+          .values({
+            gameRoomId: room.id,
+            playerId: state.playerId,
+            privateState: state,
+            updatedAt: now,
+          })
+          .onConflictDoUpdate({
+            target: [
+              playerPrivateState.gameRoomId,
+              playerPrivateState.playerId,
+            ],
+            set: { privateState: state, updatedAt: now },
+          });
+      }
+
+      if (events.length > 0) {
+        await tx
+          .insert(gameEvents)
+          .values(
+            events.map((event) => ({
+              id: event.id,
+              gameRoomId: room.id,
+              seq: event.seq,
+              type: event.type,
+              visibility: event.visibility,
+              actorId: event.actorId ?? null,
+              subjectId: event.subjectId ?? null,
+              payload: event.payload,
+              createdAt: new Date(event.createdAt),
+            }))
+          )
+          .onConflictDoNothing({
+            target: [gameEvents.gameRoomId, gameEvents.seq],
+          });
+      }
+    });
+  }
+
+  /**
    * Set when the runtime should next be ticked for this room. The tick
    * worker polls `next_tick_at <= now()` and calls scheduleAdvance for any
    * matches. Passing null clears the schedule (e.g. when a human turn has
@@ -279,6 +413,7 @@ export class GameStore {
         ready: p.ready,
         onlineState: p.onlineState as "online" | "offline",
         leftAt: p.leftAt ? p.leftAt.toISOString() : null,
+        joinedAt: p.joinedAt.toISOString(),
       }));
       const privateStates = (privateByRoom.get(r.id) ?? []).map(
         (row) => row.privateState as PlayerPrivateState
@@ -322,18 +457,27 @@ export class GameStore {
    * Return room IDs whose next_tick_at deadline has passed. Used by the
    * tick worker to drive auto-advance for rooms with no live client.
    */
-  async claimDueRooms(now: Date): Promise<string[]> {
-    const rows = await this.db
-      .select({ id: gameRooms.id })
-      .from(gameRooms)
-      .where(
-        and(
-          eq(gameRooms.status, "active"),
-          isNotNull(gameRooms.nextTickAt),
-          lte(gameRooms.nextTickAt, now)
-        )
-      );
-    return rows.map((r) => r.id);
+  async claimDueRooms(now: Date, leaseMs = 30_000, limit = 25): Promise<string[]> {
+    const leaseUntil = new Date(now.getTime() + leaseMs);
+    const nowIso = now.toISOString();
+    const leaseUntilIso = leaseUntil.toISOString();
+    const rows = await this.db.execute<{ id: string }>(rawSql`
+      UPDATE game_rooms
+      SET runtime_lease_until = ${leaseUntilIso}, updated_at = ${nowIso}
+      WHERE id IN (
+        SELECT id
+        FROM game_rooms
+        WHERE status = 'active'
+          AND next_tick_at IS NOT NULL
+          AND next_tick_at <= ${nowIso}
+          AND (runtime_lease_until IS NULL OR runtime_lease_until <= ${nowIso})
+        ORDER BY next_tick_at
+        LIMIT ${limit}
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id
+    `);
+    return rows.map((row) => row.id);
   }
 
   /**

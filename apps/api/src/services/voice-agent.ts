@@ -21,6 +21,10 @@ const TTS_OUTPUT_FORMAT: TtsOutputFormat = "pcm_16000";
 const TTS_AUDIO_SOURCE_SAMPLE_RATE = 16000;
 const TTS_AUDIO_SOURCE_CHANNELS = 1;
 const AGENT_VOICE_TRACK_NAME = "agent-voice";
+const TTS_CONNECT_TIMEOUT_MS = 5000;
+const TTS_SYNTH_TIMEOUT_MS = 30_000;
+const LIVEKIT_RECONNECT_DELAY_MS = 1000;
+const LIVEKIT_CONNECT_TIMEOUT_MS = 7000;
 
 export interface VoiceAgentConfig {
   livekitUrl: string;
@@ -70,6 +74,9 @@ export class VoiceAgentService {
    *  player's matrix ID). Falls back to config.unsealAgentId when missing. */
   private playerAgentIds = new Map<string, string>();
   private connected = false;
+  private connectPromise: Promise<void> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionalDisconnect = false;
   /** Serializes speak() so two simultaneous utterances don't interleave
    *  PCM into the shared audio track. */
   private speakQueue: Promise<void> = Promise.resolve();
@@ -103,7 +110,20 @@ export class VoiceAgentService {
   }
 
   async connect(): Promise<void> {
-    if (this.connected) return;
+    if (this.connected && this.room && this.audioSource) return;
+    if (this.connectPromise) return this.connectPromise;
+    this.connectPromise = this.connectInner().finally(() => {
+      this.connectPromise = null;
+    });
+    return this.connectPromise;
+  }
+
+  private async connectInner(): Promise<void> {
+    this.intentionalDisconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     const at = new AccessToken(this.config.livekitApiKey, this.config.livekitApiSecret, {
       identity: `voice-agent:${this.gameRoomId}`,
       name: "Voice Agent",
@@ -119,34 +139,64 @@ export class VoiceAgentService {
     const token = await at.toJwt();
     const room = new Room();
     this.room = room;
+    room.on(RoomEvent.Disconnected, () => {
+      this.connected = false;
+      this.audioSource = null;
+      this.agentTrack = null;
+      if (!this.intentionalDisconnect) {
+        this.scheduleReconnect("LiveKit room disconnected");
+      }
+    });
     room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
       if (track.kind !== TrackKind.KIND_AUDIO) return;
       const identity = participant.identity;
       if (identity.startsWith("voice-agent:")) return;
       void this.handlePlayerTrack(identity, track as RemoteTrack);
     });
-    await room.connect(this.config.livekitUrl, token, {
-      autoSubscribe: true,
-      dynacast: false,
-    });
-    this.connected = true;
+    try {
+      await withTimeout(
+        room.connect(this.config.livekitUrl, token, {
+          autoSubscribe: true,
+          dynacast: false,
+        }),
+        LIVEKIT_CONNECT_TIMEOUT_MS,
+        "LiveKit voice-agent connect timed out"
+      );
+      this.connected = true;
 
-    const source = new AudioSource(
-      TTS_AUDIO_SOURCE_SAMPLE_RATE,
-      TTS_AUDIO_SOURCE_CHANNELS
-    );
-    this.audioSource = source;
-    const track = LocalAudioTrack.createAudioTrack(AGENT_VOICE_TRACK_NAME, source);
-    this.agentTrack = track;
-    const opts = new TrackPublishOptions();
-    opts.source = TrackSource.SOURCE_MICROPHONE;
-    if (!room.localParticipant) {
-      throw new Error("LiveKit local participant unavailable after connect");
+      const source = new AudioSource(
+        TTS_AUDIO_SOURCE_SAMPLE_RATE,
+        TTS_AUDIO_SOURCE_CHANNELS
+      );
+      this.audioSource = source;
+      const track = LocalAudioTrack.createAudioTrack(AGENT_VOICE_TRACK_NAME, source);
+      this.agentTrack = track;
+      const opts = new TrackPublishOptions();
+      opts.source = TrackSource.SOURCE_MICROPHONE;
+      if (!room.localParticipant) {
+        throw new Error("LiveKit local participant unavailable after connect");
+      }
+      await room.localParticipant.publishTrack(track, opts);
+    } catch (err) {
+      this.connected = false;
+      this.audioSource = null;
+      this.agentTrack = null;
+      try {
+        await room.disconnect();
+      } catch {
+        // ignore
+      }
+      if (this.room === room) this.room = null;
+      throw err;
     }
-    await room.localParticipant.publishTrack(track, opts);
   }
 
   async disconnect(): Promise<void> {
+    this.intentionalDisconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     for (const session of this.playerSessions.values()) {
       session.active = false;
       session.client.close();
@@ -162,6 +212,7 @@ export class VoiceAgentService {
       this.room = null;
     }
     this.connected = false;
+    this.connectPromise = null;
   }
 
   /**
@@ -197,6 +248,13 @@ export class VoiceAgentService {
     return text;
   }
 
+  resetPlayerTranscript(playerId: string): void {
+    const session = this.playerSessions.get(playerId);
+    if (!session) return;
+    session.client.resetBuffer();
+    session.lastSentChunk = null;
+  }
+
   /**
    * Synthesize speech, stream PCM into the shared agent voice track, and
    * resolve only after the audio has had enough time to play out.
@@ -214,13 +272,13 @@ export class VoiceAgentService {
   }
 
   /**
-   * Hard ceiling on a single speak() call. The TTS WebSocket has its own 30s
+   * Hard ceiling on a single speak() call. The TTS WebSocket has its own short
    * timeout, but the LiveKit native AudioSource can occasionally hang on
    * captureFrame (e.g., transient SFU connection issues), and we MUST NOT let
    * a single stuck utterance block the speakQueue forever — every subsequent
    * agent turn chains off speakQueue and would stall the whole game.
    */
-  private static readonly SPEAK_HARD_TIMEOUT_MS = 120_000;
+  private static readonly SPEAK_HARD_TIMEOUT_MS = 90_000;
 
   private async speakImpl(text: string, playerId?: string | null): Promise<void> {
     const inner = this.speakImplInner(text, playerId);
@@ -244,11 +302,21 @@ export class VoiceAgentService {
     text: string,
     playerId?: string | null
   ): Promise<void> {
-    if (!this.connected || !this.audioSource) return;
     const trimmed = text.trim();
     if (!trimmed) return;
+    try {
+      await this.connect();
+    } catch (err) {
+      console.error("[VoiceAgent] reconnect before speak failed:", err);
+      this.scheduleReconnect("speak connect failed");
+      return;
+    }
+    if (!this.connected || !this.audioSource) {
+      this.scheduleReconnect("speak without connected audio source");
+      return;
+    }
 
-    let totalSamples = 0;
+    let publishedSamples = 0;
     const sampleRate = TTS_AUDIO_SOURCE_SAMPLE_RATE; // we always request pcm_16000
     // Serialize captureFrame calls — the LiveKit rtc-node AudioSource native
     // FFI rejects concurrent captures with "InvalidState - failed to capture
@@ -259,6 +327,7 @@ export class VoiceAgentService {
       apiBaseUrl: this.config.unsealApiBaseUrl,
       agentId: this.resolveAgentId(playerId),
       apiKey: this.config.unsealApiKey,
+      connectTimeoutMs: TTS_CONNECT_TIMEOUT_MS,
       onAudioChunk: (chunk, frameRate) => {
         const rate = frameRate ?? sampleRate;
         const int16Length = Math.floor(chunk.byteLength / Int16Array.BYTES_PER_ELEMENT);
@@ -268,24 +337,25 @@ export class VoiceAgentService {
         for (let i = 0; i < int16Length; i += 1) {
           int16[i] = chunk.readInt16LE(i * Int16Array.BYTES_PER_ELEMENT);
         }
-        totalSamples += int16Length;
         captureChain = captureChain
           .then(async () => {
             const cap = this.publishTtsPcm(int16, rate);
-            if (cap) await cap;
+            if (cap && (await cap)) {
+              publishedSamples += int16Length;
+            }
           })
           .catch(() => undefined);
       },
       onError: (err) => console.error("[VoiceAgent] TTS error:", err),
     });
 
-    const t0 = Date.now();
     try {
       await ttsClient.connect();
       await ttsClient.synthesize(trimmed, {
         outputFormat: TTS_OUTPUT_FORMAT,
         modelId: "eleven_multilingual_v2",
         flush: true,
+        timeoutMs: TTS_SYNTH_TIMEOUT_MS,
       });
       // Wait for the serialized capture chain so every PCM frame is queued in
       // the AudioSource before we begin the duration wait below.
@@ -299,13 +369,14 @@ export class VoiceAgentService {
     // Block the queue until the audio has had time to play out so that
     // the game-service caller doesn't advance to the next speaker while
     // the previous agent is still speaking.
-    if (totalSamples > 0) {
-      const audioMs = (totalSamples / sampleRate) * 1000;
-      const elapsedMs = Date.now() - t0;
-      // Small tail so the WebRTC layer can flush its jitter buffer to
-      // the receiver before the next utterance begins.
-      const tailMs = 250;
-      const waitMs = Math.max(0, audioMs - elapsedMs + tailMs);
+    if (publishedSamples > 0) {
+      const audioMs = (publishedSamples / sampleRate) * 1000;
+      // `captureFrame` only tells us the frame was accepted by LiveKit; it
+      // does not prove remote clients have played the queued PCM. Drain from
+      // the end of capture instead of subtracting TTS generation time, or the
+      // game can advance to voting while the final utterance is still audible.
+      const tailMs = 500;
+      const waitMs = audioMs + tailMs;
       if (waitMs > 0) {
         await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
       }
@@ -404,7 +475,7 @@ export class VoiceAgentService {
   private publishTtsPcm(
     samples: Int16Array,
     sampleRate: number
-  ): Promise<void> | null {
+  ): Promise<boolean> | null {
     if (!this.audioSource || samples.length === 0) return null;
     const frame = new AudioFrame(
       samples,
@@ -412,10 +483,43 @@ export class VoiceAgentService {
       TTS_AUDIO_SOURCE_CHANNELS,
       samples.length
     );
-    return this.audioSource.captureFrame(frame).catch((err) => {
-      console.error("[VoiceAgent] captureFrame error:", err);
-    });
+    return this.audioSource
+      .captureFrame(frame)
+      .then(() => true)
+      .catch((err) => {
+        console.error("[VoiceAgent] captureFrame error:", err);
+        this.connected = false;
+        this.audioSource = null;
+        this.scheduleReconnect("TTS captureFrame failed");
+        return false;
+      });
   }
+
+  private scheduleReconnect(reason: string): void {
+    if (this.intentionalDisconnect || this.reconnectTimer) return;
+    console.error(`[VoiceAgent] scheduling reconnect: ${reason}`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect().catch((err) => {
+        console.error("[VoiceAgent] reconnect failed:", err);
+        this.scheduleReconnect("reconnect failed");
+      });
+    }, LIVEKIT_RECONNECT_DELAY_MS);
+  }
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 }
 
 /** One VoiceAgentService per game room. */

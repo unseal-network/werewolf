@@ -64,9 +64,9 @@ export class TickWorker {
       // fine and avoids one slow room blocking another.
       for (const roomId of roomIds) {
         void this.games
-          .scheduleAdvance(roomId)
+          .scheduleDeadlineAdvance(roomId)
           .catch((err) =>
-            console.error(`[TickWorker] scheduleAdvance(${roomId}) failed:`, err)
+            console.error(`[TickWorker] scheduleDeadlineAdvance(${roomId}) failed:`, err)
           );
       }
     } catch (err) {

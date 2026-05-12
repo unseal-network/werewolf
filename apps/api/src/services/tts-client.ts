@@ -10,6 +10,8 @@ export interface TtsClientOptions {
   apiBaseUrl: string; // e.g. https://un-server.dev-excel-alt.pagepeek.org/api
   agentId: string;
   apiKey: string;
+  /** @default 5000 */
+  connectTimeoutMs?: number;
   /**
    * Invoked for each non-empty audio chunk, decoded from the `audio` base64
    * field. The first argument is the raw audio bytes in the requested
@@ -91,6 +93,15 @@ export class TtsWebSocketClient {
         headers: { "x-api-key": this.opts.apiKey },
       });
       this.ws = ws;
+      const timer = setTimeout(() => {
+        cleanupHandshake();
+        try {
+          ws.terminate();
+        } catch {
+          // ignore
+        }
+        reject(new Error("TTS websocket connect timed out"));
+      }, this.opts.connectTimeoutMs ?? 5000);
 
       const onOpen = () => {
         cleanupHandshake();
@@ -101,6 +112,7 @@ export class TtsWebSocketClient {
         reject(err);
       };
       const cleanupHandshake = () => {
+        clearTimeout(timer);
         ws.off("open", onOpen);
         ws.off("error", onError);
       };
@@ -162,8 +174,12 @@ export class TtsWebSocketClient {
       this.currentRequest.resolve();
       this.currentRequest = null;
     }
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close();
+    if (this.ws) {
+      if (this.ws.readyState === WebSocket.OPEN) {
+        this.ws.close();
+      } else if (this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.terminate();
+      }
     }
     this.ws = null;
   }

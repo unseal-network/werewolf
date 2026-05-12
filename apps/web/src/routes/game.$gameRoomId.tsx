@@ -13,6 +13,13 @@ import { getPhaseAnimationCue } from "../animation/phaseCatalog";
 import { useT } from "../i18n/I18nProvider";
 import type { SceneId } from "../components/GameRoomShell";
 import type { EngineGameState } from "../engine/GameEngine";
+import {
+  DEMO_DISPLAY_NAME,
+  DEMO_USER_ID,
+  MATRIX_USER_ID_STORAGE_KEY,
+  matrixServerBaseFromToken,
+  readMatrixToken,
+} from "../matrix/session";
 
 interface PhaseDressing {
   scene: SceneId;
@@ -53,20 +60,6 @@ interface UserSeatState {
 }
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
-
-function matrixServerBaseFromToken(token: string): string {
-  if (token.includes(":")) {
-    const atMatch = token.match(/@[^:]+:([^:]+)$/);
-    if (atMatch) {
-      return `https://${atMatch[1]}`;
-    }
-  }
-  const mxMatch = token.match(/\.([A-Za-z0-9.-]+)(?::\w+)?$/);
-  if (mxMatch) {
-    return `https://${mxMatch[1]}`;
-  }
-  return "https://keepsecret.io";
-}
 
 function stripPayloadFromEvent(raw: string): string {
   if (raw.startsWith("data:")) {
@@ -409,15 +402,13 @@ function parseCurrentSpeakerSeat(
   return player?.seatNo;
 }
 
-const DEMO_TOKEN = "syt_a2ltaWdhbWUx_WEnXKgiFtirbEiSPTMwU_2p1YIY";
-const DEMO_USER_ID = "@kimigame1:keepsecret.io";
-const DEMO_DISPLAY_NAME = "kimi game 1";
-
 export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   const t = useT();
-  const matrixToken = DEMO_TOKEN;
-  const matrixUserId = DEMO_USER_ID;
-  const matrixDisplayName = DEMO_DISPLAY_NAME;
+  const [matrixToken] = useState(() => readMatrixToken());
+  const [matrixUserId, setMatrixUserId] = useState(
+    () => localStorage.getItem(MATRIX_USER_ID_STORAGE_KEY) ?? DEMO_USER_ID
+  );
+  const [matrixDisplayName, setMatrixDisplayName] = useState(DEMO_DISPLAY_NAME);
   const [room, setRoom] = useState<GameRoom | null>(null);
   const [projection, setProjection] = useState<RoomProjection | null>(null);
   const [privateStates, setPrivateStates] = useState<PlayerPrivateState[]>([]);
@@ -441,6 +432,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   // recompute (now - deadlineAt) on a steady cadence.
   const [nowTick, setNowTick] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const sseReconnectTimerRef = useRef<number | null>(null);
   const pollTimerRef = useRef<number | null>(null);
   const autoTickPhaseRef = useRef<string>("");
   const isDevMode = useMemo(
@@ -452,10 +444,26 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     () =>
       createApiClient({
         baseUrl: apiBaseUrl,
-        getMatrixToken: () => DEMO_TOKEN,
+        getMatrixToken: () => matrixToken,
       }),
-    []
+    [matrixToken]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    void client
+      .whoAmI(matrixServerBaseFromToken(matrixToken))
+      .then((whoami) => {
+        if (cancelled || !whoami.user_id) return;
+        localStorage.setItem(MATRIX_USER_ID_STORAGE_KEY, whoami.user_id);
+        setMatrixUserId(whoami.user_id);
+        setMatrixDisplayName(whoami.display_name ?? whoami.user_id);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [client, matrixToken]);
 
   const refreshGame = useCallback(async () => {
     try {
@@ -478,7 +486,24 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
   }, [client, gameRoomId]);
 
+  const queueSnapshotRefresh = useCallback(
+    (delayMs = 350) => {
+      if (pollTimerRef.current !== null) {
+        window.clearTimeout(pollTimerRef.current);
+      }
+      pollTimerRef.current = window.setTimeout(() => {
+        pollTimerRef.current = null;
+        void refreshGame();
+      }, delayMs);
+    },
+    [refreshGame]
+  );
+
   const connectSSE = useCallback(() => {
+    if (sseReconnectTimerRef.current !== null) {
+      window.clearTimeout(sseReconnectTimerRef.current);
+      sseReconnectTimerRef.current = null;
+    }
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
@@ -509,6 +534,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     source.onerror = () => {
       source.close();
       eventSourceRef.current = null;
+      sseReconnectTimerRef.current = window.setTimeout(() => {
+        sseReconnectTimerRef.current = null;
+        void refreshGame().finally(() => connectSSE());
+      }, 1000);
     };
     eventSourceRef.current = source;
   }, [client, gameRoomId, refreshGame]);
@@ -528,6 +557,12 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       mounted = false;
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
+      }
+      if (sseReconnectTimerRef.current !== null) {
+        window.clearTimeout(sseReconnectTimerRef.current);
+      }
+      if (pollTimerRef.current !== null) {
+        window.clearTimeout(pollTimerRef.current);
       }
     };
   }, [refreshGame, connectSSE]);
@@ -569,6 +604,11 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   const myPrivateState = useMemo(
     () => privateStates.find((state) => state.playerId === myPlayer?.id),
     [myPlayer?.id, privateStates]
+  );
+  const myIsAlive = Boolean(
+    myPlayer &&
+      myPrivateState?.alive !== false &&
+      (projection?.alivePlayerIds.includes(myPlayer.id) ?? true)
   );
   // Mirror myPrivateState into a ref so the long-lived SSE handler (created
   // once per gameRoomId) can read it without forcing a reconnect every time
@@ -623,6 +663,30 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     return () => window.clearInterval(id);
   }, [projection?.deadlineAt]);
 
+  useEffect(() => {
+    setSelectedTargetId(null);
+  }, [projection?.phase, projection?.day]);
+
+  useEffect(() => {
+    if (!projection?.deadlineAt || projection.status === "ended") return;
+    const deadlineMs = new Date(projection.deadlineAt).getTime();
+    if (!Number.isFinite(deadlineMs)) return;
+    const delayMs = Math.max(0, deadlineMs - Date.now() + 750);
+    const id = window.setTimeout(() => {
+      void refreshGame();
+      if (!eventSourceRef.current) {
+        connectSSE();
+      }
+    }, delayMs);
+    return () => window.clearTimeout(id);
+  }, [
+    connectSSE,
+    projection?.deadlineAt,
+    projection?.phase,
+    projection?.status,
+    refreshGame,
+  ]);
+
   const uiProjection = useMemo(() => {
     const spec = mapServerPhaseToUi(projection?.phase ?? null);
     const label = spec.rawLabel ?? t(spec.labelKey, { day: projection?.day ?? 1 });
@@ -638,17 +702,33 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     () => parseCurrentSpeakerSeat(room?.players ?? [], projection),
     [projection, room?.players]
   );
+  const witchHealTargetId = useMemo(() => {
+    if (projection?.phase !== "night_witch_heal" || myPrivateState?.role !== "witch") {
+      return null;
+    }
+    const wolfKill = [...events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "witch_kill_revealed" &&
+          Number(event.payload?.day) === projection.day
+      );
+    const targetId = String(wolfKill?.payload?.targetPlayerId ?? "");
+    return targetId || null;
+  }, [events, myPrivateState?.role, projection?.day, projection?.phase]);
 
   const legalTargetIds = useMemo(() => {
     const alive = new Set(projection?.alivePlayerIds ?? []);
     const out = new Set<string>();
     const isCreatorRunning = projection?.status === "active" || projection?.status === "paused";
-    if (!room || !isCreatorRunning || !myPlayer) {
+    if (!room || !isCreatorRunning || !myPlayer || !myIsAlive) {
       return out;
     }
     if (projection?.phase === "day_vote") {
       for (const playerId of alive) {
-        out.add(playerId);
+        if (playerId !== myPlayer.id) {
+          out.add(playerId);
+        }
       }
       return out;
     }
@@ -675,14 +755,8 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       return out;
     }
     if (projection?.phase === "night_witch_heal" && myPrivateState?.role === "witch") {
-      if (!myPrivateState.witchItems?.healAvailable) {
-        return out;
-      }
-      for (const player of room.players) {
-        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
-          out.add(player.id);
-        }
-      }
+      // The witch heal phase is a yes/no decision against the revealed wolf
+      // target, not a free target selection interaction.
       return out;
     }
     if (projection?.phase === "night_witch_poison" && myPrivateState?.role === "witch") {
@@ -705,7 +779,28 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       return out;
     }
     return out;
-  }, [myPlayer, room, projection, seerChecked, myPrivateState]);
+  }, [myPlayer, myIsAlive, room, projection, seerChecked, myPrivateState]);
+
+  const centerActionTargetIds = useMemo(() => {
+    const out = new Set(legalTargetIds);
+    if (
+      projection?.phase === "night_witch_heal" &&
+      myPrivateState?.role === "witch" &&
+      myPrivateState.witchItems?.healAvailable &&
+      witchHealTargetId &&
+      projection.alivePlayerIds.includes(witchHealTargetId)
+    ) {
+      out.add(witchHealTargetId);
+    }
+    return out;
+  }, [
+    legalTargetIds,
+    myPrivateState?.role,
+    myPrivateState?.witchItems?.healAvailable,
+    projection?.alivePlayerIds,
+    projection?.phase,
+    witchHealTargetId,
+  ]);
 
   const knownTeammateIds = useMemo(() => {
     const ids = myPrivateState?.knownTeammatePlayerIds ?? [];
@@ -742,7 +837,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   const candidateSeats = useMemo(
     () =>
-      Array.from(legalTargetIds)
+      Array.from(centerActionTargetIds)
         .map((playerId) => room?.players.find((player) => player.id === playerId))
         .filter((player): player is RoomPlayer => Boolean(player))
         .map((player) => ({
@@ -750,7 +845,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
           playerId: player.id,
           displayName: player.displayName,
         })),
-    [legalTargetIds, room?.players]
+    [centerActionTargetIds, room?.players]
   );
 
   const actionCanRun = isCreator && uiProjection.canProgress;
@@ -786,13 +881,24 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   const isMyTurnToSpeak = useMemo(() => {
     if (!myPlayer) return false;
+    if (!myIsAlive) return false;
     if (uiProjection.phaseId !== "day") return false;
     return projection?.currentSpeakerPlayerId === myPlayer.id;
-  }, [myPlayer, uiProjection.phaseId, projection?.currentSpeakerPlayerId]);
+  }, [myPlayer, myIsAlive, uiProjection.phaseId, projection?.currentSpeakerPlayerId]);
+  const isWolfNightDiscussion = useMemo(
+    () =>
+      Boolean(
+        myPlayer &&
+          myIsAlive &&
+          projection?.phase === "night_wolf" &&
+          myPrivateState?.role === "werewolf"
+      ),
+    [myPlayer, myIsAlive, myPrivateState?.role, projection?.phase]
+  );
 
   const hasActedThisPhase = useMemo(() => {
     if (!myPlayer || !projection || !projection.phase) return false;
-    const phase = projection.phase;
+    const phase = projection.phase ?? "";
     const day = projection.day;
     if (phase === "day_speak" || phase === "tie_speech") {
       return projection.currentSpeakerPlayerId !== myPlayer.id;
@@ -826,28 +932,29 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   const canCurrentUserAct = useMemo(() => {
     if (!myPlayer) return false;
+    if (!myIsAlive) return false;
     if (uiProjection.actionMode === "lobby" || uiProjection.actionMode === "deal" || uiProjection.actionMode === "end" || uiProjection.actionMode === "waiting") {
       return false;
     }
     if (hasActedThisPhase) return false;
-    if (legalTargetIds.size > 0) return true;
+    if (centerActionTargetIds.size > 0) return true;
     if (isMyTurnToSpeak) return true;
     return false;
-  }, [myPlayer, uiProjection.actionMode, legalTargetIds.size, isMyTurnToSpeak, hasActedThisPhase]);
+  }, [myPlayer, myIsAlive, uiProjection.actionMode, centerActionTargetIds.size, isMyTurnToSpeak, hasActedThisPhase]);
 
   const privateResultCopy = useMemo(() => {
     if (!myPlayer || !myPrivateState || !projection) return "";
-    const phase = projection.phase;
+    const phase = projection.phase ?? "";
     const currentDay = projection.day;
-    if (phase !== "night_resolution" && phase !== "day_speak" && phase !== "day_vote") return "";
 
     const currentDayEvents = events.filter((e) => Number(e.payload?.day) === currentDay);
 
     // Find the most recent seer_result_revealed for this player
-    const seerResult = [...currentDayEvents].reverse().find(
-      (e) => e.type === "seer_result_revealed" && e.payload?.seerPlayerId === myPlayer.id
-    );
-    if (seerResult) {
+    if (phase === "night_seer" && myPrivateState.role === "seer") {
+      const seerResult = [...currentDayEvents].reverse().find(
+        (e) => e.type === "seer_result_revealed" && e.payload?.seerPlayerId === myPlayer.id
+      );
+      if (!seerResult) return "";
       const inspectedId = String(seerResult.payload?.inspectedPlayerId ?? "");
       const inspectedSeat = room?.players.find((p) => p.id === inspectedId)?.seatNo ?? 0;
       const alignment = String(seerResult.payload?.alignment ?? "good");
@@ -858,7 +965,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
 
     // Find witch_kill_revealed for witch
-    if (myPrivateState.role === "witch") {
+    if (phase === "night_witch_heal" && myPrivateState.role === "witch") {
       const witchKill = [...currentDayEvents].reverse().find(
         (e) => e.type === "witch_kill_revealed"
       );
@@ -870,7 +977,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
 
     // Find guardProtect from night_action_submitted (now private:user)
-    if (myPrivateState.role === "guard") {
+    if (phase === "night_guard" && myPrivateState.role === "guard") {
       const guardAction = [...currentDayEvents].reverse().find(
         (e) => e.type === "night_action_submitted" && e.actorId === myPlayer.id
       );
@@ -937,7 +1044,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       const started = await client.startGame(gameRoomId);
       setProjection(started.projection);
       setPrivateStates(started.privateStates);
-      setEvents((current) => [...current.slice(-260), ...started.events]);
+      setEvents((current) => {
+        const byId = new Map(current.map((event) => [event.id, event]));
+        for (const event of started.events) {
+          byId.set(event.id, event);
+        }
+        return Array.from(byId.values()).slice(-260);
+      });
+      setShowFillPrompt(false);
+      setShowAgentPicker(false);
       return started;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1040,7 +1155,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   }
 
   function onTargetSelect(playerId: string) {
-    if (!legalTargetIds.has(playerId)) return;
+    if (!centerActionTargetIds.has(playerId)) return;
     setSelectedTargetId(playerId);
   }
 
@@ -1048,17 +1163,25 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     setSelectedTargetId(null);
   }
 
-  async function onConfirmTarget() {
-    if (!selectedTargetId || !myPlayer) return;
+  async function onConfirmTarget(explicitTargetId?: string) {
+    const targetPlayerId = explicitTargetId ?? selectedTargetId;
+    if (!targetPlayerId || !myPlayer) return;
     setErrorMessage("");
     setActionLoading(true);
     try {
       const phase = projection?.phase;
       const kind: "nightAction" | "vote" =
         phase === "day_vote" || phase === "tie_vote" ? "vote" : "nightAction";
-      await client.submitAction(gameRoomId, { kind, targetPlayerId: selectedTargetId });
+      const result = await client.submitAction(gameRoomId, { kind, targetPlayerId });
+      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        setEvents((current) => {
+          if (current.some((event) => event.id === result.event!.id)) return current;
+          const next = [...current, result.event!];
+          return next.length <= 260 ? next : next.slice(-260);
+        });
+      }
       setSelectedTargetId(null);
-      await refreshGame();
+      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1074,12 +1197,26 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     try {
       const text = (speech ?? speechDraft).trim();
       if (!text) {
-        await client.submitAction(gameRoomId, { kind: "pass" });
+        const result = await client.submitAction(gameRoomId, { kind: "pass" });
+        if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+          setEvents((current) => {
+            if (current.some((event) => event.id === result.event!.id)) return current;
+            const next = [...current, result.event!];
+            return next.length <= 260 ? next : next.slice(-260);
+          });
+        }
       } else {
-        await client.submitAction(gameRoomId, { kind: "speech", speech: text });
+        const result = await client.submitAction(gameRoomId, { kind: "speech", speech: text });
+        if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+          setEvents((current) => {
+            if (current.some((event) => event.id === result.event!.id)) return current;
+            const next = [...current, result.event!];
+            return next.length <= 260 ? next : next.slice(-260);
+          });
+        }
       }
       setSpeechDraft("");
-      await refreshGame();
+      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1093,10 +1230,17 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     setErrorMessage("");
     setActionLoading(true);
     try {
-      await client.submitAction(gameRoomId, { kind: "pass" });
+      const result = await client.submitAction(gameRoomId, { kind: "pass" });
+      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        setEvents((current) => {
+          if (current.some((event) => event.id === result.event!.id)) return current;
+          const next = [...current, result.event!];
+          return next.length <= 260 ? next : next.slice(-260);
+        });
+      }
       setSelectedTargetId(null);
       setSpeechDraft("");
-      await refreshGame();
+      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1110,9 +1254,16 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     setErrorMessage("");
     setActionLoading(true);
     try {
-      await client.submitAction(gameRoomId, { kind: "speechComplete" });
+      const result = await client.submitAction(gameRoomId, { kind: "speechComplete" });
+      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        setEvents((current) => {
+          if (current.some((event) => event.id === result.event!.id)) return current;
+          const next = [...current, result.event!];
+          return next.length <= 260 ? next : next.slice(-260);
+        });
+      }
       setSpeechDraft("");
-      await refreshGame();
+      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1207,7 +1358,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
             winnerText={winnerText}
             statusText={statusText}
             currentSpeakerSeatNo={currentSpeakerSeatNo ?? 0}
-            isMyTurnToSpeak={isMyTurnToSpeak}
+            isMyTurnToSpeak={isMyTurnToSpeak || (isWolfNightDiscussion && !hasActedThisPhase)}
             speechInput={speechDraft}
             actionLoading={actionLoading}
             onStart={handleStartIntent}
@@ -1232,6 +1383,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
             events={events}
             players={room?.players ?? []}
             myPlayerId={myPlayer?.id}
+            revealAll={projection?.status === "ended" || room?.status === "ended"}
           />
         }
         roleCardEntry={
@@ -1261,6 +1413,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
                 (room?.targetPlayerCount ?? 12) - activeSeatCount,
                 0
               )}
+              canStartNow={hasEnoughPlayers}
               onAdd={addAgentToSeat}
               onRefresh={refreshAgentCandidates}
               onStartNow={onAgentPickerStartNow}

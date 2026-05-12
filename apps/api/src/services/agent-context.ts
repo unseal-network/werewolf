@@ -28,6 +28,7 @@ export function buildAgentContext(
   const isWolf = state.team === "wolf";
   const day = projection.day;
   const phase = projection.phase;
+  const includeWolfPrivateContext = isWolf && phase === "night_wolf";
 
   // --- player roster ---
   const aliveSet = new Set(projection.alivePlayerIds);
@@ -57,7 +58,14 @@ export function buildAgentContext(
 
   // --- speech history ---
   const speeches = visibleEvents
-    .filter((e) => e.type === "speech_submitted" && e.actorId && e.actorId !== "runtime")
+    .filter(
+      (e) =>
+        e.type === "speech_submitted" &&
+        e.actorId &&
+        e.actorId !== "runtime" &&
+        (e.visibility === "public" ||
+          (includeWolfPrivateContext && e.visibility === "private:team:wolf"))
+    )
     .slice(-maxSpeechHistory);
 
   const speechLines = speeches.map((e) => {
@@ -98,7 +106,7 @@ export function buildAgentContext(
 
   // --- wolf vote history (for wolves only) ---
   let wolfVoteLines: string[] = [];
-  if (isWolf) {
+  if (includeWolfPrivateContext) {
     const wolfVotes = room.events.filter(
       (e) => e.visibility === "private:team:wolf" && e.type === "wolf_vote_submitted" && e.actorId
     );

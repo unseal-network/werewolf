@@ -52,7 +52,7 @@ export interface CenterStageProps {
   onRunRuntime?: () => void;
   onTargetSelect: (playerId: string) => void;
   onClearTarget: () => void;
-  onConfirmTarget: () => void;
+  onConfirmTarget: (playerId?: string) => void;
   onSpeak: (speech?: string) => void;
   onSpeechChange?: (text: string) => void;
   onSpeechComplete?: () => void;
@@ -170,8 +170,12 @@ export function CenterStage({
 
   // Waiting / public phases the local user cannot act in
   const hasTargets = legalTargets.length > 0;
-  const showSelect = canCurrentUserAct && hasTargets && !selectedTarget;
-  const showConfirm = canCurrentUserAct && Boolean(selectedTarget);
+  const isWitchSave = confirmMode === "witch-save";
+  const showSelect = canCurrentUserAct && hasTargets && !selectedTarget && !isWitchSave;
+  const showConfirm = canCurrentUserAct && Boolean(selectedTarget) && !isWitchSave;
+  const witchSaveTarget =
+    canCurrentUserAct && isWitchSave ? legalTargets[0] : undefined;
+  const showWitchSaveChoice = Boolean(witchSaveTarget);
   const showSpeechInput = isMyTurnToSpeak;
   const showPrimarySkip = canCurrentUserAct && !hasTargets && !showSpeechInput;
   const showWaitingChip = !canCurrentUserAct;
@@ -200,7 +204,28 @@ export function CenterStage({
           <div className="target-chip">{t("stage.waiting")}</div>
         ) : null}
 
-        {showSelect ? (
+        {showWitchSaveChoice && witchSaveTarget ? (
+          <>
+            <button
+              type="button"
+              className="stage-confirm"
+              onClick={() => onConfirmTarget(witchSaveTarget.playerId)}
+              disabled={actionLoading}
+            >
+              {actionLoading ? "..." : t("stage.primary.witchSave")}
+            </button>
+            <button
+              type="button"
+              className="stage-skip"
+              onClick={onSkip}
+              disabled={actionLoading}
+            >
+              {t("stage.primary.witchPass")}
+            </button>
+          </>
+        ) : null}
+
+        {showSelect && !showWitchSaveChoice ? (
           <select
             className="target-select"
             value=""
@@ -237,7 +262,7 @@ export function CenterStage({
             <button
               type="button"
               className="stage-confirm"
-              onClick={onConfirmTarget}
+              onClick={() => onConfirmTarget()}
               disabled={actionLoading}
             >
               {actionLoading ? "..." : t(PRIMARY_KEY[confirmMode])}

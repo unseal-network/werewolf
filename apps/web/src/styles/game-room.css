@@ -1779,7 +1779,8 @@ body.logs-open .log-peek {
 }
 
 .create-form input,
-.create-form select {
+.create-form select,
+.create-form textarea {
   border: 1px solid var(--line);
   background: #fff;
   border-radius: 12px;
@@ -1792,10 +1793,29 @@ body.logs-open .log-peek {
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
 
+.create-form textarea {
+  min-height: 82px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  line-height: 1.45;
+}
+
 .create-form input:focus,
-.create-form select:focus {
+.create-form select:focus,
+.create-form textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.create-room-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -6px;
+}
+
+.create-room-tools .action.secondary {
+  min-height: 38px;
+  padding: 0 14px;
 }
 
 .create-form .stage-start {
@@ -1851,4 +1871,111 @@ body.logs-open .log-peek {
   100% {
     transform: translateX(250%);
   }
+}
+
+/* ------------------ Contrast safety pass ------------------ */
+
+.game-room-root {
+  --control-bg: #ffffff;
+  --control-fg: #141b2d;
+  --control-muted: #56647c;
+  --control-border: #cfd8e8;
+  --panel-bg: rgba(255, 255, 255, 0.96);
+  --panel-fg: #141b2d;
+  --panel-muted: #66738b;
+}
+
+.game-room-root[data-scene="night"] {
+  --control-bg: rgba(245, 248, 255, 0.96);
+  --control-fg: #10182a;
+  --control-muted: #43506a;
+  --control-border: rgba(180, 200, 240, 0.42);
+  --panel-bg: rgba(20, 26, 44, 0.94);
+  --panel-fg: #e7eefc;
+  --panel-muted: #b6c0d6;
+}
+
+.phase-card,
+.profile-dialog,
+.start-dialog,
+.agent-picker {
+  color: var(--panel-fg);
+}
+
+.phase-card {
+  background: var(--panel-bg);
+}
+
+.phase-copy,
+.start-copy,
+.agent-picker-sub,
+.agent-picker-empty,
+.agent-id,
+.profile-meta,
+.target-confirm-copy {
+  color: var(--panel-muted);
+}
+
+.target-chip,
+.target-select,
+.speech-textarea,
+.voice-mic,
+.profile-close,
+.action.secondary,
+.stage-skip {
+  background: var(--control-bg);
+  color: var(--control-fg);
+  border-color: var(--control-border);
+}
+
+.target-select option {
+  background: #ffffff;
+  color: #141b2d;
+}
+
+.stage-confirm,
+.stage-start,
+.action.primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.stage-confirm:disabled,
+.stage-skip:disabled,
+.stage-start:disabled,
+.action:disabled,
+.voice-mic:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.stage-skip.added {
+  background: #e6f8ee;
+  color: #0b6f48;
+}
+
+.game-room-root[data-scene="night"] .stage-skip.added {
+  background: rgba(196, 247, 219, 0.92);
+  color: #0b5a3c;
+}
+
+.game-room-root[data-scene="night"] .start-dialog {
+  background: var(--panel-bg);
+  border-color: rgba(180, 200, 240, 0.18);
+  color: var(--panel-fg);
+}
+
+.game-room-root[data-scene="night"] .start-copy,
+.game-room-root[data-scene="night"] .agent-picker-sub,
+.game-room-root[data-scene="night"] .agent-id {
+  color: var(--panel-muted);
+}
+
+.game-room-root[data-scene="night"] .target-select,
+.game-room-root[data-scene="night"] .speech-textarea,
+.game-room-root[data-scene="night"] .voice-mic {
+  background: #f8fbff;
+  color: #10182a;
 }

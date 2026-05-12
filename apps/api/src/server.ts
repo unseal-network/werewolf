@@ -46,6 +46,16 @@ if (databaseUrl) {
       }
       tickWorker = new TickWorker(activeStore, games);
       tickWorker.start();
+      for (const roomId of roomIds) {
+        const room = games.snapshot(roomId);
+        if (room.status === "active") {
+          void games
+            .scheduleAdvance(roomId)
+            .catch((err) =>
+              console.error(`[Startup] scheduleAdvance(${roomId}) failed:`, err)
+            );
+        }
+      }
     })
     .catch((err) => {
       console.error("[Startup] hydrateFromStore failed — running in-memory only:", err);

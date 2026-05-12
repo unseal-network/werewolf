@@ -31,9 +31,16 @@ interface TimelineCapsuleProps {
   events: GameEventLike[];
   players?: TimelinePlayerLike[];
   myPlayerId?: string | undefined;
+  revealAll?: boolean;
 }
 
-function isVisibleEvent(event: GameEventLike, myPlayerId?: string): boolean {
+function isVisibleEvent(
+  event: GameEventLike,
+  myPlayerId?: string,
+  revealAll = false
+): boolean {
+  if (event.visibility === "runtime") return false;
+  if (revealAll) return true;
   if (event.type === "game_ended") return true;
   if (event.type === "night_action_submitted") {
     return event.actorId === myPlayerId;
@@ -45,7 +52,6 @@ function isVisibleEvent(event: GameEventLike, myPlayerId?: string): boolean {
     return event.visibility === `private:user:${myPlayerId}`;
   }
   if (event.visibility === "public") return true;
-  if (event.visibility === "runtime") return false;
   if (event.visibility.startsWith("private:user:")) {
     return event.visibility === `private:user:${myPlayerId}`;
   }
@@ -201,7 +207,13 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(value, max));
 }
 
-export function TimelineCapsule({ enabled, events, players, myPlayerId }: TimelineCapsuleProps) {
+export function TimelineCapsule({
+  enabled,
+  events,
+  players,
+  myPlayerId,
+  revealAll,
+}: TimelineCapsuleProps) {
   const t = useT();
   const playerLabel = useMemo(() => {
     const map = new Map<string, string>();
@@ -232,8 +244,12 @@ export function TimelineCapsule({ enabled, events, players, myPlayerId }: Timeli
   const peekRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleEvents = useMemo(
-    () => events.filter((e) => isVisibleEvent(e, myPlayerId)).slice(-120).reverse(),
-    [events, myPlayerId]
+    () =>
+      events
+        .filter((e) => isVisibleEvent(e, myPlayerId, Boolean(revealAll)))
+        .slice(-120)
+        .reverse(),
+    [events, myPlayerId, revealAll]
   );
 
   const groupedEvents = useMemo(() => {

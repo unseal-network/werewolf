@@ -91,7 +91,7 @@ export function VoicePanel({
             background: isMicOn
               ? "rgba(196, 61, 77, 0.18)"
               : "rgba(255,255,255,0.94)",
-            color: isMicOn ? "#c43d4d" : "inherit",
+            color: isMicOn ? "#a82438" : "#141b2d",
             font: "inherit",
             fontSize: 14,
             cursor: canToggleMic ? "pointer" : "not-allowed",
@@ -125,7 +125,7 @@ export function VoicePanel({
           borderRadius: 14,
           border: "1px solid rgba(216,224,238,0.9)",
           background: "rgba(255,255,255,0.94)",
-          color: "inherit",
+          color: "#141b2d",
           font: "inherit",
           fontSize: 14,
           resize: "vertical",

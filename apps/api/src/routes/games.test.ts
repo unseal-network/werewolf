@@ -9,6 +9,12 @@ describe("games API", () => {
     expect(response.status).toBe(401);
   });
 
+  it("requires Matrix bearer auth for SSE subscriptions", async () => {
+    const app = createApp(createTestDeps());
+    const response = await app.request("/games/game_missing/subscribe");
+    expect(response.status).toBe(401);
+  });
+
   it("creates a game and defaults agent source room to source room", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", {

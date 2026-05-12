@@ -98,7 +98,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         status: started.room.status,
         projection: started.projection,
         privateStates: myPrivateState ? [myPrivateState] : [],
-        events: filterEventsForUser(started.events, myPlayer?.id, myPrivateState?.team === "wolf"),
+        events: filterEventsForUser(
+          started.events,
+          myPlayer?.id,
+          myPrivateState?.team === "wolf" && myPrivateState.alive,
+          started.room.status === "ended"
+        ),
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
@@ -152,6 +157,31 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     }
   });
 
+  app.post("/:gameRoomId/runtime/tick", async (c) => {
+    try {
+      await authenticateRequest(c.req.raw, deps.matrix);
+      if (!deps.runAgentTurn) {
+        throw new AppError("conflict", "Runtime agent turn runner is not configured", 409);
+      }
+      const result = await deps.games.advanceGame(
+        c.req.param("gameRoomId"),
+        deps.runAgentTurn
+      );
+      return c.json({
+        status: result.room.status,
+        done: result.done,
+        projection: result.projection,
+        events: result.events,
+      });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
   app.get("/:gameRoomId", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix);
@@ -163,9 +193,14 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       const myPrivateState = myPlayerId
         ? room.privateStates.find((s) => s.playerId === myPlayerId)
         : undefined;
-      const isWolf = myPrivateState?.team === "wolf";
+      const isWolf = myPrivateState?.team === "wolf" && myPrivateState.alive;
 
-      const filteredEvents = filterEventsForUser(room.events, myPlayerId, isWolf);
+      const filteredEvents = filterEventsForUser(
+        room.events,
+        myPlayerId,
+        isWolf,
+        room.status === "ended" || room.projection?.status === "ended"
+      );
       const filteredPrivateStates = myPrivateState ? [myPrivateState] : [];
 
       return c.json({
@@ -331,14 +366,16 @@ function numberValue(value: unknown): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function filterEventsForUser(
+export function filterEventsForUser(
   events: GameEvent[],
   myPlayerId: string | undefined,
-  isWolf: boolean
+  isWolf: boolean,
+  revealAll = false
 ): GameEvent[] {
   return events.filter((event) => {
-    if (event.visibility === "public") return true;
     if (event.visibility === "runtime") return false;
+    if (revealAll) return true;
+    if (event.visibility === "public") return true;
     if (event.visibility === "private:team:wolf") return isWolf;
     if (event.visibility.startsWith("private:user:")) {
       return event.visibility === `private:user:${myPlayerId}`;

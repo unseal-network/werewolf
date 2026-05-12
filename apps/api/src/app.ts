@@ -17,9 +17,20 @@ export function createApp(deps: AppDeps): Hono {
   const app = new Hono();
   const broker = deps.broker ?? new SseBroker();
   deps.games.setBroker(broker);
+  if (deps.runAgentTurn) {
+    deps.games.setRunAgentTurn(deps.runAgentTurn);
+  }
   app.use("*", cors());
   app.route("/games", createGamesRoutes(deps));
-  app.route("/games", createEventsRoutes({ broker, store: deps.store ?? null }));
+  app.route(
+    "/games",
+    createEventsRoutes({
+      broker,
+      store: deps.store ?? null,
+      games: deps.games,
+      matrix: deps.matrix,
+    })
+  );
   app.route("/games", createLivekitRoutes(deps));
   return app;
 }

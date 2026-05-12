@@ -68,6 +68,7 @@ export function validatePlayerAction(
     return {
       ...baseEvent(input),
       type: "vote_submitted",
+      subjectId: input.action.targetPlayerId,
       payload: {
         day: input.day,
         targetPlayerId: input.action.targetPlayerId,
