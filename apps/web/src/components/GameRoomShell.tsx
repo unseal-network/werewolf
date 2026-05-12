@@ -3,6 +3,7 @@ import { useI18n } from "../i18n/I18nProvider";
 import { SeatAvatar } from "./SeatAvatar";
 import type { SeatData } from "./SeatAvatar";
 import { GameEngine, type EngineGameState } from "../engine/GameEngine";
+import { RoleRevealEngine } from "./RoleRevealEngine";
 
 export type SceneId = "lobby" | "deal" | "night" | "day" | "vote" | "tie" | "end" | "waiting";
 
@@ -137,7 +138,6 @@ export function GameRoomShell({
     ["--accent" as string]: accent,
     ["--role-card-back-url" as string]: `url("${assetBase}/card-back.png")`,
   } as React.CSSProperties;
-  const roleRevealActive = Boolean(engineGameState.roleCard?.visible);
   return (
     <main
       className="game-room-root visual-runtime-root"
@@ -147,10 +147,9 @@ export function GameRoomShell({
       style={rootStyle}
     >
       <div
-        className={`game-engine-layer visual-role-engine ${roleRevealActive ? "role-reveal-active" : ""}`}
-        onClick={roleRevealActive ? onRoleCardClose : undefined}
+        className="game-engine-layer visual-role-engine"
       >
-        <GameEngine gameState={engineGameState} onRoleCardClose={onRoleCardClose} />
+        <GameEngine gameState={engineGameState} />
       </div>
 
       <div className="dom-ui-layer">
@@ -218,6 +217,10 @@ export function GameRoomShell({
         ) : null}
 
         {roleCardEntry}
+        <RoleRevealEngine
+          roleCard={engineGameState.roleCard}
+          onClose={onRoleCardClose}
+        />
 
         <main className="visual-game">
           <section className="visual-room">
