@@ -49,8 +49,7 @@ async function withLock(fn) {
 await withLock(async () => {
   console.log(`[deploy] Starting ${new Date().toISOString()} in ${root}`);
   await run("git", ["pull", "--ff-only", remote, branch]);
-  await run("pnpm", ["migrate"]);
-  console.log("[deploy] Skipping install/build; deploy is pull-and-restart only");
+  console.log("[deploy] Skipping install/build/migrate; deploy is pull-and-restart only");
   await run("pm2", ["restart", "werewolf-web", "--update-env"]);
   await run("pm2", ["save"]);
   console.log(`[deploy] Restarting API last at ${new Date().toISOString()}`);
