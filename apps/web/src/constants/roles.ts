@@ -1,9 +1,3 @@
-import civilianImg from "../assets/civilian.jpeg";
-import guardImg from "../assets/guard.jpeg";
-import hunterImg from "../assets/hunter.jpeg";
-import prophetImg from "../assets/prophet.jpeg";
-import werewolfImg from "../assets/werewolf.jpeg";
-import witchImg from "../assets/witch.jpeg";
 import logoImg from "../assets/logo.jpeg";
 
 export type DisplayRole = "villager" | "guard" | "hunter" | "seer" | "werewolf" | "witch";
@@ -22,13 +16,15 @@ export type DisplayPhase =
   | "tie"
   | "end";
 
+const roleCardAssetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
+
 export const ROLE_IMG: Record<DisplayRole, string> = {
-  villager: civilianImg,
-  guard: guardImg,
-  hunter: hunterImg,
-  seer: prophetImg,
-  werewolf: werewolfImg,
-  witch: witchImg,
+  villager: `${roleCardAssetBase}/villager.png`,
+  guard: `${roleCardAssetBase}/guard.png`,
+  hunter: `${roleCardAssetBase}/villager.png`,
+  seer: `${roleCardAssetBase}/seer.png`,
+  werewolf: `${roleCardAssetBase}/werewolf.png`,
+  witch: `${roleCardAssetBase}/witch.png`,
 };
 
 export const ROLE_LABEL: Record<DisplayRole, string> = {

@@ -78,7 +78,7 @@ export abstract class BaseScene extends Phaser.Scene {
     this.dismissRoleReveal(true);
 
     const { width, height } = this.scale;
-    const cardWidth = Math.min(330, width * 0.26);
+    const cardWidth = Math.min(360, width * 0.68, height * 0.33);
     const cardHeight = cardWidth * 1.5;
     const startX = Math.max(72, width * 0.08);
     const startY = Math.max(90, height - 112);
@@ -117,7 +117,7 @@ export abstract class BaseScene extends Phaser.Scene {
     container.addAt(glow, 0);
 
     const title = this.add
-      .text(0, cardHeight * 0.34, roleCard.roleLabel, {
+      .text(0, cardHeight * 0.40, roleCard.roleLabel, {
         fontFamily: "Noto Sans SC, PingFang SC, sans-serif",
         fontSize: "34px",
         color: "#fff3c7",
@@ -127,11 +127,12 @@ export abstract class BaseScene extends Phaser.Scene {
         strokeThickness: 4,
       })
       .setOrigin(0.5)
-      .setAlpha(0);
+      .setAlpha(0)
+      .setVisible(false);
     container.add(title);
 
     const description = this.add
-      .text(0, cardHeight * 0.44, roleCard.roleDescription, {
+      .text(0, cardHeight * 0.50, roleCard.roleDescription, {
         fontFamily: "Noto Sans SC, PingFang SC, sans-serif",
         fontSize: "16px",
         color: "#f5ead1",
@@ -140,18 +141,20 @@ export abstract class BaseScene extends Phaser.Scene {
         lineSpacing: 5,
       })
       .setOrigin(0.5, 0)
-      .setAlpha(0);
+      .setAlpha(0)
+      .setVisible(false);
     container.add(description);
 
     const closeHint = this.add
-      .text(0, cardHeight * 0.62, "点击卡牌收起", {
+      .text(0, cardHeight * 0.68, "点击卡牌收起", {
         fontFamily: "Noto Sans SC, PingFang SC, sans-serif",
         fontSize: "14px",
         color: "#d8c593",
         align: "center",
       })
       .setOrigin(0.5)
-      .setAlpha(0);
+      .setAlpha(0)
+      .setVisible(false);
     container.add(closeHint);
 
     this.tweens.add({
@@ -175,13 +178,6 @@ export abstract class BaseScene extends Phaser.Scene {
               scaleX: 1,
               duration: 210,
               ease: "Back.easeOut",
-            });
-            this.tweens.add({
-              targets: [title, description, closeHint],
-              alpha: 1,
-              duration: 240,
-              ease: "Sine.easeOut",
-              delay: 80,
             });
           },
         });
