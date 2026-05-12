@@ -1,3 +1,4 @@
+import { LOGO_IMG, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG, ROLE_LABEL } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
 import { VoicePanel } from "./VoicePanel";
 
@@ -43,6 +44,10 @@ export interface CenterStageProps {
   winnerText: string;
   statusText: string;
   currentSpeakerSeatNo?: number;
+  currentSpeakerName?: string | undefined;
+  myRoleId?: string | undefined;
+  aliveCount?: number | undefined;
+  totalCount?: number | undefined;
   isMyTurnToSpeak?: boolean;
   speechInput?: string;
   actionLoading?: boolean;
@@ -93,6 +98,10 @@ export function CenterStage({
   winnerText,
   statusText,
   currentSpeakerSeatNo,
+  currentSpeakerName,
+  myRoleId,
+  aliveCount,
+  totalCount,
   isMyTurnToSpeak,
   speechInput,
   actionLoading,
@@ -109,11 +118,40 @@ export function CenterStage({
 }: CenterStageProps) {
   const t = useT();
   const selectedTarget = legalTargets.find((s) => s.playerId === selectedTargetId);
+  const displayRole = myRoleId ? normalizeDisplayRole(myRoleId) : undefined;
+  const roleImg = displayRole ? ROLE_IMG[displayRole] : LOGO_IMG;
+  const roleColor = displayRole ? ROLE_COLOR[displayRole] : "var(--accent)";
+  const roleLabel = displayRole ? ROLE_LABEL[displayRole] : t("role.unknown");
+  const liveAliveCount = aliveCount ?? 0;
+  const liveTotalCount = Math.max(totalCount ?? liveAliveCount, liveAliveCount);
+  const showIdentity = actionMode !== "lobby" || Boolean(myRoleId);
+  const identity = showIdentity ? (
+    <div className="stage-identity">
+      <div
+        className="stage-role-token"
+        style={{ ["--stage-role-color" as string]: roleColor }}
+      >
+        <img src={roleImg} alt="" draggable={false} />
+      </div>
+      <div className="stage-identity-copy">
+        <span>{roleLabel}</span>
+        {currentSpeakerName ? <strong>{currentSpeakerName}</strong> : null}
+      </div>
+      {liveTotalCount > 0 ? (
+        <div className="stage-alive-dots" aria-label={`${liveAliveCount}/${liveTotalCount}`}>
+          {Array.from({ length: liveTotalCount }).map((_, index) => (
+            <span key={index} className={index < liveAliveCount ? "alive" : ""} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  ) : null;
 
   // Lobby: only the start button + status copy
   if (actionMode === "lobby") {
     return (
       <article className="phase-card">
+        {identity}
         <div className="phase-title">{title}</div>
         {statusText ? <div className="phase-copy">{statusText}</div> : null}
         <div className="target-row">
@@ -142,6 +180,7 @@ export function CenterStage({
   if (actionMode === "deal") {
     return (
       <article className="phase-card">
+        {identity}
         <div className="phase-kicker">{kicker}</div>
         <div className="phase-title">{title}</div>
         <div className="phase-copy">{copy || t("stage.prompt.deal")}</div>
@@ -160,6 +199,7 @@ export function CenterStage({
   if (actionMode === "end") {
     return (
       <article className="phase-card">
+        {identity}
         <div className="phase-kicker">{kicker}</div>
         <div className="phase-title">{title}</div>
         {winnerText ? <div className="phase-copy" style={{ color: "var(--accent)" }}>{winnerText}</div> : null}
@@ -187,6 +227,7 @@ export function CenterStage({
     <article className="phase-card">
       {headerVisible ? (
         <>
+          {identity}
           <div className="phase-kicker">{kicker}</div>
           <div className="phase-title">{title}</div>
           {copy ? <div className="phase-copy">{copy}</div> : null}

@@ -57,6 +57,7 @@ interface UserSeatState {
   isSelected: boolean;
   isCurrentSpeaker?: boolean;
   isWolfTeammate?: boolean;
+  visibleRole?: string | undefined;
 }
 
 const apiBaseUrl = defaultApiBaseUrl();
@@ -328,7 +329,8 @@ function buildSeatView(
   selectedTargetId: string | null,
   legalTargetIds: Set<string>,
   currentSpeakerPlayerId: string | undefined,
-  knownTeammatePlayerIds: Set<string> = new Set()
+  knownTeammatePlayerIds: Set<string> = new Set(),
+  visibleRolesByPlayerId: Map<string, string> = new Map()
 ): UserSeatState[] {
   if (!room) {
     return Array.from({ length: targetPlayerCount }, (_, index) => ({
@@ -340,6 +342,7 @@ function buildSeatView(
       isSelected: false,
       isCurrentSpeaker: false,
       isWolfTeammate: false,
+      visibleRole: undefined,
       playerId: undefined,
       displayName: undefined,
       kind: undefined,
@@ -366,6 +369,7 @@ function buildSeatView(
       isSelected: playerId === selectedTargetId,
       isCurrentSpeaker: Boolean(playerId && currentSpeakerPlayerId && playerId === currentSpeakerPlayerId),
       isWolfTeammate: Boolean(playerId && knownTeammatePlayerIds.has(playerId)),
+      visibleRole: playerId ? visibleRolesByPlayerId.get(playerId) : undefined,
     });
   }
 
@@ -741,6 +745,11 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     () => parseCurrentSpeakerSeat(room?.players ?? [], projection),
     [projection, room?.players]
   );
+  const currentSpeakerName = useMemo(() => {
+    const speakerId = projection?.currentSpeakerPlayerId;
+    if (!speakerId) return undefined;
+    return room?.players.find((player) => player.id === speakerId)?.displayName;
+  }, [projection?.currentSpeakerPlayerId, room?.players]);
   const witchHealTargetId = useMemo(() => {
     if (projection?.phase !== "night_witch_heal" || myPrivateState?.role !== "witch") {
       return null;
@@ -845,6 +854,16 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     const ids = myPrivateState?.knownTeammatePlayerIds ?? [];
     return new Set(ids.filter((id): id is string => typeof id === "string"));
   }, [myPrivateState?.knownTeammatePlayerIds]);
+  const visibleRolesByPlayerId = useMemo(() => {
+    const out = new Map<string, string>();
+    if (myPlayer?.id && myPrivateState?.role) {
+      out.set(myPlayer.id, myPrivateState.role);
+    }
+    for (const teammateId of knownTeammateIds) {
+      out.set(teammateId, "werewolf");
+    }
+    return out;
+  }, [knownTeammateIds, myPlayer?.id, myPrivateState?.role]);
 
   const seatView = useMemo(
     () =>
@@ -855,7 +874,8 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         selectedTargetId,
         legalTargetIds,
         projection?.currentSpeakerPlayerId ?? undefined,
-        knownTeammateIds
+        knownTeammateIds,
+        visibleRolesByPlayerId
       ),
     [
       myPlayer?.id,
@@ -865,6 +885,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       selectedTargetId,
       projection?.currentSpeakerPlayerId,
       knownTeammateIds,
+      visibleRolesByPlayerId,
     ]
   );
   const viewingSeat = useMemo(
@@ -1405,6 +1426,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
             winnerText={winnerText}
             statusText={statusText}
             currentSpeakerSeatNo={currentSpeakerSeatNo ?? 0}
+            currentSpeakerName={currentSpeakerName}
+            myRoleId={myPrivateState?.role}
+            aliveCount={projection?.alivePlayerIds.length ?? activeSeatCount}
+            totalCount={activeSeatCount}
             isMyTurnToSpeak={isMyTurnToSpeak || (isWolfNightDiscussion && !hasActedThisPhase)}
             speechInput={speechDraft}
             actionLoading={actionLoading}
