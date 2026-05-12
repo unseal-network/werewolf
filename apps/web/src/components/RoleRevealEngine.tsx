@@ -66,8 +66,9 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
 
   useEffect(() => {
     if (!roleCard?.visible || roleCard.nonce <= 0) return;
+    const host = hostRef.current;
     const card = cardRef.current;
-    if (!card) return;
+    if (!host || !card) return;
 
     let originBeta: number | undefined;
     let originGamma: number | undefined;
@@ -95,22 +96,25 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
     const onPointerMove = (event: PointerEvent) => {
       if (event.pointerType === "touch") return;
       const rect = card.getBoundingClientRect();
-      const relX = (event.clientX - rect.left) / rect.width - 0.5;
-      const relY = (event.clientY - rect.top) / rect.height - 0.5;
-      applyTilt(Phaser.Math.Clamp(relY * -18, -14, 14), Phaser.Math.Clamp(relX * 18, -14, 14));
+      const relX = (event.clientX - (rect.left + rect.width / 2)) / rect.width;
+      const relY = (event.clientY - (rect.top + rect.height / 2)) / rect.height;
+      applyTilt(
+        Phaser.Math.Clamp(relY * -22, -18, 18),
+        Phaser.Math.Clamp(relX * 22, -18, 18)
+      );
     };
 
     const onPointerLeave = () => applyTilt(0, 0);
 
     window.addEventListener("deviceorientation", onOrientation);
-    card.addEventListener("pointermove", onPointerMove);
-    card.addEventListener("pointerleave", onPointerLeave);
+    host.addEventListener("pointermove", onPointerMove);
+    host.addEventListener("pointerleave", onPointerLeave);
 
     return () => {
       window.cancelAnimationFrame(frame);
       window.removeEventListener("deviceorientation", onOrientation);
-      card.removeEventListener("pointermove", onPointerMove);
-      card.removeEventListener("pointerleave", onPointerLeave);
+      host.removeEventListener("pointermove", onPointerMove);
+      host.removeEventListener("pointerleave", onPointerLeave);
     };
   }, [roleCard?.visible, roleCard?.nonce]);
 
