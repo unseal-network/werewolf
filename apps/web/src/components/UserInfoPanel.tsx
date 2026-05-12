@@ -25,15 +25,16 @@ export function UserInfoPanel({ seat, onClose }: UserInfoPanelProps) {
     : seat.kind === "agent"
       ? t("user.kindAgent")
       : t("user.kindUser");
+  if (!open) return null;
 
   return (
     <>
       <div
-        className={`sheet-backdrop ${open ? "show" : ""}`}
+        className="sheet-backdrop show"
         onClick={onClose}
         aria-hidden
       />
-      <section className={`profile-dialog ${open ? "open" : ""}`} role="dialog" aria-modal="true">
+      <section className="profile-dialog open" role="dialog" aria-modal="true">
         {seat ? (
           <>
             <div className="profile-head">

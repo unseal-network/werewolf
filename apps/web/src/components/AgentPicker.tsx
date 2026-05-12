@@ -48,15 +48,17 @@ export function AgentPicker({
     [onAdd]
   );
 
+  if (!open) return null;
+
   return (
     <>
       <div
-        className={`sheet-backdrop ${open ? "show" : ""}`}
+        className="sheet-backdrop show"
         onClick={onClose}
         aria-hidden
       />
       <section
-        className={`agent-picker ${open ? "open" : ""}`}
+        className="agent-picker open"
         role="dialog"
         aria-modal="true"
       >

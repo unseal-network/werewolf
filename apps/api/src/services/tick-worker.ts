@@ -59,16 +59,18 @@ export class TickWorker {
     try {
       const roomIds = await this.store.claimDueRooms(new Date());
       if (roomIds.length === 0) return;
-      // scheduleAdvance is async but we don't need to await — each call has
-      // its own lock and runs independently. Letting them run in parallel is
-      // fine and avoids one slow room blocking another.
-      for (const roomId of roomIds) {
-        void this.games
-          .scheduleDeadlineAdvance(roomId)
-          .catch((err) =>
-            console.error(`[TickWorker] scheduleDeadlineAdvance(${roomId}) failed:`, err)
-          );
-      }
+      // Run due rooms in parallel, but keep this worker tick open until the
+      // advances settle. Otherwise a slow LLM/TTS turn can outlive the DB
+      // lease and be claimed by a later poll from this process.
+      await Promise.allSettled(
+        roomIds.map(async (roomId) => {
+          try {
+            await this.games.scheduleDeadlineAdvance(roomId);
+          } catch (err) {
+            console.error(`[TickWorker] scheduleDeadlineAdvance(${roomId}) failed:`, err);
+          }
+        })
+      );
     } catch (err) {
       console.error("[TickWorker] tick failed:", err);
     } finally {

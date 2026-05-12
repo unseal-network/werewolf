@@ -177,6 +177,10 @@ export class InMemoryGameService {
     this.runAgentTurnImpl = impl;
   }
 
+  hasRunAgentTurn(): boolean {
+    return Boolean(this.runAgentTurnImpl);
+  }
+
   createGame(
     input: unknown,
     creatorUserId: string
@@ -742,6 +746,7 @@ export class InMemoryGameService {
         action: { kind: "submitVote", targetPlayerId: action.targetPlayerId },
         now,
       });
+      event.payload = { ...event.payload, phase };
       room.pendingVotes.push({ actorPlayerId: playerId, targetPlayerId: action.targetPlayerId });
       const [assigned] = this.assignAndAppendEvents(room, [event]);
       void this.scheduleAdvance(gameRoomId);
@@ -836,7 +841,7 @@ export class InMemoryGameService {
             ...this.baseEvent(room, playerId, "public"),
             type: "vote_submitted",
             subjectId: undefined,
-            payload: { day: room.projection.day, targetPlayerId: "" },
+            payload: { day: room.projection.day, phase, targetPlayerId: "" },
           },
         ]);
         void this.scheduleAdvance(gameRoomId);
@@ -1268,7 +1273,8 @@ export class InMemoryGameService {
                 (event) =>
                   event.type === "vote_submitted" &&
                   event.actorId === vote.actorPlayerId &&
-                  Number(event.payload?.day) === room.projection?.day
+                  Number(event.payload?.day) === room.projection?.day &&
+                  String(event.payload?.phase ?? "day_vote") === room.projection?.phase
               )
           )
           .map((vote) => ({
@@ -1279,7 +1285,11 @@ export class InMemoryGameService {
             visibility: "public" as const,
             actorId: vote.actorPlayerId,
             subjectId: vote.targetPlayerId || undefined,
-            payload: { day: room.projection?.day ?? 1, targetPlayerId: vote.targetPlayerId },
+            payload: {
+              day: room.projection?.day ?? 1,
+              phase: room.projection?.phase,
+              targetPlayerId: vote.targetPlayerId,
+            },
             createdAt: now.toISOString(),
           }))
       );
@@ -1749,6 +1759,40 @@ export class InMemoryGameService {
     this.recordNightAction(room, action);
   }
 
+  private validateNightActionForRuntime(
+    room: StoredGameRoom,
+    actorPlayerId: string,
+    action: RuntimeNightAction
+  ): RuntimeNightAction {
+    if (!room.projection) throw new Error("projection is required");
+    if (action.kind === "passAction") return action;
+    if (!room.projection.alivePlayerIds.includes(action.targetPlayerId)) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    if (action.targetPlayerId === actorPlayerId) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+
+    const state = this.requirePrivateState(room, actorPlayerId);
+    if (action.kind === "witchHeal") {
+      if (!state.witchItems?.healAvailable) return { actorPlayerId, kind: "passAction" };
+      const wolfKill = room.pendingNightActions.find(
+        (nightAction): nightAction is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
+          nightAction.kind === "wolfKill"
+      );
+      if (!wolfKill || action.targetPlayerId !== wolfKill.targetPlayerId) {
+        return { actorPlayerId, kind: "passAction" };
+      }
+    }
+    if (action.kind === "witchPoison" && !state.witchItems?.poisonAvailable) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    if (room.pendingNightActions.some((pending) => pending.actorPlayerId === actorPlayerId)) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    return action;
+  }
+
   private nightActionFromTool(
     room: StoredGameRoom,
     actorPlayerId: string,
@@ -1774,7 +1818,11 @@ export class InMemoryGameService {
     if (!room.projection.alivePlayerIds.includes(targetPlayerId)) {
       return { actorPlayerId, kind: "passAction" };
     }
-    return { actorPlayerId, kind: expectedTool, targetPlayerId } as RuntimeNightAction;
+    return this.validateNightActionForRuntime(room, actorPlayerId, {
+      actorPlayerId,
+      kind: expectedTool,
+      targetPlayerId,
+    } as RuntimeNightAction);
   }
 
   private async runAgentVotes(

@@ -2571,8 +2571,12 @@ body {
   background: rgba(255, 255, 255, 0.06) !important;
 }
 
+.profile-fact b {
+  color: var(--wolf-muted) !important;
+}
+
 .agent-row .stage-skip:not(:disabled),
-.agent-picker-actions .stage-start:not(:disabled) {
+.agent-picker-actions .action.primary:not(:disabled) {
   background: linear-gradient(180deg, var(--wolf-gold-bright), var(--wolf-gold)) !important;
   color: #141009 !important;
   border-color: transparent !important;
@@ -2580,7 +2584,7 @@ body {
 
 .agent-row .stage-skip:disabled,
 .agent-picker-actions .stage-skip:disabled,
-.agent-picker-actions .stage-start:disabled {
+.agent-picker-actions .action.primary:disabled {
   background: rgba(255, 255, 255, 0.06) !important;
   color: rgba(238, 242, 251, 0.46) !important;
   border-color: rgba(255, 255, 255, 0.10) !important;
@@ -2844,5 +2848,33 @@ body {
 
   .create-form textarea {
     min-height: 104px;
+  }
+}
+
+@media (max-width: 360px) {
+  .game {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .room {
+    grid-template-columns: minmax(38px, 42px) minmax(0, 1fr) minmax(38px, 42px);
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .table,
+  .table-center-frame {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .seat {
+    width: 42px;
+  }
+
+  .avatar {
+    width: 38px;
+    height: 38px;
   }
 }

@@ -457,7 +457,7 @@ export class GameStore {
    * Return room IDs whose next_tick_at deadline has passed. Used by the
    * tick worker to drive auto-advance for rooms with no live client.
    */
-  async claimDueRooms(now: Date, leaseMs = 30_000, limit = 25): Promise<string[]> {
+  async claimDueRooms(now: Date, leaseMs = 120_000, limit = 25): Promise<string[]> {
     const leaseUntil = new Date(now.getTime() + leaseMs);
     const nowIso = now.toISOString();
     const leaseUntilIso = leaseUntil.toISOString();

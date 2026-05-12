@@ -159,19 +159,40 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/runtime/tick", async (c) => {
     try {
-      await authenticateRequest(c.req.raw, deps.matrix);
-      if (!deps.runAgentTurn) {
+      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      if (!deps.games.hasRunAgentTurn()) {
         throw new AppError("conflict", "Runtime agent turn runner is not configured", 409);
       }
-      const result = await deps.games.advanceGame(
-        c.req.param("gameRoomId"),
-        deps.runAgentTurn
+      const gameRoomId = c.req.param("gameRoomId");
+      const beforeRoom = deps.games.snapshot(gameRoomId);
+      const myPlayer = beforeRoom.players.find(
+        (p) => p.userId === user.id && !p.leftAt
+      );
+      const isCreator = beforeRoom.creatorUserId === user.id;
+      if (!myPlayer && !isCreator) {
+        throw new AppError("not_found", "You are not in this room", 404);
+      }
+      const myPrivateState = beforeRoom.privateStates.find(
+        (state) => state.playerId === myPlayer?.id
+      );
+      const beforeSeq = beforeRoom.events.length;
+
+      await deps.games.scheduleAdvance(gameRoomId);
+
+      const room = deps.games.snapshot(gameRoomId);
+      const revealAll = room.status === "ended" || room.projection?.status === "ended";
+      const isWolf = myPrivateState?.team === "wolf" && myPrivateState.alive;
+      const events = filterEventsForUser(
+        room.events.slice(beforeSeq),
+        myPlayer?.id,
+        Boolean(isWolf),
+        revealAll
       );
       return c.json({
-        status: result.room.status,
-        done: result.done,
-        projection: result.projection,
-        events: result.events,
+        status: room.status,
+        done: room.status === "ended",
+        projection: room.projection,
+        events,
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);

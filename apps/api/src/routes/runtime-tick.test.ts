@@ -125,7 +125,7 @@ describe("runtime tick API", () => {
     });
     const gameRoomId = await createStartedGame(app);
     runtimeRoomId = gameRoomId;
-    const eventTypes: string[] = [];
+    const responseEventTypes: string[] = [];
     let done = false;
     let winner: string | null = null;
 
@@ -142,23 +142,54 @@ describe("runtime tick API", () => {
       const body = (await tick.json()) as {
         done: boolean;
         projection: { winner: string | null };
-        events: Array<{ type: string; payload?: { toolName?: string; action?: { kind?: string } } }>;
+        events: Array<{
+          type: string;
+          visibility: string;
+          payload?: { toolName?: string; action?: { kind?: string } };
+        }>;
       };
       done = body.done;
       winner = body.projection.winner;
-      eventTypes.push(...body.events.map((event) => event.type));
+      expect(body.events.every((event) => event.visibility !== "runtime")).toBe(true);
+      expect(body.events.some((event) => event.type.startsWith("agent_llm_"))).toBe(false);
+      responseEventTypes.push(...body.events.map((event) => event.type));
     }
+
+    const internalEventTypes = deps.games
+      .snapshot(gameRoomId)
+      .events.map((event) => event.type);
 
     expect(done).toBe(true);
     expect(["good", "wolf"]).toContain(winner);
-    expect(eventTypes).toContain("night_action_submitted");
-    expect(eventTypes).toContain("wolf_vote_resolved");
-    expect(eventTypes).toContain("agent_llm_requested");
-    expect(eventTypes).toContain("agent_llm_completed");
-    expect(eventTypes).toContain("night_resolved");
-    expect(eventTypes).toContain("speech_submitted");
-    expect(eventTypes).toContain("vote_submitted");
-    expect(eventTypes).toContain("player_eliminated");
-    expect(eventTypes).toContain("game_ended");
+    expect(internalEventTypes).toContain("night_action_submitted");
+    expect(internalEventTypes).toContain("wolf_vote_resolved");
+    expect(internalEventTypes).toContain("agent_llm_requested");
+    expect(internalEventTypes).toContain("agent_llm_completed");
+    expect(responseEventTypes).not.toContain("agent_llm_requested");
+    expect(responseEventTypes).not.toContain("agent_llm_completed");
+    expect(responseEventTypes.length).toBeGreaterThan(0);
+    expect(internalEventTypes).toContain("night_resolved");
+    expect(internalEventTypes).toContain("speech_submitted");
+    expect(internalEventTypes).toContain("vote_submitted");
+    expect(internalEventTypes).toContain("player_eliminated");
+    expect(internalEventTypes).toContain("game_ended");
+  });
+
+  it("rejects runtime ticks from authenticated users outside the room", async () => {
+    const deps = createTestDeps();
+    const app = createApp({
+      ...deps,
+      async runAgentTurn() {
+        return { text: "", toolName: "passAction", input: {} };
+      },
+    });
+    const gameRoomId = await createStartedGame(app);
+
+    const tick = await app.request(`/games/${gameRoomId}/runtime/tick`, {
+      method: "POST",
+      headers: { authorization: "Bearer matrix-token-bob" },
+    });
+
+    expect(tick.status).toBe(404);
   });
 });

@@ -96,8 +96,9 @@ function parseSseEvent(raw: string): GameEventDto | undefined {
 }
 
 /**
- * Mirror server-side filterEventsForUser logic — the SSE channel sends all
- * events for the room, the client drops ones it shouldn't see.
+ * Defensive mirror of server-side filterEventsForUser. The SSE route already
+ * filters events, but the client keeps this guard for optimistic action
+ * responses and future transport changes.
  */
 function sseEventVisibleToMe(
   event: GameEventDto,

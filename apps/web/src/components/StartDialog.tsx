@@ -10,14 +10,16 @@ interface StartDialogProps {
 
 export function StartDialog({ open, filled, target, onFillAi, onWait }: StartDialogProps) {
   const t = useT();
+  if (!open) return null;
+
   return (
     <>
       <div
-        className={`sheet-backdrop ${open ? "show" : ""}`}
+        className="sheet-backdrop show"
         onClick={onWait}
         aria-hidden
       />
-      <section className={`start-dialog ${open ? "open" : ""}`} role="dialog" aria-modal="true">
+      <section className="start-dialog open" role="dialog" aria-modal="true">
         <div className="start-title">{t("startDialog.title")}</div>
         <div className="start-copy">
           {t("startDialog.copy", { now: filled })}
