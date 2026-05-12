@@ -71,17 +71,15 @@ function phaseIcon(scene: SceneId) {
   }
 }
 
-function VisualSeatColumn({
+function VisualSeatGrid({
   seats,
-  side,
   onSeatClick,
 }: {
   seats: SeatData[];
-  side: "left" | "right";
   onSeatClick: (seatNo: number) => void;
 }) {
   return (
-    <div className={`visual-seat-column ${side}`}>
+    <div className="visual-seat-grid">
       {seats.map((seat) => (
         <SeatAvatar
           key={seat.seatNo}
@@ -132,8 +130,6 @@ export function GameRoomShell({
     Math.max(6, playerCount, activeSeats.filter((seat) => !seat.isEmpty).length)
   );
   const boardSeats = activeSeats.slice(0, visibleSeatCount);
-  const leftSeats = boardSeats.filter((_, index) => index % 2 === 0);
-  const rightSeats = boardSeats.filter((_, index) => index % 2 === 1);
   const compact = boardSeats.length >= 10;
   const rootStyle = {
     ["--accent" as string]: accent,
@@ -218,9 +214,8 @@ export function GameRoomShell({
         <main className="visual-game">
           <section className="visual-room">
             <div className="visual-magic-circle" aria-hidden />
-            <VisualSeatColumn seats={leftSeats} side="left" onSeatClick={onSeatClick} />
             <div className="visual-center">{center}</div>
-            <VisualSeatColumn seats={rightSeats} side="right" onSeatClick={onSeatClick} />
+            <VisualSeatGrid seats={boardSeats} onSeatClick={onSeatClick} />
           </section>
         </main>
 

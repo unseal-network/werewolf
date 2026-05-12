@@ -3578,10 +3578,10 @@ body {
 
 .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
   --visual-shell-width: min(calc(100vw - clamp(20px, 5vw, 56px)), 760px);
-  --visual-seat-width: clamp(72px, 13.5vw, 112px);
-  --visual-center-track: clamp(184px, 38vw, 300px);
-  --visual-center-card-width: clamp(184px, 38vw, 300px);
-  --visual-board-gap: clamp(8px, 2vw, 18px);
+  --visual-seat-columns: 3;
+  --visual-seat-width: clamp(82px, 18vw, 128px);
+  --visual-center-card-width: clamp(230px, 46vw, 300px);
+  --visual-board-gap: clamp(12px, 2.2vw, 18px);
   position: relative;
   z-index: 2;
   min-height: 100dvh;
@@ -3718,26 +3718,27 @@ body {
   min-width: 0;
   position: relative;
   display: grid;
-  grid-template-columns: var(--visual-seat-width) var(--visual-center-track) var(--visual-seat-width);
-  justify-content: center;
-  gap: var(--visual-board-gap);
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: clamp(14px, 2.4dvh, 26px);
   padding: clamp(14px, 2.2dvh, 28px) 0 92px;
-  align-items: flex-start;
+  align-items: start;
 }
 
-.visual-seat-column {
+.visual-seat-grid {
   position: relative;
   z-index: 2;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(8px, 1.4dvh, 14px);
+  width: min(100%, calc(var(--visual-seat-width) * var(--visual-seat-columns) + var(--visual-board-gap) * (var(--visual-seat-columns) - 1)));
+  display: grid;
+  grid-template-columns: repeat(var(--visual-seat-columns), minmax(0, 1fr));
+  gap: var(--visual-board-gap);
 }
 
 .visual-center {
   position: relative;
   z-index: 2;
-  min-width: 0;
+  width: min(100%, var(--visual-center-card-width));
+  min-width: min(100%, var(--visual-center-card-width));
   align-self: flex-start;
   display: flex;
   justify-content: center;
@@ -3747,7 +3748,7 @@ body {
 .visual-magic-circle {
   position: absolute;
   left: 50%;
-  top: clamp(34px, 7dvh, 78px);
+  top: clamp(60px, 12dvh, 132px);
   width: min(66dvh, calc(var(--visual-shell-width) * 0.86));
   aspect-ratio: 1;
   transform: translateX(-50%);
@@ -3761,7 +3762,7 @@ body {
 
 .visual-runtime-root .phase-card {
   width: 100%;
-  max-width: var(--visual-center-card-width);
+  max-width: 100%;
   min-height: clamp(220px, 35dvh, 300px);
   align-content: center;
   padding: clamp(18px, 3vw, 28px);
@@ -3815,6 +3816,7 @@ body {
   max-width: 100%;
   border-radius: 14px;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .visual-runtime-root .stage-start,
@@ -3847,8 +3849,8 @@ body {
 
 .visual-runtime-root .seat {
   width: 100%;
-  min-height: clamp(74px, 11dvh, 118px);
-  aspect-ratio: 1 / 1.02;
+  min-height: auto;
+  aspect-ratio: 1 / 0.86;
   grid-template-columns: 1fr;
   justify-items: center;
   align-content: center;
@@ -3887,7 +3889,7 @@ body {
 }
 
 .visual-runtime-root .seat-name {
-  max-width: calc(var(--visual-seat-width) - 12px);
+  max-width: calc((var(--visual-seat-width) - 12px));
   color: #cbd5e1;
   font-size: clamp(10px, 1.7vw, 14px);
   line-height: 1.25;
@@ -3918,8 +3920,8 @@ body {
 @media (min-width: 720px) {
   .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
     --visual-shell-width: min(calc(100vw - 48px), 780px);
-    --visual-seat-width: clamp(100px, 14vw, 132px);
-    --visual-center-track: clamp(260px, 38vw, 330px);
+    --visual-seat-columns: 3;
+    --visual-seat-width: clamp(112px, 16vw, 150px);
     --visual-center-card-width: clamp(260px, 38vw, 330px);
   }
 
@@ -3935,9 +3937,9 @@ body {
 @media (max-width: 420px) {
   .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
     --visual-shell-width: calc(100vw - 12px);
-    --visual-seat-width: clamp(64px, 18vw, 72px);
-    --visual-center-track: minmax(0, 1fr);
-    --visual-center-card-width: 100%;
+    --visual-seat-columns: 3;
+    --visual-seat-width: clamp(70px, 29vw, 112px);
+    --visual-center-card-width: clamp(220px, 62vw, 248px);
     --visual-board-gap: 6px;
   }
 
@@ -3957,15 +3959,9 @@ body {
     display: none;
   }
 
-  .visual-room {
-    grid-template-columns: var(--visual-seat-width) minmax(0, 1fr) var(--visual-seat-width);
-    padding-left: 0;
-    padding-right: 0;
-  }
-
   .visual-runtime-root .phase-card {
     max-width: 100%;
-    min-height: 218px;
+    min-height: 206px;
     padding: 18px 12px;
   }
 
@@ -3996,5 +3992,22 @@ body {
 
   .visual-runtime-root .stage-alive-dots {
     display: none;
+  }
+}
+
+@media (min-width: 960px) and (orientation: landscape) {
+  .game-room-root[data-visual-runtime="true"] .dom-ui-layer {
+    --visual-shell-width: min(calc(100vw - 56px), 880px);
+    --visual-seat-columns: 6;
+    --visual-seat-width: clamp(104px, 10vw, 128px);
+    --visual-center-card-width: clamp(280px, 30vw, 360px);
+  }
+
+  .visual-room {
+    gap: 22px;
+  }
+
+  .visual-runtime-root .phase-card {
+    min-height: 260px;
   }
 }
