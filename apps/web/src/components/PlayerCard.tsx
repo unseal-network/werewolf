@@ -1,6 +1,8 @@
+import { useRef } from 'react'
 import { Mic } from 'lucide-react'
 import type { RoomPlayer } from '../api/client'
-import { ROLE_IMG } from '../constants/roles'
+import { ROLE_IMG, ROLE_COLOR } from '../constants/roles'
+import type { RoleId } from './RolePickerBubble'
 
 interface PlayerCardProps {
   player: RoomPlayer
@@ -11,8 +13,10 @@ interface PlayerCardProps {
   isDead: boolean
   seerResult?: 'wolf' | 'good'
   visibleRole?: string
+  markedRole?: RoleId | null | undefined
   onSelect: () => void
-  compact?: boolean   // 10+ 人紧凑模式
+  onLongPress?: ((rect: DOMRect) => void) | undefined
+  compact?: boolean | undefined
 }
 
 function getInitial(name: string): string {
@@ -23,9 +27,27 @@ function getInitial(name: string): string {
 
 export function PlayerCard({
   player, isSelf, isSpeaking, isSelectable, isSelected,
-  isDead, seerResult, visibleRole, onSelect, compact = false,
+  isDead, seerResult, visibleRole, markedRole, onSelect, onLongPress, compact = false,
 }: PlayerCardProps) {
   const roleImg = visibleRole ? ROLE_IMG[visibleRole] : undefined
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cardRef = useRef<HTMLButtonElement>(null)
+
+  // 长按事件处理
+  const handlePointerDown = () => {
+    if (isSelf || !onLongPress) return
+    longPressTimer.current = setTimeout(() => {
+      if (cardRef.current) {
+        onLongPress(cardRef.current.getBoundingClientRect())
+      }
+    }, 500)
+  }
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
 
   // 头像尺寸
   const avatarSize = compact ? 50 : 60
@@ -63,7 +85,12 @@ export function PlayerCard({
 
   return (
     <button
+      ref={cardRef}
       onClick={onSelect}
+      onPointerDown={handlePointerDown}
+      onPointerUp={cancelLongPress}
+      onPointerLeave={cancelLongPress}
+      onPointerCancel={cancelLongPress}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -179,15 +206,39 @@ export function PlayerCard({
           }} />
         )}
 
-        {/* 自己的金点 */}
+        {/* 自己的金点（移到左下角，避让标记） */}
         {isSelf && !isDead && !isSelected && (
           <div style={{
-            position: 'absolute', bottom: -1, right: -1,
+            position: 'absolute', bottom: -1, left: -1,
             width: compact ? 8 : 10, height: compact ? 8 : 10,
             borderRadius: '50%',
             background: '#ffd166',
             border: '2px solid #07041a',
           }} />
+        )}
+
+        {/* 本地标记角色角标（右下角） */}
+        {markedRole && (
+          <div style={{
+            position: 'absolute',
+            bottom: compact ? -4 : -5,
+            right: compact ? -4 : -5,
+            width: compact ? 18 : 22,
+            height: compact ? 18 : 22,
+            borderRadius: '50%',
+            overflow: 'hidden',
+            border: `2px solid ${ROLE_COLOR[markedRole] ?? '#8b5cf6'}`,
+            background: '#07041a',
+            boxShadow: `0 0 6px ${ROLE_COLOR[markedRole] ?? '#8b5cf6'}66`,
+            zIndex: 11,
+          }}>
+            {ROLE_IMG[markedRole]
+              ? <img src={ROLE_IMG[markedRole]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable={false} />
+              : <span style={{ fontSize: compact ? 10 : 12, display: 'block', textAlign: 'center', lineHeight: compact ? '18px' : '22px' }}>
+                  {{ werewolf:'🐺', villager:'👤', seer:'🔮', witch:'🧙', guard:'🛡', hunter:'🏹' }[markedRole]}
+                </span>
+            }
+          </div>
         )}
 
         {/* ── 座位号牌 ── */}

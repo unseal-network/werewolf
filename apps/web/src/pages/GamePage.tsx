@@ -8,7 +8,9 @@ import { PhaseOverlay } from '../components/PhaseOverlay'
 import { AdminModal } from '../components/AdminModal'
 import { WaitingRoomView } from '../components/WaitingRoomView'
 import { EventLog } from '../components/EventLog'
+import { RolePickerBubble } from '../components/RolePickerBubble'
 import { VoiceRoomProvider } from '../components/VoiceRoom'
+import type { RoleId, BubblePosition } from '../components/RolePickerBubble'
 import { useGameSSE } from '../hooks/useGameSSE'
 import type { GameRoom, RoomProjection, RoomPlayer, PlayerPrivateState, GameEventDto, AgentCandidate } from '../api/client'
 
@@ -48,6 +50,9 @@ export function GamePage({
   const [submitting, setSubmitting] = useState(false)
   const [phaseAnim, setPhaseAnim] = useState<string | null>(null)
   const [showAdminModal, setShowAdminModal] = useState(false)
+  // 本地角色标记
+  const [roleMarks, setRoleMarks] = useState<Record<string, RoleId | null>>({})
+  const [pickerTarget, setPickerTarget] = useState<{ playerId: string; pos: BubblePosition } | null>(null)
   const prevPhaseRef = useRef('')
   const initRef = useRef(false)
 
@@ -154,6 +159,22 @@ export function GamePage({
     }
   }
 
+  // 长按头像 → 计算气泡位置 → 打开 picker
+  const handleLongPress = useCallback((playerId: string, rect: DOMRect) => {
+    const midY = rect.top + rect.height / 2
+    const direction: BubblePosition['direction'] = midY > window.innerHeight / 2 ? 'up' : 'down'
+    const isLeft = rect.left < window.innerWidth / 2
+    setPickerTarget({
+      playerId,
+      pos: {
+        x: isLeft ? rect.left : rect.right,
+        y: direction === 'down' ? rect.bottom : rect.top,
+        direction,
+        align: isLeft ? 'left' : 'right',
+      },
+    })
+  }, [])
+
   const actionHint = !canAct ? undefined
     : actionKind === 'speech' ? '🎙 轮到你发言'
     : actionKind === 'vote' ? '🗳 选择放逐目标'
@@ -215,7 +236,9 @@ export function GamePage({
                   isSelectable={canTarget(p)}
                   isSelected={selectedPlayerId === p.id}
                   isDead={!alivePlayerIds.has(p.id)}
+                  markedRole={roleMarks[p.id] ?? null}
                   onSelect={() => { if (canTarget(p)) setSelectedPlayerId(prev => prev === p.id ? null : p.id) }}
+                  onLongPress={p.userId !== userId ? (rect) => handleLongPress(p.id, rect) : undefined}
                   compact={compact}
                 />
               ))}
@@ -246,7 +269,9 @@ export function GamePage({
                   isSelectable={canTarget(p)}
                   isSelected={selectedPlayerId === p.id}
                   isDead={!alivePlayerIds.has(p.id)}
+                  markedRole={roleMarks[p.id] ?? null}
                   onSelect={() => { if (canTarget(p)) setSelectedPlayerId(prev => prev === p.id ? null : p.id) }}
+                  onLongPress={p.userId !== userId ? (rect) => handleLongPress(p.id, rect) : undefined}
                   compact={compact}
                 />
               ))}
@@ -277,6 +302,19 @@ export function GamePage({
           onCancel={() => setSelectedPlayerId(null)}
           onBackToLobby={onBackToLobby}
         />
+
+        {/* 角色标记气泡 */}
+        {pickerTarget && (
+          <RolePickerBubble
+            position={pickerTarget.pos}
+            currentMark={roleMarks[pickerTarget.playerId] ?? null}
+            onSelect={(role) => {
+              setRoleMarks(prev => ({ ...prev, [pickerTarget.playerId]: role }))
+              setPickerTarget(null)
+            }}
+            onClose={() => setPickerTarget(null)}
+          />
+        )}
 
         {showAdminModal && (
           <AdminModal
