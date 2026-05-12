@@ -5,7 +5,7 @@ dist
 .turbo
 .vite
 .env
-.env.*
+.env.development*
 coverage
 .gstack/
 apps/web/public/verify-config.local.json
