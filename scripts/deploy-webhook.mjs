@@ -8,6 +8,17 @@ const remote = process.env.DEPLOY_REMOTE ?? "origin";
 const branch = process.env.DEPLOY_BRANCH ?? "main";
 const lockPath = process.env.DEPLOY_LOCK_PATH ?? "/tmp/werewolf-deploy.lock";
 const webBasePath = process.env.WEB_BASE_PATH ?? "/werewolf/";
+const packageMetadataPaths = [
+  "package.json",
+  "pnpm-lock.yaml",
+  "apps/api/package.json",
+  "apps/runtime-worker/package.json",
+  "apps/web/package.json",
+  "packages/agent-client/package.json",
+  "packages/db/package.json",
+  "packages/shared/package.json",
+  "packages/werewolf-engine/package.json",
+];
 
 async function run(command, args, options = {}) {
   console.log(`[deploy] $ ${command} ${args.join(" ")}`);
@@ -53,15 +64,16 @@ await withLock(async () => {
   await run("pnpm", ["install", "--frozen-lockfile"]).catch(async (error) => {
     console.warn(`[deploy] frozen install failed: ${error.message}`);
     await run("pnpm", ["install", "--no-frozen-lockfile"]);
-    await run("git", ["checkout", "--", "package.json", "pnpm-lock.yaml"]);
+    await run("git", ["checkout", "--", ...packageMetadataPaths]);
   });
   await run("pnpm", ["migrate"]);
   await run("pnpm", ["--filter", "@werewolf/api", "build"]);
   await run("pnpm", ["--filter", "@werewolf/web", "build"], {
     env: { VITE_APP_BASE_PATH: webBasePath },
   });
-  await run("pm2", ["restart", "werewolf-api", "--update-env"]);
   await run("pm2", ["restart", "werewolf-web", "--update-env"]);
   await run("pm2", ["save"]);
+  console.log(`[deploy] Restarting API last at ${new Date().toISOString()}`);
+  await run("pm2", ["restart", "werewolf-api", "--update-env"]);
   console.log(`[deploy] Completed ${new Date().toISOString()}`);
 });

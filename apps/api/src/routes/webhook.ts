@@ -90,7 +90,7 @@ export function createWebhookRoutes(): Hono {
       process.env.DEPLOY_WEBHOOK_SCRIPT ??
       path.join(root, "scripts", "deploy-webhook.mjs");
     const logPath =
-      process.env.DEPLOY_WEBHOOK_LOG ?? path.join(root, "deploy-webhook.log");
+      process.env.DEPLOY_WEBHOOK_LOG ?? "/tmp/werewolf-deploy-webhook.log";
 
     await mkdir(path.dirname(logPath), { recursive: true });
     const logFd = openSync(logPath, "a");
