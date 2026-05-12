@@ -819,11 +819,11 @@ packages:
     os: [win32]
 
   '@livekit/rtc-ffi-bindings@0.12.52':
-    resolution: {integrity: sha512-3ag+l6cRmckkynR0fs/36MNNbXhOE6dv8MvataL/82PB4tjo0HfhQOu8Q9YDdu3K1ycpSjzmbaJO1872gGe0Ww==}
+    resolution: {integrity: sha512-h2TF+C5qYJyoInshLwYxr6JDKNqjjaL/qzwF+tW2x9SeRF6oUxerVHmoY9NOuIkwiOOYmM4zSqNGbHxTZYWTuA==}
     engines: {node: '>= 18'}
 
   '@livekit/rtc-node@0.13.24':
-    resolution: {integrity: sha512-PsngGq9/lcwRGwAf5e9haop9XWLxz3CO+ztgRYK0goqJQYZqVPxjTCTGdZxZyQoAR5UPXhIeNgQtlkNqsjjO7A==}
+    resolution: {integrity: sha512-06pF8YJlJk11R6J7kFXFpwV8etpbmCskoXFvwfwcDDixMqaP6qtS5srq3G23mDaRjx7ofz/PXg2GtiZbqNGT5A==}
     engines: {node: '>= 18'}
 
   '@livekit/typed-emitter@3.0.0':
