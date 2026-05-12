@@ -1018,15 +1018,20 @@ button {
 }
 
 .seat-avatar-img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   display: block;
+  border-radius: inherit;
+  z-index: 0;
 }
 
 .seat .avatar {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-color: color-mix(in srgb, var(--seat-role-color, var(--accent)) 45%, rgba(248, 242, 205, 0.34));
 }
 
@@ -3947,8 +3952,8 @@ body {
 }
 
 .visual-runtime-root .avatar {
-  width: clamp(42px, 7.6vw, 68px);
-  height: clamp(42px, 7.6vw, 68px);
+  width: clamp(58px, calc(var(--visual-seat-width) * 0.48), 86px);
+  height: clamp(58px, calc(var(--visual-seat-width) * 0.48), 86px);
   border-radius: 999px;
   border: clamp(2px, 0.36vw, 4px) solid color-mix(in srgb, var(--seat-role-color, #8b5cf6) 58%, rgba(255, 255, 255, 0.18));
   background: rgba(255, 255, 255, 0.06);
@@ -3982,8 +3987,8 @@ body {
 }
 
 .visual-runtime-root[data-compact="true"] .avatar {
-  width: clamp(42px, 7.6vw, 62px);
-  height: clamp(42px, 7.6vw, 62px);
+  width: clamp(56px, calc(var(--visual-seat-width) * 0.44), 78px);
+  height: clamp(56px, calc(var(--visual-seat-width) * 0.44), 78px);
 }
 
 .visual-runtime-root[data-compact="true"] .seat-name {
