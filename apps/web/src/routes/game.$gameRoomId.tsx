@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createApiClient, type GameEventDto, type GameRoom, type RoomPlayer, type PlayerPrivateState, type RoomProjection } from "../api/client";
+import { createApiClient, defaultApiBaseUrl, type GameEventDto, type GameRoom, type RoomPlayer, type PlayerPrivateState, type RoomProjection } from "../api/client";
 import { GameRoomShell } from "../components/GameRoomShell";
 import { CenterStage, type ActionMode, type ConfirmMode } from "../components/CenterStage";
 import { TimelineCapsule } from "../components/TimelineCapsule";
@@ -59,7 +59,7 @@ interface UserSeatState {
   isWolfTeammate?: boolean;
 }
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+const apiBaseUrl = defaultApiBaseUrl();
 
 function stripPayloadFromEvent(raw: string): string {
   if (raw.startsWith("data:")) {

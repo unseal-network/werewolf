@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createApiClient } from "../api/client";
+import { createApiClient, defaultApiBaseUrl } from "../api/client";
 import { useI18n } from "../i18n/I18nProvider";
 import {
   DEFAULT_SOURCE_ROOM_ID,
@@ -35,7 +35,7 @@ export function CreateGamePage({
   const client = useMemo(
     () =>
       createApiClient({
-        baseUrl: import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000",
+        baseUrl: defaultApiBaseUrl(),
         getMatrixToken: () => matrixToken.trim(),
       }),
     [matrixToken]

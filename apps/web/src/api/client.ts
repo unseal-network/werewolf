@@ -154,9 +154,36 @@ export interface AgentCandidatesResponse {
   roomId: string;
 }
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function appBasePath(): string {
+  const base = import.meta.env.BASE_URL || "/";
+  const leading = base.startsWith("/") ? base : `/${base}`;
+  return leading.endsWith("/") ? leading : `${leading}/`;
+}
+
+export function defaultApiBaseUrl(): string {
+  const explicit = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (explicit) return trimTrailingSlash(explicit);
+
+  const { protocol, hostname, origin } = window.location;
+  const isLocalDev =
+    protocol === "http:" &&
+    (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1");
+  if (isLocalDev && appBasePath() === "/") {
+    return "http://localhost:3000";
+  }
+
+  return `${origin}${trimTrailingSlash(appBasePath())}/api`;
+}
+
 export function createApiClient(options: ApiClientOptions) {
+  const baseUrl = trimTrailingSlash(options.baseUrl);
+
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(`${options.baseUrl}${path}`, {
+    const response = await fetch(`${baseUrl}${path}`, {
       ...init,
       headers: {
         "content-type": "application/json",
@@ -265,7 +292,7 @@ export function createApiClient(options: ApiClientOptions) {
     },
     subscribeUrl(gameRoomId: string) {
       const token = encodeURIComponent(options.getMatrixToken());
-      return `${options.baseUrl}/games/${gameRoomId}/subscribe?access_token=${token}`;
+      return `${baseUrl}/games/${gameRoomId}/subscribe?access_token=${token}`;
     },
     async whoAmI(matrixServerBase: string): Promise<MatrixWhoAmI> {
       const response = await fetch(
