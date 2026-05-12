@@ -72,5 +72,6 @@ export class VoteScene extends BaseScene {
         delay: Phaser.Math.Between(0, 8000),
       });
     }
+    this.bootRoleCardLayer();
   }
 }

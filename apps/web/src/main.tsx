@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { RootLayout } from "./routes/__root";
 import { CreateGamePage } from "./routes/create";
 import { GameRoomPage } from "./routes/game.$gameRoomId";
+import { AnimationDemoPage } from "./routes/animation-demo";
 import { I18nProvider } from "./i18n/I18nProvider";
 import "./styles/game-room.css";
 
@@ -16,6 +17,9 @@ function App() {
   }, []);
 
   const params = new URLSearchParams(search);
+  if (params.get("animationDemo") === "1") {
+    return <AnimationDemoPage />;
+  }
   const gameRoomId = params.get("gameRoomId");
 
   if (gameRoomId) {

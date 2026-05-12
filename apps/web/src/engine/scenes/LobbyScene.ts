@@ -22,5 +22,6 @@ export class LobbyScene extends BaseScene {
     const warmGlow = this.add.graphics();
     warmGlow.fillStyle(0xfff0dd, 0.35);
     warmGlow.fillCircle(width * 0.85, height * 0.75, Math.min(width, height) * 0.35);
+    this.bootRoleCardLayer();
   }
 }

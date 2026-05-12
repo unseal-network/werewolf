@@ -21,6 +21,340 @@
   --radius-pill: 999px;
 }
 
+/* ------------------------------------------------------------------
+   2026 table redesign overrides
+   Main view = player seats + central table decisions. Timeline and role
+   identity are utility affordances, not permanent columns.
+------------------------------------------------------------------ */
+
+.game-room-root {
+  --table-bg: rgba(5, 13, 16, 0.70);
+  --table-panel: rgba(7, 18, 22, 0.78);
+  --table-line: rgba(205, 226, 220, 0.22);
+  --table-text: #eef8f5;
+  --table-muted: #b8cbc7;
+  --table-gold: #dfbd67;
+  color: var(--table-text);
+}
+
+.game-room-root::before,
+.game-room-root[data-scene="lobby"]::before,
+.game-room-root[data-scene="waiting"]::before,
+.game-room-root[data-scene="deal"]::before,
+.game-room-root[data-scene="night"]::before,
+.game-room-root[data-scene="day"]::before,
+.game-room-root[data-scene="vote"]::before,
+.game-room-root[data-scene="tie"]::before,
+.game-room-root[data-scene="end"]::before {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(112, 202, 194, 0.18), transparent 31%),
+    radial-gradient(circle at 50% 80%, rgba(218, 178, 94, 0.08), transparent 30%),
+    linear-gradient(115deg, rgba(16, 46, 47, 0.42), transparent 36%),
+    linear-gradient(245deg, rgba(35, 43, 35, 0.52), transparent 34%),
+    linear-gradient(180deg, #061116 0%, #081316 48%, #03080a 100%);
+}
+
+.game-room-root[data-scene="vote"]::before,
+.game-room-root[data-scene="tie"]::before {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(177, 44, 54, 0.24), transparent 34%),
+    radial-gradient(circle at 50% 80%, rgba(218, 178, 94, 0.07), transparent 30%),
+    linear-gradient(115deg, rgba(16, 46, 47, 0.34), transparent 36%),
+    linear-gradient(180deg, #13080b 0%, #0a1012 52%, #03080a 100%);
+}
+
+.game-room-root[data-scene="end"]::before {
+  background:
+    radial-gradient(circle at 50% 38%, rgba(223, 189, 103, 0.18), transparent 34%),
+    linear-gradient(115deg, rgba(16, 46, 47, 0.36), transparent 36%),
+    linear-gradient(180deg, #071316 0%, #0a1711 52%, #03080a 100%);
+}
+
+.dom-ui-layer::before {
+  background:
+    repeating-linear-gradient(104deg, transparent 0 70px, rgba(231, 245, 241, 0.025) 72px 74px),
+    radial-gradient(ellipse at 18% 40%, rgba(190, 210, 192, 0.08), transparent 26%),
+    radial-gradient(ellipse at 82% 28%, rgba(86, 129, 126, 0.12), transparent 28%),
+    radial-gradient(circle at 50% 44%, transparent 0 28%, rgba(1, 7, 10, 0.50) 72%);
+}
+
+.game {
+  padding: 82px 28px 112px;
+}
+
+.room {
+  min-height: calc(100vh - 190px);
+  grid-template-columns: minmax(130px, 180px) minmax(520px, 1fr) minmax(130px, 180px);
+  gap: clamp(14px, 2vw, 28px);
+  padding: 14px 20px;
+}
+
+.seat-column {
+  gap: clamp(10px, 1.4vh, 15px);
+}
+
+.seat {
+  width: min(150px, 100%);
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  justify-items: start;
+  gap: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(183, 216, 211, 0.17);
+  background: linear-gradient(180deg, rgba(7, 18, 22, 0.78), rgba(4, 10, 13, 0.68));
+  padding: 8px;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.20);
+  backdrop-filter: blur(10px);
+}
+
+.avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  background: radial-gradient(circle at 45% 30%, #eef6e8, #748e8d 52%, #172429 100%);
+  border: 1px solid rgba(248, 242, 205, 0.38);
+  color: #061215;
+  box-shadow: none;
+}
+
+.seat-name,
+.seat.empty .seat-name,
+.game-room-root[data-scene="night"] .seat-name,
+.game-room-root[data-scene="night"] .seat.empty .seat-name {
+  max-width: 88px;
+  color: #f4fbf7;
+  text-align: left;
+  text-shadow: none;
+}
+
+.seat.empty .seat-name {
+  color: #9fb4b0;
+}
+
+.seat.active,
+.seat.current {
+  border-color: rgba(240, 217, 135, 0.62);
+  box-shadow: 0 0 0 1px rgba(240, 217, 135, 0.18), 0 0 34px rgba(240, 217, 135, 0.11);
+}
+
+.seat.active .seat-name {
+  color: #ffe7a0;
+}
+
+.seat.dead {
+  opacity: 0.55;
+  filter: grayscale(0.45);
+}
+
+.table {
+  width: min(860px, 100%);
+  min-height: min(54vh, 520px);
+  border-radius: 34px;
+  border: 1px solid var(--table-line);
+  background:
+    radial-gradient(ellipse at 50% 52%, rgba(116, 211, 202, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(8, 20, 24, 0.74), rgba(5, 12, 16, 0.58));
+  box-shadow: 0 22px 68px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px);
+  position: relative;
+  overflow: hidden;
+}
+
+.table::before {
+  content: "";
+  position: absolute;
+  width: min(76%, 560px);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background:
+    repeating-radial-gradient(circle, rgba(155, 225, 218, 0.18) 0 1px, transparent 2px 36px),
+    radial-gradient(circle, rgba(126, 218, 209, 0.16), transparent 62%);
+  transform: rotateX(64deg);
+  filter: drop-shadow(0 0 38px rgba(104, 216, 209, 0.18));
+  pointer-events: none;
+}
+
+.phase-card,
+.game-room-root[data-scene="lobby"] .phase-card,
+.game-room-root[data-scene="deal"] .phase-card,
+.game-room-root[data-scene="night"] .phase-card,
+.game-room-root[data-scene="day"] .phase-card,
+.game-room-root[data-scene="vote"] .phase-card,
+.game-room-root[data-scene="tie"] .phase-card,
+.game-room-root[data-scene="end"] .phase-card {
+  width: min(520px, 88%);
+  border-radius: 24px;
+  border: 1px solid rgba(238, 232, 187, 0.28);
+  background: rgba(3, 10, 13, 0.72);
+  color: var(--table-text);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+}
+
+.phase-kicker,
+.game-room-root[data-scene="end"] .phase-kicker {
+  color: var(--table-gold);
+}
+
+.phase-title,
+.game-room-root[data-scene="day"] .phase-title,
+.game-room-root[data-scene="end"] .phase-title,
+.game-room-root[data-scene="lobby"] .phase-title {
+  color: #fff7d2;
+}
+
+.phase-copy,
+.game-room-root[data-scene="day"] .phase-copy,
+.game-room-root[data-scene="night"] .phase-copy,
+.game-room-root[data-scene="end"] .phase-copy {
+  color: var(--table-muted);
+}
+
+.stage-start,
+.stage-confirm,
+.stage-skip,
+.target-select {
+  min-height: 46px;
+  border-radius: 14px;
+}
+
+.stage-start,
+.stage-confirm {
+  border: 1px solid rgba(225, 189, 103, 0.48);
+  background: linear-gradient(180deg, #f4d882, #b87935);
+  color: #140f0a;
+  font-weight: 950;
+}
+
+.stage-skip {
+  border: 1px solid rgba(177, 215, 211, 0.26);
+  background: rgba(6, 16, 20, 0.78);
+  color: #eef8f5;
+  font-weight: 900;
+}
+
+.target-chip,
+.game-room-root[data-scene="night"] .target-chip {
+  border-color: rgba(177, 215, 211, 0.22);
+  background: rgba(6, 16, 20, 0.76);
+  color: #dcebe7;
+}
+
+.role-card-entry,
+.game-room-root[data-scene="night"] .role-card-entry {
+  left: 28px;
+  right: auto;
+  top: auto;
+  bottom: 24px;
+  width: 64px;
+  height: 86px;
+  padding: 0;
+  border-radius: 13px;
+  border: 1px solid rgba(246, 229, 164, 0.58);
+  background: #071116 var(--role-card-back-url) center / cover no-repeat;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.38), 0 0 28px rgba(137, 221, 213, 0.14);
+  color: transparent;
+}
+
+.role-card-entry:hover {
+  transform: translateY(-3px) rotate(-2deg);
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.44), 0 0 34px rgba(223, 189, 103, 0.18);
+}
+
+.role-card-entry-text,
+.role-card-entry-mark {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.log-peek,
+.game-room-root[data-scene="night"] .log-peek {
+  left: auto;
+  right: 28px;
+  bottom: 24px;
+  transform: none;
+  min-width: 112px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(177, 215, 211, 0.26);
+  background: rgba(6, 16, 20, 0.84);
+  color: #eef8f5;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+}
+
+.log-peek .grip {
+  display: none;
+}
+
+.log-peek strong {
+  font-size: 0;
+}
+
+.log-peek strong::after {
+  content: "事件";
+  font-size: 14px;
+}
+
+.log-sheet {
+  left: auto;
+  right: 24px;
+  top: 92px;
+  bottom: 92px;
+  width: min(380px, calc(100vw - 48px));
+  height: auto;
+  border-radius: 22px;
+  border: 1px solid var(--table-line);
+  background: linear-gradient(180deg, rgba(8, 20, 24, 0.94), rgba(5, 12, 16, 0.90));
+  color: var(--table-text);
+  transform: translateX(24px) scale(0.98);
+  transform-origin: right bottom;
+}
+
+.log-sheet.open {
+  transform: translateX(0) scale(1);
+}
+
+.sheet-head,
+.log-row {
+  color: var(--table-text);
+}
+
+.sheet-title,
+.log-phase-header {
+  color: #fff7d2;
+}
+
+.sheet-sub,
+.log-text,
+.log-meta,
+.log-time {
+  color: #c6d8d4;
+}
+
+@media (max-width: 900px) {
+  .room {
+    grid-template-columns: 64px minmax(250px, 1fr) 64px;
+  }
+
+  .seat {
+    width: 56px;
+    min-height: 64px;
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .seat-name {
+    max-width: 54px;
+    text-align: center;
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -95,6 +429,11 @@ button {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.game-engine-layer.role-reveal-active {
+  z-index: 4;
+  pointer-events: auto;
 }
 
 /* DOM UI overlay layer */
@@ -1762,6 +2101,123 @@ body.logs-open .log-peek {
   }
 }
 
+/* ------------------ Animation demo lab ------------------ */
+
+.animation-demo-page {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  background: #05080a;
+  color: #f4ead0;
+}
+
+.animation-demo-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.animation-demo-canvas canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.animation-demo-panel {
+  position: fixed;
+  right: 24px;
+  top: 24px;
+  z-index: 5;
+  width: min(360px, calc(100vw - 48px));
+  display: grid;
+  gap: 16px;
+  border: 1px solid rgba(223, 189, 103, 0.28);
+  border-radius: 18px;
+  background: rgba(7, 12, 16, 0.78);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(16px);
+  padding: 18px;
+}
+
+.animation-demo-kicker {
+  margin: 0 0 8px;
+  color: #dfbd67;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.animation-demo-panel h1 {
+  margin: 0 0 8px;
+  color: #fff7d2;
+  font-size: 22px;
+}
+
+.animation-demo-panel p {
+  margin: 0;
+  color: #c5d3cf;
+  line-height: 1.55;
+}
+
+.animation-demo-panel label {
+  display: grid;
+  gap: 8px;
+  color: #dfbd67;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.animation-demo-panel select {
+  min-height: 44px;
+  border: 1px solid rgba(184, 203, 199, 0.26);
+  border-radius: 12px;
+  background: rgba(5, 11, 14, 0.9);
+  color: #eef8f5;
+  padding: 0 12px;
+  font: inherit;
+  font-weight: 800;
+}
+
+.animation-demo-counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.animation-demo-counts button {
+  min-height: 40px;
+  border: 1px solid rgba(184, 203, 199, 0.22);
+  border-radius: 12px;
+  background: rgba(5, 11, 14, 0.8);
+  color: #eef8f5;
+  font-weight: 900;
+}
+
+.animation-demo-counts button.active {
+  border-color: rgba(223, 189, 103, 0.68);
+  background: linear-gradient(180deg, #dfbd67, #9b672c);
+  color: #160f08;
+}
+
+.animation-demo-note {
+  border-radius: 14px;
+  border: 1px solid rgba(94, 185, 178, 0.22);
+  background: rgba(94, 185, 178, 0.08);
+  color: #c5d3cf;
+  padding: 12px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .animation-demo-panel {
+    left: 12px;
+    right: 12px;
+    top: 12px;
+    width: auto;
+  }
+}
+
 /* ------------------ Reduced motion ------------------ */
 
 @media (prefers-reduced-motion: reduce) {
@@ -2895,5 +3351,70 @@ body {
   .avatar {
     width: 38px;
     height: 38px;
+  }
+}
+
+/* Final table-redesign guards. These stay at EOF to beat older responsive
+   rules in this historically layered stylesheet. */
+.role-card-entry,
+.game-room-root[data-scene="night"] .role-card-entry {
+  left: 28px !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: 24px !important;
+  width: 64px !important;
+  height: 86px !important;
+  border-radius: 13px !important;
+  background: #071116 var(--role-card-back-url) center / cover no-repeat !important;
+  color: transparent !important;
+}
+
+.log-peek,
+.game-room-root[data-scene="night"] .log-peek {
+  left: auto !important;
+  right: 28px !important;
+  bottom: 24px !important;
+  transform: none !important;
+  min-width: 112px !important;
+  width: auto !important;
+  height: 48px !important;
+  border-radius: 14px !important;
+}
+
+.log-sheet {
+  left: auto !important;
+  right: 24px !important;
+  top: 92px !important;
+  bottom: 92px !important;
+  width: min(380px, calc(100vw - 48px)) !important;
+  height: auto !important;
+  transform: translateX(24px) scale(0.98) !important;
+  transform-origin: right bottom !important;
+}
+
+.log-sheet.open {
+  transform: translateX(0) scale(1) !important;
+}
+
+.timeline-backdrop.show {
+  opacity: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+@media (max-width: 640px) {
+  .role-card-entry,
+  .game-room-root[data-scene="night"] .role-card-entry {
+    width: 52px !important;
+    height: 70px !important;
+    left: 16px !important;
+    bottom: 16px !important;
+  }
+
+  .log-peek,
+  .game-room-root[data-scene="night"] .log-peek {
+    right: 16px !important;
+    bottom: 16px !important;
   }
 }

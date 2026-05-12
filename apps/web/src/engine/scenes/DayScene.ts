@@ -15,6 +15,7 @@ export class DayScene extends BaseScene {
     this.createDarkClouds(width, height);
     this.createGothicVillage(width, height);
     this.createCrows(width, height);
+    this.bootRoleCardLayer();
   }
 
   private createGothicDaySky(width: number, height: number) {

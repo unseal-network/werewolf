@@ -239,6 +239,84 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("starts the next human speaker deadline after agent TTS finishes", async () => {
+    vi.useFakeTimers();
+    try {
+      const { games, gameRoomId } = createStartedServiceGame();
+      const room = games.snapshot(gameRoomId);
+      const agentSpeaker = room.players[0]!;
+      const humanSpeaker = room.players[1]!;
+      let resolveSpeak: () => void = () => undefined;
+      const speakDone = new Promise<void>((resolve) => {
+        resolveSpeak = resolve;
+      });
+
+      games.setVoiceAgents({
+        get: () => ({
+          speak: () => speakDone,
+        }),
+      } as unknown as VoiceAgentRegistry);
+      agentSpeaker.kind = "agent";
+      agentSpeaker.agentId = "@agent-speaker:example.com";
+      room.projection = {
+        ...room.projection!,
+        phase: "day_speak",
+        currentSpeakerPlayerId: agentSpeaker.id,
+        deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+      room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+      const advance = games.advanceGame(gameRoomId, async (input) => ({
+        text: `${input.displayName} has a short claim.`,
+        toolName: "saySpeech",
+        input: { speech: `${input.displayName} has a short claim.` },
+      }));
+
+      await vi.advanceTimersByTimeAsync(57_000);
+      resolveSpeak();
+      await advance;
+
+      const remainingMs =
+        new Date(room.projection.deadlineAt!).getTime() - Date.now();
+      expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+      expect(remainingMs).toBeGreaterThanOrEqual(59_000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits a turn event with a fresh deadline when day speech opens", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const firstSpeaker = room.players[0]!;
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_resolution",
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    room.pendingNightActions = [];
+
+    await games.advanceGame(gameRoomId, passAgentTurn);
+
+    const turnEvent = room.events.find(
+      (event) => event.type === "turn_started" && event.subjectId === firstSpeaker.id
+    );
+    expect(room.projection.phase).toBe("day_speak");
+    expect(room.projection.currentSpeakerPlayerId).toBe(firstSpeaker.id);
+    expect(turnEvent).toEqual(
+      expect.objectContaining({
+        type: "turn_started",
+        subjectId: firstSpeaker.id,
+        payload: expect.objectContaining({
+          currentSpeakerPlayerId: firstSpeaker.id,
+          deadlineAt: room.projection.deadlineAt,
+        }),
+      })
+    );
+    expect(new Date(room.projection.deadlineAt!).getTime()).toBeGreaterThan(Date.now());
+  });
+
   it("does not advance when a stale deadline from an older phase fires", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

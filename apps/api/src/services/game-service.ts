@@ -1226,11 +1226,15 @@ export class InMemoryGameService {
 
       room.pendingNightActions = [];
       this.startPhase(room, "day_speak", now);
-      room.speechQueue = room.players
-        .filter((player) => room.projection?.alivePlayerIds.includes(player.id))
-        .sort((left, right) => left.seatNo - right.seatNo)
-        .map((player) => player.id);
-      room.projection.currentSpeakerPlayerId = room.speechQueue[0] ?? null;
+      this.beginSpeechQueue(
+        room,
+        room.players
+          .filter((player) => room.projection?.alivePlayerIds.includes(player.id))
+          .sort((left, right) => left.seatNo - right.seatNo)
+          .map((player) => player.id),
+        "runtime",
+        new Date()
+      );
     } else if (
       room.projection.phase === "day_speak" ||
       room.projection.phase === "tie_speech"
@@ -1304,8 +1308,7 @@ export class InMemoryGameService {
       } else if (resolved.tiedPlayerIds.length > 0) {
         room.tiePlayerIds = resolved.tiedPlayerIds;
         this.startPhase(room, "tie_speech", now);
-        room.speechQueue = resolved.speechQueue;
-        room.projection.currentSpeakerPlayerId = room.speechQueue[0] ?? null;
+        this.beginSpeechQueue(room, resolved.speechQueue, "runtime", new Date());
       } else {
         this.startPhase(room, "day_resolution", now);
       }
@@ -1446,7 +1449,10 @@ export class InMemoryGameService {
     now: Date
   ): void {
     if (!room.projection) throw new Error("projection is required");
-    const deadlineAt = this.deadlineForPhase(room, phase, now);
+    const deadlineAt =
+      phase === "day_speak" || phase === "tie_speech"
+        ? null
+        : this.deadlineForPhase(room, phase, now);
     room.projection = {
       ...room.projection,
       phase,
@@ -1466,6 +1472,26 @@ export class InMemoryGameService {
         createdAt: now.toISOString(),
       },
     ]);
+  }
+
+  private beginSpeechQueue(
+    room: StoredGameRoom,
+    speechQueue: string[],
+    previousSpeakerPlayerId: string,
+    now: Date
+  ): void {
+    if (!room.projection) throw new Error("projection is required");
+    room.speechQueue = speechQueue;
+    const currentSpeakerPlayerId = room.speechQueue[0] ?? null;
+    room.projection = {
+      ...room.projection,
+      currentSpeakerPlayerId,
+      deadlineAt: currentSpeakerPlayerId
+        ? new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString()
+        : null,
+      version: room.events.length + 1,
+    };
+    this.emitSpeechTurnStarted(room, previousSpeakerPlayerId, now);
   }
 
   private deadlineForPhase(
@@ -2078,8 +2104,9 @@ export class InMemoryGameService {
       }
     }
 
-    this.advanceSpeechSpeaker(room, playerId, now);
-    this.emitSpeechTurnStarted(room, playerId, now);
+    const completedAt = new Date();
+    this.advanceSpeechSpeaker(room, playerId, completedAt);
+    this.emitSpeechTurnStarted(room, playerId, completedAt);
   }
 
   private advanceSpeechSpeaker(

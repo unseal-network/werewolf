@@ -17,6 +17,7 @@ export class NightScene extends BaseScene {
     this.createGothicGround(width, height);
     this.createBats(width, height);
     this.createGothicSpires(width, height);
+    this.bootRoleCardLayer();
   }
 
   private createGothicSky(width: number, height: number) {

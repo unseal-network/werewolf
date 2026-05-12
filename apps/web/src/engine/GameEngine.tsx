@@ -25,19 +25,31 @@ export interface EngineGameState {
   phase: string | null;
   seats: EngineSeat[];
   selectedTargetId: string | null;
+  roleCard?: EngineRoleCardState | undefined;
+}
+
+export interface EngineRoleCardState {
+  nonce: number;
+  roleId: string;
+  roleLabel: string;
+  roleDescription: string;
+  cardBackUrl: string;
+  cardFrontUrl: string;
+  visible: boolean;
 }
 
 export interface GameEngineProps {
   gameState: EngineGameState;
   onSeatClick?: (playerId: string) => void;
+  onRoleCardClose?: (() => void) | undefined;
 }
 
-export function GameEngine({ gameState, onSeatClick }: GameEngineProps) {
+export function GameEngine({ gameState, onSeatClick, onRoleCardClose }: GameEngineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
-  const callbacksRef = useRef({ onSeatClick });
+  const callbacksRef = useRef({ onSeatClick, onRoleCardClose });
 
-  callbacksRef.current = { onSeatClick };
+  callbacksRef.current = { onSeatClick, onRoleCardClose };
 
   useEffect(() => {
     const container = containerRef.current;
@@ -63,6 +75,9 @@ export function GameEngine({ gameState, onSeatClick }: GameEngineProps) {
     // Bridge: Phaser events → React callbacks
     game.events.on("seat-click", (playerId: string) => {
       callbacksRef.current.onSeatClick?.(playerId);
+    });
+    game.events.on("role-card-close", () => {
+      callbacksRef.current.onRoleCardClose?.();
     });
 
     return () => {

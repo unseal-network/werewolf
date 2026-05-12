@@ -23,6 +23,7 @@ interface GameRoomShellProps {
   roleCardEntry: ReactNode;
   overlays?: ReactNode;
   engineGameState: EngineGameState;
+  onRoleCardClose?: () => void;
   onHomeClick?: () => void;
   isLoading?: boolean;
 }
@@ -44,10 +45,16 @@ export function GameRoomShell({
   roleCardEntry,
   overlays,
   engineGameState,
+  onRoleCardClose,
   onHomeClick,
   isLoading,
 }: GameRoomShellProps) {
-  const rootStyle = { ["--accent" as string]: accent } as React.CSSProperties;
+  const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
+  const rootStyle = {
+    ["--accent" as string]: accent,
+    ["--role-card-back-url" as string]: `url("${assetBase}/card-back.png")`,
+  } as React.CSSProperties;
+  const roleRevealActive = Boolean(engineGameState.roleCard?.visible);
   return (
     <main
       className="game-room-root"
@@ -55,8 +62,11 @@ export function GameRoomShell({
       style={rootStyle}
     >
       {/* Phaser game engine canvas layer */}
-      <div className="game-engine-layer">
-        <GameEngine gameState={engineGameState} />
+      <div
+        className={`game-engine-layer ${roleRevealActive ? "role-reveal-active" : ""}`}
+        onClick={roleRevealActive ? onRoleCardClose : undefined}
+      >
+        <GameEngine gameState={engineGameState} onRoleCardClose={onRoleCardClose} />
       </div>
 
       {/* DOM UI overlay layer */}

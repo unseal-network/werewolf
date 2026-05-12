@@ -76,5 +76,6 @@ export class EndScene extends BaseScene {
         height * 0.3 + Math.sin(angle + 0.15) * length
       );
     }
+    this.bootRoleCardLayer();
   }
 }

@@ -60,6 +60,29 @@ interface UserSeatState {
 }
 
 const apiBaseUrl = defaultApiBaseUrl();
+const appBasePath = import.meta.env.BASE_URL ?? "/";
+const roleAssetBase = `${appBasePath.replace(/\/?$/, "/")}assets/role-cards`;
+
+function normalizeRoleId(roleId: string | undefined): string {
+  switch (roleId) {
+    case "werewolf":
+    case "seer":
+    case "witch":
+    case "guard":
+    case "villager":
+      return roleId;
+    default:
+      return "villager";
+  }
+}
+
+function roleCardFrontUrl(roleId: string | undefined): string {
+  return `${roleAssetBase}/${normalizeRoleId(roleId)}.png`;
+}
+
+function roleCardBackUrl(): string {
+  return `${roleAssetBase}/card-back.png`;
+}
 
 function stripPayloadFromEvent(raw: string): string {
   if (raw.startsWith("data:")) {
@@ -409,13 +432,14 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   const [actionLoading, setActionLoading] = useState(false);
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitServerUrl, setLivekitServerUrl] = useState<string | null>(null);
+  const [roleRevealNonce, setRoleRevealNonce] = useState(0);
+  const [roleRevealOpen, setRoleRevealOpen] = useState(false);
   // Tick once per second so countdown text re-renders smoothly between SSE
   // events. The projection's deadlineAt is absolute, so we just need to
   // recompute (now - deadlineAt) on a steady cadence.
   const [nowTick, setNowTick] = useState(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const sseReconnectTimerRef = useRef<number | null>(null);
-  const pollTimerRef = useRef<number | null>(null);
   const autoTickPhaseRef = useRef<string>("");
   const isDevMode = useMemo(
     () => new URLSearchParams(window.location.search).get("dev") === "1",
@@ -463,15 +487,73 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
   }, [client, gameRoomId]);
 
-  const queueSnapshotRefresh = useCallback(
-    (delayMs = 350) => {
-      if (pollTimerRef.current !== null) {
-        window.clearTimeout(pollTimerRef.current);
-      }
-      pollTimerRef.current = window.setTimeout(() => {
-        pollTimerRef.current = null;
+  const applyServerEvent = useCallback(
+    (event: GameEventDto) => {
+      setEvents((current) => {
+        if (current.some((candidate) => candidate.id === event.id)) return current;
+        const next = [...current, event];
+        return next.length <= 260 ? next : next.slice(-260);
+      });
+      setProjection((current) => {
+        if (!current) return current;
+        if (event.type === "phase_started") {
+          return {
+            ...current,
+            phase: String(event.payload.phase ?? current.phase),
+            day: Number(event.payload.day ?? current.day),
+            deadlineAt:
+              typeof event.payload.deadlineAt === "string"
+                ? event.payload.deadlineAt
+                : null,
+            currentSpeakerPlayerId: null,
+            version: event.seq,
+          };
+        }
+        if (event.type === "turn_started") {
+          return {
+            ...current,
+            phase: String(event.payload.phase ?? current.phase),
+            day: Number(event.payload.day ?? current.day),
+            deadlineAt:
+              typeof event.payload.deadlineAt === "string"
+                ? event.payload.deadlineAt
+                : current.deadlineAt,
+            currentSpeakerPlayerId:
+              typeof event.payload.currentSpeakerPlayerId === "string"
+                ? event.payload.currentSpeakerPlayerId
+                : event.subjectId ?? current.currentSpeakerPlayerId,
+            version: event.seq,
+          };
+        }
+        if (event.type === "player_eliminated") {
+          const playerId = String(event.payload.playerId ?? event.subjectId ?? "");
+          if (!playerId) return current;
+          return {
+            ...current,
+            alivePlayerIds: current.alivePlayerIds.filter((id) => id !== playerId),
+            version: event.seq,
+          };
+        }
+        if (event.type === "game_ended") {
+          return {
+            ...current,
+            status: "ended",
+            phase: "post_game",
+            winner:
+              event.payload.winner === "wolf" || event.payload.winner === "good"
+                ? event.payload.winner
+                : current.winner,
+            deadlineAt: null,
+            currentSpeakerPlayerId: null,
+            version: event.seq,
+          };
+        }
+        return current;
+      });
+
+      if (event.type === "game_ended") {
         void refreshGame();
-      }, delayMs);
+      }
     },
     [refreshGame]
   );
@@ -489,14 +571,8 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     source.onmessage = (event) => {
       const parsed = parseSseEvent(stripPayloadFromEvent(event.data));
       if (!parsed) return;
-      // Treat SSE as the durable notification channel, not as the client-side
-      // source of truth. Every visible event triggers a fresh room snapshot so
-      // projection, private state and timeline are rebuilt from the server's
-      // visibility-filtered event log. This is especially important for the
-      // post-game reveal, where the server intentionally removes role-based
-      // event filtering.
       if (sseEventVisibleToMe(parsed, myPrivateStateRef.current)) {
-        void refreshGame();
+        applyServerEvent(parsed);
       }
     };
     source.onerror = () => {
@@ -504,11 +580,11 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       eventSourceRef.current = null;
       sseReconnectTimerRef.current = window.setTimeout(() => {
         sseReconnectTimerRef.current = null;
-        void refreshGame().finally(() => connectSSE());
+        connectSSE();
       }, 1000);
     };
     eventSourceRef.current = source;
-  }, [client, gameRoomId, refreshGame]);
+  }, [applyServerEvent, client, gameRoomId]);
 
   useEffect(() => {
     autoTickPhaseRef.current = "";
@@ -528,9 +604,6 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       }
       if (sseReconnectTimerRef.current !== null) {
         window.clearTimeout(sseReconnectTimerRef.current);
-      }
-      if (pollTimerRef.current !== null) {
-        window.clearTimeout(pollTimerRef.current);
       }
     };
   }, [refreshGame, connectSSE]);
@@ -641,7 +714,6 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     if (!Number.isFinite(deadlineMs)) return;
     const delayMs = Math.max(0, deadlineMs - Date.now() + 750);
     const id = window.setTimeout(() => {
-      void refreshGame();
       if (!eventSourceRef.current) {
         connectSSE();
       }
@@ -652,7 +724,6 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     projection?.deadlineAt,
     projection?.phase,
     projection?.status,
-    refreshGame,
   ]);
 
   const uiProjection = useMemo(() => {
@@ -1142,14 +1213,9 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         phase === "day_vote" || phase === "tie_vote" ? "vote" : "nightAction";
       const result = await client.submitAction(gameRoomId, { kind, targetPlayerId });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
-        setEvents((current) => {
-          if (current.some((event) => event.id === result.event!.id)) return current;
-          const next = [...current, result.event!];
-          return next.length <= 260 ? next : next.slice(-260);
-        });
+        applyServerEvent(result.event);
       }
       setSelectedTargetId(null);
-      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1167,24 +1233,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       if (!text) {
         const result = await client.submitAction(gameRoomId, { kind: "pass" });
         if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
-          setEvents((current) => {
-            if (current.some((event) => event.id === result.event!.id)) return current;
-            const next = [...current, result.event!];
-            return next.length <= 260 ? next : next.slice(-260);
-          });
+          applyServerEvent(result.event);
         }
       } else {
         const result = await client.submitAction(gameRoomId, { kind: "speech", speech: text });
         if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
-          setEvents((current) => {
-            if (current.some((event) => event.id === result.event!.id)) return current;
-            const next = [...current, result.event!];
-            return next.length <= 260 ? next : next.slice(-260);
-          });
+          applyServerEvent(result.event);
         }
       }
       setSpeechDraft("");
-      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1200,15 +1257,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     try {
       const result = await client.submitAction(gameRoomId, { kind: "pass" });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
-        setEvents((current) => {
-          if (current.some((event) => event.id === result.event!.id)) return current;
-          const next = [...current, result.event!];
-          return next.length <= 260 ? next : next.slice(-260);
-        });
+        applyServerEvent(result.event);
       }
       setSelectedTargetId(null);
       setSpeechDraft("");
-      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1224,14 +1276,9 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     try {
       const result = await client.submitAction(gameRoomId, { kind: "speechComplete" });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
-        setEvents((current) => {
-          if (current.some((event) => event.id === result.event!.id)) return current;
-          const next = [...current, result.event!];
-          return next.length <= 260 ? next : next.slice(-260);
-        });
+        applyServerEvent(result.event);
       }
       setSpeechDraft("");
-      queueSnapshotRefresh();
       // Server auto-advances after action
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1272,6 +1319,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       ? t("stage.winnerWolf")
       : t("stage.winnerVillage")
     : "";
+  const roleId = normalizeRoleId(myPrivateState?.role);
+  const roleLabel = t(`role.${roleId}`);
+  const roleDescription = t(`roleCard.description.${roleId}`);
+
+  const revealRoleCard = useCallback(() => {
+    if (!myPrivateState?.role) return;
+    setRoleRevealOpen(true);
+    setRoleRevealNonce((value) => value + 1);
+  }, [myPrivateState?.role]);
 
   const engineGameState: EngineGameState = useMemo(
     () => ({
@@ -1289,14 +1345,37 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         isWolfTeammate: !!seat.isWolfTeammate,
       })),
       selectedTargetId: selectedTargetId ?? null,
+      roleCard: myPrivateState?.role
+        ? {
+            nonce: roleRevealNonce,
+            roleId,
+            roleLabel,
+            roleDescription,
+            cardBackUrl: roleCardBackUrl(),
+            cardFrontUrl: roleCardFrontUrl(roleId),
+            visible: roleRevealOpen,
+          }
+        : undefined,
     }),
-    [dressing.scene, projection?.phase, seatView, selectedTargetId]
+    [
+      dressing.scene,
+      myPrivateState?.role,
+      projection?.phase,
+      roleDescription,
+      roleId,
+      roleLabel,
+      roleRevealNonce,
+      roleRevealOpen,
+      seatView,
+      selectedTargetId,
+    ]
   );
 
   return (
     <VoiceRoomProvider serverUrl={livekitServerUrl} token={livekitToken}>
       <GameRoomShell
         engineGameState={engineGameState}
+        onRoleCardClose={() => setRoleRevealOpen(false)}
         title={room?.title ?? t("app.title")}
         roomCode={gameRoomId}
         sourceMatrixRoomId={room?.createdFromMatrixRoomId}
@@ -1358,7 +1437,8 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
           <RoleCardLayer
             roleId={myPrivateState?.role}
             ownerName={myPlayer?.displayName ?? matrixDisplayName}
-            enabled={uiProjection.showRoleCard}
+            enabled={Boolean(myPrivateState?.role)}
+            onReveal={revealRoleCard}
           />
         }
         overlays={

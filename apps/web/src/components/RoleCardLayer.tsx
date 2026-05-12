@@ -5,6 +5,7 @@ export interface RoleCardLayerProps {
   roleId?: string | undefined;
   ownerName?: string | undefined;
   enabled: boolean;
+  onReveal?: () => void;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -32,78 +33,48 @@ export function RoleCardLayer({
   roleId,
   ownerName,
   enabled,
+  onReveal,
   onOpenChange,
 }: RoleCardLayerProps) {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
   const [revealedThisDeal, setRevealedThisDeal] = useState(false);
 
   // Auto-open when entering a deal-like enabled state for the first time
   useEffect(() => {
     if (enabled && !revealedThisDeal) {
-      setOpen(true);
+      onReveal?.();
       setRevealedThisDeal(true);
     }
     if (!enabled) {
       setRevealedThisDeal(false);
-      setOpen(false);
     }
-  }, [enabled, revealedThisDeal]);
+  }, [enabled, onReveal, revealedThisDeal]);
 
   useEffect(() => {
-    onOpenChange?.(open);
-  }, [open, onOpenChange]);
+    onOpenChange?.(false);
+  }, [onOpenChange]);
 
-  if (!enabled && !confirmed) {
+  if (!enabled) {
     return null;
   }
 
   const role = roleId ?? "villager";
   const roleLabel = ROLE_KEY[role] ? t(ROLE_KEY[role]) : t("role.unknown");
-  const symbol = ROLE_SYMBOL[role] ?? "?";
-
-  const close = () => {
-    setOpen(false);
-    setConfirmed(true);
-  };
-
-  const reopen = () => {
-    setOpen(true);
-  };
+  const symbol = ROLE_SYMBOL[role] ?? "";
+  const owner = ownerName ?? t("roleCard.fallbackOwner");
 
   return (
-    <>
-      {confirmed ? (
-        <button
-          type="button"
-          className="role-card-entry"
-          onClick={reopen}
-          aria-label={t("roleCard.entry")}
-          title={`${ownerName ?? t("roleCard.fallbackOwner")} · ${roleLabel}`}
-        >
-          ♜
-        </button>
-      ) : null}
-
-      <div
-        className={`sheet-backdrop ${open ? "show" : ""}`}
-        onClick={close}
-        aria-hidden
-      />
-      <div className={`role-card-dialog ${open ? "open" : ""}`}>
-        <div
-          className="role-card-art"
-          data-role={role}
-          onClick={close}
-          role="button"
-          aria-label={`${roleLabel}`}
-          key={open ? "open" : "closed"}
-        >
-          <div className="role-card-symbol">{symbol}</div>
-          <div className="role-card-title">{roleLabel}</div>
-        </div>
-      </div>
-    </>
+    <button
+      type="button"
+      className="role-card-entry"
+      onClick={onReveal}
+      aria-label={`${t("roleCard.entry")} · ${owner} · ${roleLabel}`}
+      title={`${owner} · ${roleLabel}`}
+      data-role={role}
+    >
+      <span className="role-card-entry-back" aria-hidden />
+      <span className="role-card-entry-mark" aria-hidden>{symbol}</span>
+      <span className="role-card-entry-text">{t("roleCard.entry")}</span>
+    </button>
   );
 }

@@ -365,7 +365,7 @@ export function TimelineCapsule({
       </button>
 
       <div
-        className={`sheet-backdrop ${open ? "show" : ""}`}
+        className={`sheet-backdrop timeline-backdrop ${open ? "show" : ""}`}
         onClick={() => setOpen(false)}
       />
       <section className={`log-sheet ${open ? "open" : ""}`} style={sheetOriginStyle}>
