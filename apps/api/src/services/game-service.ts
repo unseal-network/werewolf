@@ -122,6 +122,7 @@ export class InMemoryGameService {
   private rooms = new Map<string, StoredGameRoom>();
   private advanceTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private advancing = new Map<string, boolean>();
+  private pendingAdvance = new Map<string, boolean>();
   private runAgentTurnImpl: ((input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>) | null = null;
   private broker: SseBroker | null = null;
   private voiceAgents: VoiceAgentRegistry | null = null;
@@ -703,9 +704,9 @@ export class InMemoryGameService {
         now,
       });
       this.advanceSpeechSpeaker(room, playerId, now);
-      this.assignAndAppendEvents(room, [event]);
+      const [assigned] = this.assignAndAppendEvents(room, [event]);
       void this.scheduleAdvance(gameRoomId);
-      return event;
+      return assigned!;
     }
 
     if (action.kind === "vote") {
@@ -882,10 +883,14 @@ export class InMemoryGameService {
   }
 
   async scheduleAdvance(gameRoomId: string): Promise<void> {
-    if (this.advancing.get(gameRoomId)) return; // prevent concurrent advancement
+    if (this.advancing.get(gameRoomId)) {
+      this.pendingAdvance.set(gameRoomId, true);
+      return;
+    }
     this.advancing.set(gameRoomId, true);
 
     try {
+      this.pendingAdvance.delete(gameRoomId);
       const existing = this.advanceTimers.get(gameRoomId);
       if (existing) {
         clearTimeout(existing);
@@ -944,6 +949,12 @@ export class InMemoryGameService {
       }
     } finally {
       this.advancing.set(gameRoomId, false);
+      if (this.pendingAdvance.get(gameRoomId)) {
+        this.pendingAdvance.delete(gameRoomId);
+        setTimeout(() => {
+          void this.scheduleAdvance(gameRoomId);
+        }, 0);
+      }
     }
   }
 

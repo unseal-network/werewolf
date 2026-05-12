@@ -117,11 +117,21 @@ export function VoiceRoomProvider({
       _participant: RemoteParticipant
     ) => {
       if (track.kind !== Track.Kind.Audio) return;
+      if (
+        track.sid &&
+        Array.from(audioContainerRef.current?.children ?? []).some(
+          (child) => child instanceof HTMLElement && child.dataset.lkSid === track.sid
+        )
+      ) {
+        return;
+      }
       const el = track.attach() as HTMLAudioElement;
       el.autoplay = true;
+      el.setAttribute("playsinline", "true");
       el.dataset.lkSid = track.sid ?? "";
       const host = audioContainerRef.current ?? document.body;
       host.appendChild(el);
+      void el.play().catch(() => {});
     };
 
     const detachAudio = (track: RemoteTrack) => {
@@ -164,6 +174,13 @@ export function VoiceRoomProvider({
           return;
         }
         setRoom(lkRoom);
+        for (const participant of lkRoom.remoteParticipants.values()) {
+          for (const publication of participant.trackPublications.values()) {
+            if (publication.track && publication.isSubscribed) {
+              attachAudio(publication.track, publication, participant);
+            }
+          }
+        }
         updateMicState();
       })
       .catch((err: unknown) => {

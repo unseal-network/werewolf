@@ -218,6 +218,29 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("returns the assigned speech event when a human speaker completes STT speech", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+
+    games.setRunAgentTurn(passAgentTurn);
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [speaker.id];
+
+    const event = await games.submitAction(gameRoomId, speaker.id, {
+      kind: "speechComplete",
+    });
+
+    expect(event.id).not.toBe("pending");
+    expect(event.seq).toBeGreaterThan(0);
+    expect(event.type).toBe("speech_submitted");
+  });
+
   it("leaves day vote immediately after the final human vote", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

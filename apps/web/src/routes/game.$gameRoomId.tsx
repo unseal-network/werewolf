@@ -96,25 +96,6 @@ function parseSseEvent(raw: string): GameEventDto | undefined {
 }
 
 /**
- * Event types that reshape the public projection (phase / alive / status /
- * speaker queue). When one of these arrives via SSE we refetch the snapshot
- * once so the seat ring, phase rail and deadline timer stay in sync. All
- * other events are append-only data driven by the events array.
- */
-const PROJECTION_REFRESH_EVENT_TYPES = new Set<string>([
-  "game_started",
-  "phase_started",
-  "phase_closed",
-  "night_resolved",
-  "player_eliminated",
-  "player_seat_changed",
-  "game_ended",
-  "speech_submitted",
-  "vote_submitted",
-  "wolf_vote_resolved",
-]);
-
-/**
  * Mirror server-side filterEventsForUser logic — the SSE channel sends all
  * events for the room, the client drops ones it shouldn't see.
  */
@@ -471,12 +452,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       setRoom(result.room);
       setProjection(result.projection);
       setPrivateStates(result.privateStates);
-      setEvents((current) => {
-        const seen = new Set(current.map((event) => event.id));
-        const next = result.events.filter((event) => !seen.has(event.id));
-        const total = [...current, ...next];
-        return total.length <= 260 ? total : total.slice(-260);
-      });
+      setEvents(result.events);
       return result;
     } catch (error) {
       // Silently keep retrying; surface only meaningful changes via setErrorMessage when a user
@@ -512,22 +488,13 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     source.onmessage = (event) => {
       const parsed = parseSseEvent(stripPayloadFromEvent(event.data));
       if (!parsed) return;
-      // Append the event directly to local state, filtered by visibility
-      // and de-duped against existing events. This replaces the previous
-      // "refreshGame on every SSE message" approach that effectively turned
-      // SSE into a notification-only channel — now SSE IS the event stream.
-      const visible = sseEventVisibleToMe(parsed, myPrivateStateRef.current);
-      if (visible) {
-        setEvents((current) => {
-          if (current.some((e) => e.id === parsed.id)) return current;
-          const next = [...current, parsed];
-          return next.length <= 260 ? next : next.slice(-260);
-        });
-      }
-      // Projection-shaping events still need a snapshot refresh so the seat
-      // ring / phase rail update. Everything else (speeches, votes, agent
-      // turn logs) is fully driven by the events array.
-      if (PROJECTION_REFRESH_EVENT_TYPES.has(parsed.type)) {
+      // Treat SSE as the durable notification channel, not as the client-side
+      // source of truth. Every visible event triggers a fresh room snapshot so
+      // projection, private state and timeline are rebuilt from the server's
+      // visibility-filtered event log. This is especially important for the
+      // post-game reveal, where the server intentionally removes role-based
+      // event filtering.
+      if (sseEventVisibleToMe(parsed, myPrivateStateRef.current)) {
         void refreshGame();
       }
     };
