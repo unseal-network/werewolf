@@ -86,7 +86,10 @@ export function GameRoomShell({
               seatCount={seatCount}
               onSeatClick={onSeatClick}
             />
-            <div className="table">{center}</div>
+            <div className="table">
+              <div className="table-aura" aria-hidden />
+              <div className="table-center-frame">{center}</div>
+            </div>
           </section>
         </main>
 

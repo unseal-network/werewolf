@@ -109,6 +109,17 @@ button {
   pointer-events: auto;
 }
 
+.dom-ui-layer::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(760px 520px at 50% 42%, rgba(212, 177, 92, 0.08), transparent 68%),
+    linear-gradient(180deg, rgba(4, 6, 12, 0.42), rgba(5, 7, 13, 0.58));
+}
+
 /* Default: lobby ambient — soft daylight */
 .game-room-root[data-scene="lobby"]::before,
 .game-room-root[data-scene="waiting"]::before,
@@ -1038,6 +1049,52 @@ body.logs-open .log-peek {
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 12px;
+}
+
+.start-dialog,
+.agent-picker,
+.profile-dialog {
+  border-radius: 12px;
+  border-color: var(--wolf-line);
+  background:
+    linear-gradient(180deg, rgba(26, 29, 43, 0.98), rgba(12, 14, 23, 0.98));
+  color: var(--wolf-text);
+}
+
+.start-copy,
+.agent-picker-sub,
+.agent-id,
+.profile-meta {
+  color: var(--wolf-muted);
+}
+
+.agent-row,
+.profile-fact,
+.agent-picker-empty {
+  border-color: var(--wolf-line-soft);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.agent-name,
+.profile-name,
+.start-title,
+.agent-picker-title {
+  color: var(--wolf-text);
+}
+
+.agent-row:hover {
+  border-color: var(--wolf-gold);
+}
+
+.agent-avatar {
+  background: radial-gradient(circle at 34% 24%, #ebf0ff, #6f86ff 48%, #27336f 100%);
+}
+
+.sheet-close,
+.profile-close {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--wolf-line-soft);
+  color: var(--wolf-text);
 }
 
 .log-sheet.open {
@@ -1978,4 +2035,814 @@ body.logs-open .log-peek {
 .game-room-root[data-scene="night"] .voice-mic {
   background: #f8fbff;
   color: #10182a;
+}
+
+/* ------------------ Werewolf table polish ------------------ */
+
+:root {
+  --wolf-bg: #080a10;
+  --wolf-panel: rgba(16, 18, 28, 0.82);
+  --wolf-panel-strong: rgba(20, 22, 34, 0.96);
+  --wolf-line: rgba(207, 176, 91, 0.28);
+  --wolf-line-soft: rgba(222, 226, 240, 0.16);
+  --wolf-gold: #d4b15c;
+  --wolf-gold-bright: #f1d58a;
+  --wolf-red: #b83c48;
+  --wolf-blue: #6f86ff;
+  --wolf-text: #eef2fb;
+  --wolf-muted: #a6afc3;
+}
+
+body {
+  background:
+    radial-gradient(980px 720px at 50% -10%, rgba(108, 134, 255, 0.18), transparent 64%),
+    linear-gradient(180deg, #090b12 0%, #111420 52%, #070910 100%);
+}
+
+.game-room-root::before {
+  background:
+    radial-gradient(760px 520px at 50% 26%, rgba(212, 177, 92, 0.12), transparent 68%),
+    radial-gradient(900px 640px at 16% 84%, rgba(132, 42, 58, 0.13), transparent 66%),
+    radial-gradient(780px 560px at 85% 80%, rgba(49, 67, 135, 0.18), transparent 68%),
+    linear-gradient(180deg, #0a0c14 0%, #131722 52%, #080a10 100%) !important;
+}
+
+.game-room-root::after {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
+    radial-gradient(1px 1px at 18% 22%, rgba(255, 255, 255, 0.72), transparent 55%),
+    radial-gradient(1px 1px at 72% 16%, rgba(255, 255, 255, 0.62), transparent 55%),
+    radial-gradient(1.3px 1.3px at 88% 32%, rgba(255, 255, 255, 0.58), transparent 55%);
+  background-size: 64px 64px, 64px 64px, auto, auto, auto;
+  opacity: 0.95;
+}
+
+.game-room-root[data-scene="day"]::before {
+  background:
+    radial-gradient(760px 520px at 50% 12%, rgba(255, 206, 118, 0.34), transparent 68%),
+    radial-gradient(900px 620px at 10% 90%, rgba(195, 82, 65, 0.12), transparent 68%),
+    linear-gradient(180deg, #1d1a16 0%, #2e2519 48%, #121014 100%) !important;
+}
+
+.game-room-root[data-scene="vote"]::before,
+.game-room-root[data-scene="tie"]::before {
+  background:
+    radial-gradient(760px 520px at 50% 14%, rgba(201, 67, 82, 0.24), transparent 70%),
+    radial-gradient(840px 600px at 50% 102%, rgba(212, 177, 92, 0.13), transparent 72%),
+    linear-gradient(180deg, #160b12 0%, #24121b 48%, #0a0810 100%) !important;
+}
+
+.game-room-root[data-scene="deal"]::before,
+.game-room-root[data-scene="end"]::before {
+  background:
+    radial-gradient(760px 520px at 50% 20%, rgba(241, 213, 138, 0.28), transparent 70%),
+    radial-gradient(820px 620px at 50% 100%, rgba(67, 92, 255, 0.14), transparent 72%),
+    linear-gradient(180deg, #18140e 0%, #251d12 52%, #0b0a0f 100%) !important;
+}
+
+.topbar {
+  left: 24px;
+  right: 24px;
+  top: 18px;
+  width: auto;
+  min-height: 62px;
+  border-radius: 10px;
+  border-color: var(--wolf-line);
+  background:
+    linear-gradient(180deg, rgba(25, 27, 39, 0.88), rgba(12, 14, 23, 0.74));
+  color: var(--wolf-text);
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.brand {
+  width: 100%;
+}
+
+.mark {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 34% 24%, var(--wolf-gold-bright), var(--wolf-gold) 54%, #5a4015 100%);
+  color: #130f08;
+  box-shadow: 0 0 26px rgba(212, 177, 92, 0.22);
+}
+
+.home-btn {
+  border: 0;
+}
+
+.breadcrumb {
+  color: var(--wolf-text);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.breadcrumb .phase-crumb {
+  color: var(--wolf-gold-bright);
+}
+
+.subtitle {
+  color: var(--wolf-muted);
+  max-width: min(70vw, 980px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.locale-switcher {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.locale-switcher button {
+  color: #dbe2f0;
+}
+
+.locale-switcher button.active {
+  background: var(--wolf-gold);
+  color: #11131b;
+}
+
+.game {
+  padding: 104px 28px 88px;
+}
+
+.room {
+  min-height: calc(100vh - 202px);
+  grid-template-columns: minmax(78px, 112px) minmax(420px, 1fr) minmax(78px, 112px);
+  gap: clamp(14px, 2.6vw, 34px);
+  padding: 16px clamp(18px, 3vw, 42px);
+}
+
+.table {
+  position: relative;
+  width: min(780px, 100%);
+  min-height: min(58vh, 560px);
+  display: grid;
+  place-items: center;
+}
+
+.table-aura {
+  position: absolute;
+  inset: 50%;
+  width: min(62vw, 620px);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1px solid rgba(212, 177, 92, 0.20);
+  background:
+    radial-gradient(circle, rgba(212, 177, 92, 0.10) 0%, rgba(212, 177, 92, 0.035) 42%, transparent 66%),
+    repeating-radial-gradient(circle, transparent 0 52px, rgba(212, 177, 92, 0.08) 53px 54px);
+  box-shadow:
+    inset 0 0 80px rgba(0, 0, 0, 0.35),
+    0 0 120px rgba(0, 0, 0, 0.28);
+}
+
+.table-aura::before,
+.table-aura::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  inset: 12%;
+  border: 1px solid rgba(212, 177, 92, 0.11);
+}
+
+.table-aura::after {
+  inset: 24%;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.table-center-frame {
+  position: relative;
+  z-index: 1;
+  width: min(460px, 92%);
+}
+
+.phase-card {
+  width: 100%;
+  border-radius: 10px;
+  border-color: var(--wolf-line);
+  background:
+    linear-gradient(180deg, rgba(26, 29, 43, 0.94), rgba(12, 14, 23, 0.90));
+  color: var(--wolf-text);
+  box-shadow:
+    0 26px 72px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 26px 24px;
+}
+
+.game-room-root[data-scene="lobby"] .phase-card {
+  padding: 26px 24px;
+  border: 1px solid var(--wolf-line);
+  background:
+    linear-gradient(180deg, rgba(26, 29, 43, 0.94), rgba(12, 14, 23, 0.90));
+  box-shadow:
+    0 26px 72px rgba(0, 0, 0, 0.44),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.game-room-root[data-scene="lobby"] .phase-title,
+.phase-title {
+  color: var(--wolf-text);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.05;
+  letter-spacing: 0.04em;
+}
+
+.phase-kicker {
+  color: var(--wolf-gold);
+}
+
+.phase-copy {
+  color: var(--wolf-muted);
+}
+
+.target-row {
+  gap: 12px;
+}
+
+.stage-confirm,
+.stage-start,
+.action-primary {
+  min-height: 48px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 22px;
+  color: #141009;
+  background: linear-gradient(180deg, var(--wolf-gold-bright), var(--wolf-gold));
+  box-shadow: 0 14px 34px rgba(212, 177, 92, 0.24);
+  font-weight: 950;
+  letter-spacing: 0.06em;
+}
+
+.stage-start,
+.action-primary {
+  min-width: 210px;
+  width: auto;
+}
+
+.stage-confirm:hover,
+.stage-start:hover,
+.action-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 42px rgba(212, 177, 92, 0.34);
+}
+
+.stage-skip,
+.action.secondary,
+.target-chip,
+.target-select,
+.voice-mic,
+.speech-textarea {
+  border-radius: 8px;
+  border: 1px solid var(--wolf-line-soft);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--wolf-text);
+}
+
+.target-chip {
+  min-height: 38px;
+  color: #d7deef;
+}
+
+.target-select {
+  color: #10131d;
+  background: #f7f3e8;
+  border-color: rgba(212, 177, 92, 0.38);
+}
+
+.target-select option {
+  color: #10131d;
+  background: #fffaf0;
+}
+
+.target-confirm-avatar {
+  border-radius: 50%;
+  color: #141009;
+  background: radial-gradient(circle at 32% 26%, #fff2bd, var(--wolf-gold) 56%, #7a561d 100%);
+}
+
+.seat-column {
+  gap: clamp(8px, 1.4vh, 16px);
+}
+
+.seat {
+  width: 76px;
+  min-height: 84px;
+}
+
+.avatar {
+  width: 62px;
+  height: 62px;
+  border: 1px solid rgba(212, 177, 92, 0.28);
+  background:
+    radial-gradient(circle at 34% 24%, #ebf0ff, #6f86ff 48%, #27336f 100%);
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.seat.active .avatar {
+  box-shadow:
+    0 0 0 4px rgba(212, 177, 92, 0.18),
+    0 0 30px rgba(212, 177, 92, 0.24),
+    0 12px 30px rgba(0, 0, 0, 0.42);
+}
+
+.seat.selectable .avatar {
+  outline-color: rgba(212, 177, 92, 0.62);
+}
+
+.seat.selected .avatar {
+  outline-color: var(--wolf-gold-bright);
+}
+
+.seat.empty .avatar {
+  color: rgba(238, 242, 251, 0.72);
+  background: rgba(255, 255, 255, 0.06);
+  outline-color: rgba(212, 177, 92, 0.34);
+}
+
+.seat-name,
+.seat.empty .seat-name {
+  color: #e5ebf7;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.46);
+}
+
+.seat.active .seat-name {
+  color: var(--wolf-gold-bright);
+}
+
+.seat-tooltip {
+  border-radius: 8px;
+  border-color: rgba(212, 177, 92, 0.34);
+  background: rgba(13, 15, 24, 0.94);
+  color: var(--wolf-text);
+}
+
+.log-peek {
+  border-radius: 8px;
+  background: rgba(15, 17, 27, 0.88);
+  color: var(--wolf-text);
+  border-color: var(--wolf-line);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.36);
+}
+
+.log-sheet {
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(21, 24, 36, 0.98), rgba(8, 10, 16, 0.98));
+  border: 1px solid var(--wolf-line);
+}
+
+.role-card-entry {
+  top: 98px;
+  right: 24px;
+  border-radius: 8px;
+  border-color: var(--wolf-line);
+  background: linear-gradient(180deg, rgba(31, 34, 48, 0.94), rgba(13, 15, 24, 0.92));
+  color: var(--wolf-gold-bright);
+}
+
+.voice-panel {
+  width: 100%;
+  max-width: 430px;
+  display: grid;
+  gap: 10px;
+}
+
+.voice-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.voice-state {
+  color: var(--wolf-muted);
+  font-size: 12px;
+}
+
+.voice-mic {
+  min-height: 40px;
+  padding: 0 14px;
+  font: inherit;
+}
+
+.voice-mic.recording {
+  background: rgba(184, 60, 72, 0.20);
+  color: #ffd4d8;
+  border-color: rgba(184, 60, 72, 0.55);
+}
+
+.speech-textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: 0;
+}
+
+.speech-textarea::placeholder {
+  color: rgba(238, 242, 251, 0.48);
+}
+
+.voice-error {
+  color: #ff9aa5;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.create-page {
+  place-items: stretch center;
+  align-items: center;
+  height: 100vh;
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 48px);
+  background:
+    radial-gradient(760px 520px at 50% 2%, rgba(212, 177, 92, 0.14), transparent 70%),
+    radial-gradient(820px 620px at 12% 92%, rgba(110, 134, 255, 0.14), transparent 68%),
+    linear-gradient(180deg, #0b0d15 0%, #151825 58%, #080a10 100%);
+}
+
+.create-card {
+  width: min(100%, 760px);
+  border-radius: 14px;
+  border-color: var(--wolf-line);
+  background:
+    linear-gradient(180deg, rgba(27, 30, 44, 0.96), rgba(12, 14, 23, 0.94));
+  color: var(--wolf-text);
+  box-shadow:
+    0 34px 100px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: clamp(24px, 4vw, 44px);
+}
+
+@media (max-height: 780px) and (min-width: 641px) {
+  .create-page {
+    align-items: start;
+    padding-top: 24px;
+    padding-bottom: 24px;
+  }
+
+  .create-card {
+    width: min(100%, 600px);
+    padding: 18px 28px;
+  }
+
+  .create-header {
+    margin-bottom: 10px;
+  }
+
+  .create-header h1 {
+    font-size: 38px;
+  }
+
+  .create-form {
+    gap: 8px;
+  }
+
+  .create-form label {
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .create-form textarea {
+    min-height: 66px;
+  }
+
+  .create-form input,
+  .create-form select,
+  .create-form textarea {
+    min-height: 40px;
+    font-size: 14px;
+    padding: 8px 11px;
+  }
+
+  .create-room-tools .action.secondary {
+    min-height: 34px;
+    font-size: 13px;
+  }
+
+  .create-form .action-primary {
+    min-height: 44px;
+    font-size: 15px;
+  }
+}
+
+/* Final modal contrast guard: later legacy rules above can otherwise make
+   dialog text wash out against light modal surfaces. */
+.start-dialog,
+.agent-picker,
+.profile-dialog {
+  border-radius: 12px;
+  border-color: var(--wolf-line) !important;
+  background:
+    linear-gradient(180deg, rgba(26, 29, 43, 0.98), rgba(12, 14, 23, 0.98)) !important;
+  color: var(--wolf-text) !important;
+}
+
+.start-title,
+.agent-picker-title,
+.profile-name,
+.agent-name {
+  color: var(--wolf-text) !important;
+}
+
+.start-copy,
+.agent-picker-sub,
+.agent-id,
+.profile-meta,
+.agent-picker-empty {
+  color: var(--wolf-muted) !important;
+}
+
+.agent-row,
+.profile-fact,
+.agent-picker-empty {
+  border-color: var(--wolf-line-soft) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+
+.agent-row .stage-skip:not(:disabled),
+.agent-picker-actions .stage-start:not(:disabled) {
+  background: linear-gradient(180deg, var(--wolf-gold-bright), var(--wolf-gold)) !important;
+  color: #141009 !important;
+  border-color: transparent !important;
+}
+
+.agent-row .stage-skip:disabled,
+.agent-picker-actions .stage-skip:disabled,
+.agent-picker-actions .stage-start:disabled {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: rgba(238, 242, 251, 0.46) !important;
+  border-color: rgba(255, 255, 255, 0.10) !important;
+  opacity: 1;
+}
+
+.create-header h1 {
+  color: var(--wolf-text);
+  font-size: clamp(36px, 6vw, 62px);
+  letter-spacing: 0.08em;
+}
+
+.create-form {
+  gap: 18px;
+}
+
+.create-form label {
+  color: var(--wolf-muted);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+}
+
+.create-form input,
+.create-form select,
+.create-form textarea {
+  min-height: 54px;
+  border-radius: 10px;
+  border-color: rgba(212, 177, 92, 0.30);
+  background: rgba(255, 255, 255, 0.94);
+  color: #111522;
+  font-size: 18px;
+}
+
+.create-form textarea {
+  min-height: 112px;
+  font-size: 17px;
+}
+
+.create-room-tools .action.secondary {
+  color: var(--wolf-text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.create-form .action-primary {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.create-error {
+  color: #ff9aa5;
+  background: rgba(184, 60, 72, 0.12);
+  border: 1px solid rgba(184, 60, 72, 0.28);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    left: 14px;
+    right: 14px;
+    top: 12px;
+  }
+
+  .game {
+    padding: 100px 12px 86px;
+  }
+
+  .room {
+    grid-template-columns: 58px minmax(250px, 1fr) 58px;
+    padding: 8px;
+  }
+
+  .table {
+    min-height: min(56vh, 520px);
+  }
+
+  .table-aura {
+    width: min(70vw, 520px);
+  }
+
+  .seat {
+    width: 52px;
+    min-height: 62px;
+  }
+
+  .avatar {
+    width: 44px;
+    height: 44px;
+  }
+
+  .role-card-entry {
+    top: auto;
+    right: 14px;
+    bottom: 18px;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    overflow: auto;
+  }
+
+  .game-room-root {
+    min-height: 100svh;
+  }
+
+  .dom-ui-layer {
+    min-height: 100svh;
+  }
+
+  .topbar {
+    position: fixed;
+    min-height: 58px;
+  }
+
+  .locale-switcher {
+    flex-shrink: 0;
+  }
+
+  .breadcrumb .slash,
+  .breadcrumb span:nth-of-type(3) {
+    display: none;
+  }
+
+  .subtitle {
+    max-width: 58vw;
+  }
+
+  .room {
+    grid-template-columns: 46px minmax(212px, 1fr) 46px;
+    min-height: calc(100svh - 188px);
+    gap: 7px;
+  }
+
+  .table-center-frame {
+    width: min(300px, 94%);
+  }
+
+  .phase-card {
+    padding: 16px 14px;
+  }
+
+  .target-row {
+    flex-direction: column;
+  }
+
+  .stage-confirm,
+  .stage-skip,
+  .stage-start,
+  .action-primary,
+  .target-select {
+    width: 100%;
+  }
+
+  .create-card {
+    padding: 24px 18px;
+  }
+}
+
+@media (max-height: 780px) and (min-width: 641px) {
+  .create-card {
+    width: min(100%, 600px);
+    padding: 18px 28px;
+  }
+
+  .create-header {
+    margin-bottom: 10px;
+  }
+
+  .create-header h1 {
+    font-size: 38px;
+  }
+
+  .create-form {
+    gap: 8px;
+  }
+
+  .create-form label {
+    gap: 4px;
+    font-size: 11px;
+  }
+
+  .create-form textarea {
+    min-height: 66px;
+  }
+
+  .create-form input,
+  .create-form select,
+  .create-form textarea {
+    min-height: 40px;
+    font-size: 14px;
+    padding: 8px 11px;
+  }
+
+  .create-room-tools .action.secondary {
+    min-height: 34px;
+    font-size: 13px;
+  }
+
+  .create-form .action-primary {
+    min-height: 44px;
+    font-size: 15px;
+  }
+}
+
+/* Create screen final responsive guard. Keep this after the legacy create
+   rules above so mobile cards cannot overflow the viewport. */
+.create-page,
+.create-card,
+.create-form,
+.create-form * {
+  box-sizing: border-box;
+}
+
+.create-card {
+  width: min(760px, calc(100vw - 32px));
+  max-width: 100%;
+}
+
+.create-form input,
+.create-form select,
+.create-form textarea {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .create-page {
+    min-height: 100svh;
+    height: auto;
+    padding: 18px 12px;
+    align-items: start;
+  }
+
+  .create-card {
+    width: min(100%, calc(100vw - 24px));
+    padding: 24px 18px;
+  }
+
+  .create-header {
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .create-header h1 {
+    font-size: 36px;
+  }
+
+  .create-form {
+    gap: 14px;
+  }
+
+  .create-form input,
+  .create-form select,
+  .create-form textarea {
+    min-height: 50px;
+    font-size: 16px;
+  }
+
+  .create-form textarea {
+    min-height: 104px;
+  }
 }

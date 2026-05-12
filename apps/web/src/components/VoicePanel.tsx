@@ -70,37 +70,17 @@ export function VoicePanel({
   }
 
   return (
-    <div className="voice-panel" style={{ width: "100%", maxWidth: 420 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 8,
-        }}
-      >
+    <div className="voice-panel">
+      <div className="voice-panel-head">
         <button
           type="button"
           className={isMicOn ? "voice-mic recording" : "voice-mic"}
           onClick={toggleMicrophone}
           disabled={!canToggleMic}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 14,
-            border: "1px solid rgba(216,224,238,0.9)",
-            background: isMicOn
-              ? "rgba(196, 61, 77, 0.18)"
-              : "rgba(255,255,255,0.94)",
-            color: isMicOn ? "#a82438" : "#141b2d",
-            font: "inherit",
-            fontSize: 14,
-            cursor: canToggleMic ? "pointer" : "not-allowed",
-            opacity: canToggleMic ? 1 : 0.6,
-          }}
         >
           {isMicOn ? "🔴 关麦" : "🎤 开麦"}
         </button>
-        <span style={{ fontSize: 12, color: "#7e8693" }}>
+        <span className="voice-state">
           {voice.state === "connected"
             ? "或输入文字"
             : voice.state === "connecting"
@@ -119,19 +99,6 @@ export function VoicePanel({
         placeholder={placeholder}
         value={textDraft}
         onChange={(e) => onTextChange(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "10px 14px",
-          borderRadius: 14,
-          border: "1px solid rgba(216,224,238,0.9)",
-          background: "rgba(255,255,255,0.94)",
-          color: "#141b2d",
-          font: "inherit",
-          fontSize: 14,
-          resize: "vertical",
-          outline: 0,
-          lineHeight: 1.5,
-        }}
       />
 
       <div className="target-row" style={{ marginTop: 8 }}>
@@ -154,14 +121,7 @@ export function VoicePanel({
       </div>
 
       {(micError || voice.errorMessage) ? (
-        <div
-          style={{
-            marginTop: 6,
-            fontSize: 12,
-            color: "#c43d4d",
-            wordBreak: "break-word",
-          }}
-        >
+        <div className="voice-error">
           {micError ?? voice.errorMessage}
         </div>
       ) : null}
