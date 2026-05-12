@@ -127,11 +127,11 @@ export function GameRoomShell({
     () => seats.filter((seat) => seat.seatNo <= seatCount),
     [seatCount, seats]
   );
-  const occupied = useMemo(
-    () => activeSeats.filter((seat) => !seat.isEmpty),
-    [activeSeats]
+  const visibleSeatCount = Math.min(
+    seatCount,
+    Math.max(6, playerCount, activeSeats.filter((seat) => !seat.isEmpty).length)
   );
-  const boardSeats = occupied.length > 0 ? occupied : activeSeats.slice(0, Math.min(seatCount, 12));
+  const boardSeats = activeSeats.slice(0, visibleSeatCount);
   const leftSeats = boardSeats.filter((_, index) => index % 2 === 0);
   const rightSeats = boardSeats.filter((_, index) => index % 2 === 1);
   const compact = boardSeats.length >= 10;
