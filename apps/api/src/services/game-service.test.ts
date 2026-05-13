@@ -118,6 +118,35 @@ describe("InMemoryGameService rules", () => {
     });
   });
 
+  it("preserves waiting-room events and keeps event sequence monotonic after start", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 6)) {
+      games.join(room.id, userId, name);
+    }
+    const lobbyEventCount = room.events.length;
+
+    const started = games.start(room.id, players[0][0]);
+    const seqs = room.events.map((event) => event.seq);
+
+    expect(room.events).toHaveLength(lobbyEventCount + started.events.length);
+    expect(started.events.map((event) => event.seq)).toEqual([
+      lobbyEventCount + 1,
+      lobbyEventCount + 2,
+      lobbyEventCount + 3,
+    ]);
+    expect(seqs).toEqual(Array.from({ length: seqs.length }, (_, index) => index + 1));
+    expect(room.events.slice(0, lobbyEventCount).every((event) => event.type === "player_joined")).toBe(true);
+  });
+
   it("does not let users swap seats with another human player", () => {
     const games = new InMemoryGameService();
     const { room } = games.createGame(

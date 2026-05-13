@@ -110,6 +110,53 @@ describe("games API", () => {
     });
   });
 
+  it("streams phase changes as timeline events instead of replacing them with snapshots", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+    deps.games.join(room.id, "@bob:example.com", "Bob", undefined, 2);
+    for (let seatNo = 3; seatNo <= 6; seatNo += 1) {
+      deps.games.addAgentPlayer(
+        room.id,
+        "@alice:example.com",
+        `@agent${seatNo}:example.com`,
+        `Agent ${seatNo}`
+      );
+    }
+
+    const response = await app.request(`/games/${room.id}/subscribe`, {
+      headers: { authorization: "Bearer matrix-token-bob" },
+    });
+    expect(response.status).toBe(200);
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+    await readNextSseJson(reader!);
+
+    deps.games.start(room.id, "@alice:example.com");
+
+    const phaseStarted = await readSseUntil(
+      reader!,
+      (message) => message.type === "phase_started"
+    );
+    await reader!.cancel();
+
+    expect(phaseStarted).toMatchObject({
+      type: "phase_started",
+      visibility: "public",
+      payload: { phase: "night_guard" },
+    });
+    expect(phaseStarted.snapshot).toBeUndefined();
+  });
+
   it("creates a game and defaults agent source room to source room", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", {

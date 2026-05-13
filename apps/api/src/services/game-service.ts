@@ -729,7 +729,7 @@ export class InMemoryGameService {
     room.status = "active";
     room.projection = started.projection;
     room.privateStates = started.privateStates;
-    room.events = this.assignAndAppendEvents(room, started.events);
+    const assignedStartEvents = this.assignAndAppendEvents(room, started.events);
 
     // Lazily connect the voice agent for this room. Best-effort: if LiveKit
     // or the Unseal gateway is unavailable, the game still works via text.
@@ -762,7 +762,7 @@ export class InMemoryGameService {
       room,
       projection: room.projection,
       privateStates: room.privateStates,
-      events: room.events.slice(-started.events.length),
+      events: assignedStartEvents,
     };
   }
 

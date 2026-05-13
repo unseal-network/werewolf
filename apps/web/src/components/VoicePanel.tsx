@@ -106,7 +106,15 @@ export function VoicePanel({
   }
 
   return (
-    <div className="voice-panel" data-mode={inputMode} data-pulse={modePulse ?? "none"}>
+    <div
+      className="voice-panel"
+      data-mode={inputMode}
+      data-pulse={modePulse ?? "none"}
+      onContextMenuCapture={(event) => {
+        if (event.target instanceof HTMLTextAreaElement) return;
+        event.preventDefault();
+      }}
+    >
       <div className="voice-bubble-row" data-mode={inputMode}>
         <button
           type="button"
@@ -124,6 +132,7 @@ export function VoicePanel({
           onPointerDown={
             inputMode === "voice"
               ? (event) => {
+                  event.preventDefault();
                   event.currentTarget.setPointerCapture(event.pointerId);
                   void startMicrophone();
                 }
@@ -163,6 +172,7 @@ export function VoicePanel({
           }}
           disabled={inputMode === "voice" ? !canToggleMic : actionLoading}
           aria-label={inputMode === "text" ? switchToVoiceLabel : holdToSpeakLabel}
+          onContextMenu={(event) => event.preventDefault()}
         >
           {inputMode === "text" ? <span className="voice-bubble-icon">🎙</span> : null}
           <strong>{inputMode === "voice" ? (isMicOn ? releaseToSendLabel : holdToSpeakLabel) : ""}</strong>
@@ -178,6 +188,11 @@ export function VoicePanel({
           role={inputMode === "voice" ? "button" : undefined}
           tabIndex={inputMode === "voice" ? 0 : undefined}
           onClick={inputMode === "voice" ? handleTextMode : undefined}
+          onPointerDown={
+            inputMode === "voice"
+              ? (event) => event.preventDefault()
+              : undefined
+          }
           onKeyDown={(event) => {
             if (inputMode === "voice" && (event.key === "Enter" || event.key === " ")) {
               event.preventDefault();
@@ -193,6 +208,11 @@ export function VoicePanel({
             }
           }}
           aria-label={inputMode === "voice" ? switchToTextLabel : undefined}
+          onContextMenu={
+            inputMode === "voice"
+              ? (event) => event.preventDefault()
+              : undefined
+          }
         >
           {inputMode === "voice" ? (
             <span className="voice-bubble-icon">⌨️</span>

@@ -187,7 +187,7 @@ function eventRefreshesPerspectiveSnapshot(
   if (!visible) {
     return false;
   }
-  return event.type === "night_action_submitted" || event.type === "phase_started";
+  return event.type === "night_action_submitted";
 }
 
 function eventFromSsePayload(payload: string): GameEvent | null {

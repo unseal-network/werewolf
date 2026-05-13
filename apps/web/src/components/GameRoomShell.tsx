@@ -73,6 +73,27 @@ function phaseIcon(scene: SceneId) {
   }
 }
 
+function shouldSuppressGameContextMenu(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  if (target.closest("textarea, input, [contenteditable='true']")) return false;
+  return Boolean(
+    target.closest(
+      [
+        "button",
+        "[role='button']",
+        ".seat",
+        ".avatar",
+        ".player-picker",
+        ".player-picker-wheel",
+        ".player-picker-avatar",
+        ".player-picker-slice",
+        ".stage-action-button",
+        ".role-card-entry",
+      ].join(", ")
+    )
+  );
+}
+
 function VisualSeatGrid({
   seats,
   onSeatClick,
@@ -145,6 +166,16 @@ export function GameRoomShell({
       data-visual-runtime="true"
       data-compact={compact ? "true" : "false"}
       style={rootStyle}
+      onContextMenuCapture={(event) => {
+        if (shouldSuppressGameContextMenu(event.target)) {
+          event.preventDefault();
+        }
+      }}
+      onDragStartCapture={(event) => {
+        if (shouldSuppressGameContextMenu(event.target)) {
+          event.preventDefault();
+        }
+      }}
     >
       <div
         className="game-engine-layer visual-role-engine"
