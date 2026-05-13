@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createApiClient, defaultApiBaseUrl } from "../api/client";
 import { useI18n } from "../i18n/I18nProvider";
 import {
@@ -13,6 +13,98 @@ import {
   writeMatrixIdentity,
   writeMatrixToken,
 } from "../matrix/session";
+
+interface FormSelectOption {
+  value: string;
+  label: string;
+}
+
+function FormSelect({
+  value,
+  options,
+  onChange,
+}: {
+  value: string;
+  options: FormSelectOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className={`form-select ${open ? "open" : ""}`}
+      data-open={open ? "true" : "false"}
+    >
+      <button
+        type="button"
+        className="form-select-trigger"
+        onClick={() => setOpen((current) => !current)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className="form-select-value">{selected?.label ?? ""}</span>
+        <span className="form-select-chevron" aria-hidden>
+          <svg viewBox="0 0 16 16" focusable="false">
+            <path
+              d="M3.5 5.75 8 10.25l4.5-4.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+      </button>
+      <div className="form-select-menu" role="listbox" aria-hidden={!open}>
+        {options.map((option) => {
+          const active = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={active}
+              className={`form-select-option ${active ? "selected" : ""}`}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              <span className="form-select-option-check" aria-hidden>
+                {active ? "✓" : ""}
+              </span>
+              <span className="form-select-option-label">{option.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function CreateGamePage({
   initialError,
@@ -116,6 +208,36 @@ export function CreateGamePage({
   const roomOptions = useMemo(
     () => Array.from(new Set([defaultRoom, sourceMatrixRoomId, ...joinedRooms].filter(Boolean))),
     [defaultRoom, joinedRooms, sourceMatrixRoomId]
+  );
+
+  const roomSelectOptions = useMemo<FormSelectOption[]>(
+    () => [
+      ...roomOptions.map((roomId) => ({
+        value: roomId,
+        label: roomOptionLabel(roomId),
+      })),
+      { value: "__custom__", label: t("create.customRoom") },
+    ],
+    [roomOptions, t, roomDisplayNames, defaultRoom]
+  );
+
+  const languageOptions = useMemo<FormSelectOption[]>(
+    () => [
+      { value: "zh-CN", label: t("create.languageZh") },
+      { value: "en", label: t("create.languageEn") },
+    ],
+    [t]
+  );
+
+  const speechRateOptions = useMemo<FormSelectOption[]>(
+    () => [
+      { value: "1", label: t("create.agentSpeechRate1") },
+      { value: "1.25", label: t("create.agentSpeechRate125") },
+      { value: "1.5", label: t("create.agentSpeechRate15") },
+      { value: "1.75", label: t("create.agentSpeechRate175") },
+      { value: "2", label: t("create.agentSpeechRate2") },
+    ],
+    [t]
   );
 
   function onRoomSelect(value: string) {
@@ -239,17 +361,11 @@ export function CreateGamePage({
           </label>
           <label>
             {t("create.sourceRoom")}
-            <select
+            <FormSelect
               value={roomOptions.includes(roomSelectValue) ? roomSelectValue : "__custom__"}
-              onChange={(event) => onRoomSelect(event.target.value)}
-            >
-              {roomOptions.map((roomId) => (
-                <option key={roomId} value={roomId}>
-                  {roomOptionLabel(roomId)}
-                </option>
-              ))}
-              <option value="__custom__">{t("create.customRoom")}</option>
-            </select>
+              options={roomSelectOptions}
+              onChange={onRoomSelect}
+            />
           </label>
           {roomSelectValue === "__custom__" ? (
             <label>
@@ -263,26 +379,19 @@ export function CreateGamePage({
           ) : null}
           <label>
             {t("create.language")}
-            <select
+            <FormSelect
               value={language}
-              onChange={(event) => setLanguage(event.target.value as "zh-CN" | "en")}
-            >
-              <option value="zh-CN">{t("create.languageZh")}</option>
-              <option value="en">{t("create.languageEn")}</option>
-            </select>
+              options={languageOptions}
+              onChange={(value) => setLanguage(value as "zh-CN" | "en")}
+            />
           </label>
           <label>
             {t("create.agentSpeechRate")}
-            <select
+            <FormSelect
               value={String(agentSpeechRate)}
-              onChange={(event) => setAgentSpeechRate(Number(event.target.value))}
-            >
-              <option value="1">{t("create.agentSpeechRate1")}</option>
-              <option value="1.25">{t("create.agentSpeechRate125")}</option>
-              <option value="1.5">{t("create.agentSpeechRate15")}</option>
-              <option value="1.75">{t("create.agentSpeechRate175")}</option>
-              <option value="2">{t("create.agentSpeechRate2")}</option>
-            </select>
+              options={speechRateOptions}
+              onChange={(value) => setAgentSpeechRate(Number(value))}
+            />
           </label>
           <button type="submit" className="action-primary">
             {t("create.submit")}
