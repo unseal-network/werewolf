@@ -16,7 +16,7 @@ import {
   type RoomProjection,
 } from "@werewolf/engine";
 import { buildAgentTurnTools } from "@werewolf/agent-client";
-import { buildAgentContext } from "./agent-context";
+import { buildAgentPrompt } from "./agent-harness";
 import type { SseBroker } from "./sse-broker";
 import type { VoiceAgentRegistry } from "./voice-agent";
 import type { GameStore } from "./game-store";
@@ -2225,11 +2225,23 @@ export class InMemoryGameService {
         createdAt: now.toISOString(),
       },
     ]);
-    const context = buildAgentContext(room, player.id, state, {
-      maxSpeechHistory: 10,
-      includeVotes: true,
+    const tools =
+      "tools" in input && input.tools
+        ? input.tools
+        : buildAgentTurnTools({
+            phase: room.projection.phase,
+            role: state.role,
+            alivePlayerIds: room.projection.alivePlayerIds,
+            selfPlayerId: player.id,
+          });
+    const prompt = buildAgentPrompt({
+      room,
+      player,
+      state,
+      taskPrompt: input.prompt,
+      tools,
+      languageInstruction: this.languageInstruction(room),
     });
-    const fullPrompt = `${context}\n---\n${input.prompt}`;
 
     let output: RuntimeAgentTurnOutput;
     try {
@@ -2239,16 +2251,9 @@ export class InMemoryGameService {
         displayName: player.displayName,
         role: state.role,
         phase: room.projection.phase,
-        prompt: fullPrompt,
-        tools:
-          "tools" in input && input.tools
-            ? input.tools
-            : buildAgentTurnTools({
-                phase: room.projection.phase,
-                role: state.role,
-                alivePlayerIds: room.projection.alivePlayerIds,
-                selfPlayerId: player.id,
-              }),
+        prompt: prompt.textPrompt,
+        messages: prompt.messages,
+        tools,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

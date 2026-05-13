@@ -1016,6 +1016,42 @@ describe("InMemoryGameService rules", () => {
     expect(turnEvent!.seq).toBeGreaterThan(speechEvent!.seq);
   });
 
+  it("sends phase-aware harness messages to agent turns", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      return {
+        text: "我先给一个明确判断，2号目前偏好。",
+        toolName: "saySpeech",
+        input: { speech: "我先给一个明确判断，2号目前偏好。" },
+      };
+    });
+
+    expect(capturedInputs).toHaveLength(1);
+    expect(capturedInputs[0]!.messages).toEqual([
+      { role: "system", content: expect.stringContaining("白天发言") },
+      { role: "user", content: expect.stringContaining("<speaking_order>") },
+    ]);
+    expect(capturedInputs[0]!.messages![0]!.content).toContain("必须调用 saySpeech");
+    expect(capturedInputs[0]!.messages![1]!.content).toContain("<focus_angle>");
+    expect(capturedInputs[0]!.prompt).toContain("白天发言");
+  });
+
   it("scheduleAdvance advances an agent speaker immediately before the speech deadline", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
