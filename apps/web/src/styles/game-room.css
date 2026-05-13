@@ -5147,7 +5147,8 @@ body {
   transition: opacity 120ms ease, filter 120ms ease, background 120ms ease;
 }
 
-.player-picker-sector.hovered {
+.player-picker-sector.hovered,
+.player-picker-sector[data-player-picker-hovered="true"] {
   opacity: 0.92;
   filter: brightness(1.22) saturate(1.28);
 }
@@ -5417,6 +5418,7 @@ body {
 }
 
 .player-picker-slice.hovered,
+.player-picker-slice[data-player-picker-hovered="true"],
 .player-picker-slice:hover,
 .player-picker-avatar:hover {
   border-color: rgba(242, 228, 196, 0.86);
@@ -5441,6 +5443,7 @@ body {
 }
 
 .player-picker-slice.hovered,
+.player-picker-slice[data-player-picker-hovered="true"],
 .player-picker-slice:hover {
   transform: translate(-50%, -50%) scale(1.03);
 }
@@ -5488,13 +5491,14 @@ body {
 
 @media (pointer: coarse) {
   .player-picker-wheel {
-    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.30));
+    contain: layout paint style;
+    filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.26));
     transition: width 160ms cubic-bezier(0.16, 1, 0.3, 1);
     will-change: width;
   }
 
   .player-picker-wheel.open {
-    filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.44));
+    filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.36));
   }
 
   .player-picker-wheel.open::before {
@@ -5521,7 +5525,9 @@ body {
     transition: opacity 70ms linear;
   }
 
-  .player-picker-sector.hovered {
+  .player-picker-sector.hovered,
+  .player-picker-sector[data-player-picker-hovered="true"] {
+    opacity: 0.72;
     filter: none;
   }
 
@@ -5534,6 +5540,7 @@ body {
   }
 
   .player-picker-slice.hovered,
+  .player-picker-slice[data-player-picker-hovered="true"],
   .player-picker-slice:hover,
   .player-picker-avatar:hover,
   .player-picker-avatar.expanded.has-target {
@@ -5542,18 +5549,29 @@ body {
   }
 
   .player-picker-slice.hovered,
+  .player-picker-slice[data-player-picker-hovered="true"],
   .player-picker-slice:hover {
     transform: translate(-50%, -50%) scale(1.015);
   }
 
   .player-picker-slice.hovered,
+  .player-picker-slice[data-player-picker-hovered="true"],
   .player-picker-slice:hover,
   .player-picker-avatar:hover {
+    border-color: rgba(242, 228, 196, 0.82);
+    background:
+      radial-gradient(circle at 38% 23%, rgba(242, 228, 196, 0.24), transparent 34%),
+      linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--player-picker-avatar-bg, rgba(22, 10, 20, 0.54)) 72%, rgba(255, 255, 255, 0.14)),
+        color-mix(in srgb, var(--player-picker-avatar-bg, rgba(22, 10, 20, 0.54)) 88%, rgba(0, 0, 0, 0.30))
+      ),
+      var(--player-picker-avatar-bg, rgba(22, 10, 20, 0.54));
     box-shadow:
       0 0 0 2px rgba(5, 4, 10, 0.84),
-      0 0 0 4px rgba(143, 33, 49, 0.20),
-      0 10px 20px rgba(0, 0, 0, 0.34),
-      inset 0 0 14px rgba(242, 228, 196, 0.10);
+      0 0 0 5px rgba(216, 183, 107, 0.22),
+      0 8px 16px rgba(0, 0, 0, 0.30),
+      inset 0 0 10px rgba(242, 228, 196, 0.09);
   }
 }
 

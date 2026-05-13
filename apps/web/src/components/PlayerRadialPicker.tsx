@@ -139,10 +139,6 @@ export function PlayerRadialPicker({
   const activeTarget = wheelOpen ? hoveredTarget : selectedTarget;
 
   useEffect(() => {
-    hoveredIdRef.current = hoveredId;
-  }, [hoveredId]);
-
-  useEffect(() => {
     return () => {
       if (longPressTimerRef.current !== null) {
         window.clearTimeout(longPressTimerRef.current);
@@ -217,10 +213,28 @@ export function PlayerRadialPicker({
     return targets[index]?.playerId ?? null;
   }
 
-  function setHoveredIdIfChanged(nextId: string | null) {
+  function applyHoveredElement(nextId: string | null) {
+    const wheel = wheelRef.current;
+    if (!wheel) return;
+    wheel
+      .querySelectorAll<HTMLElement>("[data-player-picker-hovered='true']")
+      .forEach((element) => {
+        element.removeAttribute("data-player-picker-hovered");
+      });
+    if (!nextId) return;
+    wheel.querySelectorAll<HTMLElement>("[data-player-picker-target]").forEach((element) => {
+      if (element.dataset.playerPickerTarget !== nextId) return;
+      element.dataset.playerPickerHovered = "true";
+    });
+  }
+
+  function setHoveredIdIfChanged(nextId: string | null, shouldRender = true) {
     if (hoveredIdRef.current === nextId) return;
     hoveredIdRef.current = nextId;
-    setHoveredId(nextId);
+    applyHoveredElement(nextId);
+    if (shouldRender) {
+      setHoveredId(nextId);
+    }
   }
 
   function scheduleHoverUpdate(
@@ -235,7 +249,8 @@ export function PlayerRadialPicker({
       pendingHoverPointRef.current = null;
       if (!pending) return;
       setHoveredIdIfChanged(
-        getHoverTargetIdFromPoint(pending, pending.allowOutsideWheel)
+        getHoverTargetIdFromPoint(pending, pending.allowOutsideWheel),
+        false
       );
     });
   }
@@ -252,8 +267,9 @@ export function PlayerRadialPicker({
   }
 
   function commitHover() {
-    if (hoveredId) {
-      onSelect(hoveredId);
+    const targetId = hoveredIdRef.current;
+    if (targetId) {
+      onSelect(targetId);
       setWheelOpen(false);
       setHoveredIdIfChanged(null);
       wheelGeometryRef.current = null;
@@ -262,8 +278,9 @@ export function PlayerRadialPicker({
 
   function moveHover(step: number) {
     if (targets.length === 0) return;
-    const currentIndex = hoveredId
-      ? targets.findIndex((target) => target.playerId === hoveredId)
+    const currentHoveredId = hoveredIdRef.current;
+    const currentIndex = currentHoveredId
+      ? targets.findIndex((target) => target.playerId === currentHoveredId)
       : selectedTarget
         ? targets.findIndex(
             (target) => target.playerId === selectedTarget.playerId
@@ -296,13 +313,18 @@ export function PlayerRadialPicker({
           setWheelOpen(true);
           return;
         }
-        if (hoveredId) {
-          onSelect(hoveredId);
+        {
+          const targetId = hoveredIdRef.current;
+          if (!targetId) {
+            if (selectedTarget) {
+              onConfirm();
+            }
+            break;
+          }
+          onSelect(targetId);
           setWheelOpen(false);
           setHoveredIdIfChanged(null);
           wheelGeometryRef.current = null;
-        } else if (selectedTarget) {
-          onConfirm();
         }
         break;
       case "Escape":
@@ -403,6 +425,7 @@ export function PlayerRadialPicker({
             <span
               key={target.playerId}
               className={`player-picker-sector ${target.playerId === hoveredId ? "hovered" : ""}`}
+              data-player-picker-target={target.playerId}
               style={getRadialSliceStyle(index, targets.length)}
             />
           ))}
@@ -416,6 +439,7 @@ export function PlayerRadialPicker({
               className={`player-picker-slice ${target.playerId === hoveredId ? "hovered" : ""} ${
                 target.playerId === selectionPulseId ? "selected-pulse" : ""
               } ${getTargetAvatarClass(target)}`}
+              data-player-picker-target={target.playerId}
               style={{ ...getRadialItemStyle(index, targets.length), ...getTargetAvatarStyle(target) }}
               onClick={() => {
                 onSelect(target.playerId);
@@ -445,7 +469,7 @@ export function PlayerRadialPicker({
             suppressClickRef.current = false;
             return;
           }
-          if (wheelOpen && selectedTarget && !hoveredId) {
+          if (wheelOpen && selectedTarget && !hoveredIdRef.current) {
             clearSelectionAndClose();
             return;
           }
