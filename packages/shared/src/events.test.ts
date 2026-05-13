@@ -39,17 +39,28 @@ describe("game event contracts", () => {
     expect(event.visibility).toBe("private:user:player_2");
   });
 
-  it("rejects user lifecycle events from the game timeline", () => {
-    expect(() =>
-      gameEventSchema.parse({
-        id: "evt_2",
-        gameRoomId: "game_1",
-        seq: 2,
-        type: "player_joined",
-        visibility: "public",
-        payload: {},
-        createdAt: "2026-05-09T10:00:01.000Z",
-      })
-    ).toThrow();
+  it("validates lobby seat sync events", () => {
+    const event = gameEventSchema.parse({
+      id: "evt_2",
+      gameRoomId: "game_1",
+      seq: 2,
+      type: "player_joined",
+      visibility: "public",
+      actorId: "player_1",
+      payload: {
+        player: {
+          id: "player_1",
+          kind: "user",
+          userId: "@alice:example.com",
+          displayName: "Alice",
+          seatNo: 1,
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+        },
+      },
+      createdAt: "2026-05-09T10:00:01.000Z",
+    });
+    expect(event.type).toBe("player_joined");
   });
 });

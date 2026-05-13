@@ -305,7 +305,7 @@ export class InMemoryGameService {
           joinedAt: new Date().toISOString(),
         };
         room.players.push(player);
-        this.persistRoom(room);
+        this.emitPlayerJoinedEvent(room, player, userId);
         return player;
       }
       const activeAtOldSeat = room.players.some(
@@ -319,7 +319,7 @@ export class InMemoryGameService {
         existing.onlineState = "online";
         existing.displayName = displayName;
         if (avatarUrl) existing.avatarUrl = avatarUrl;
-        this.persistRoom(room);
+        this.emitPlayerJoinedEvent(room, existing, userId);
         return existing;
       }
       room.players = room.players.filter((player) => player.id !== existing.id);
@@ -341,7 +341,7 @@ export class InMemoryGameService {
       joinedAt: new Date().toISOString(),
     };
     room.players.push(player);
-    this.persistRoom(room);
+    this.emitPlayerJoinedEvent(room, player, userId);
     return player;
   }
 
@@ -379,7 +379,7 @@ export class InMemoryGameService {
     }
     player.leftAt = new Date().toISOString();
     player.onlineState = "offline";
-    this.persistRoom(room);
+    this.emitPlayerRemovedEvent(room, player, userId);
     return player;
   }
 
@@ -407,7 +407,7 @@ export class InMemoryGameService {
         existing.displayName = displayName || agentUserId;
         existing.invitedByUserId = callerUserId;
         if (avatarUrl) existing.avatarUrl = avatarUrl;
-        this.persistRoom(room);
+        this.emitPlayerJoinedEvent(room, existing, callerUserId);
         return existing;
       }
       room.players = room.players.filter((player) => player.id !== existing.id);
@@ -434,7 +434,7 @@ export class InMemoryGameService {
       joinedAt: new Date().toISOString(),
     };
     room.players.push(player);
-    this.persistRoom(room);
+    this.emitPlayerJoinedEvent(room, player, callerUserId);
     return player;
   }
 
@@ -600,6 +600,28 @@ export class InMemoryGameService {
     });
     this.persistRoom(room);
     return { player: moved, swappedWith: null };
+  }
+
+  private emitPlayerJoinedEvent(
+    room: StoredGameRoom,
+    player: StoredPlayer,
+    joinedByUserId: string
+  ): void {
+    this.assignAndAppendEvents(room, [
+      {
+        id: "pending",
+        gameRoomId: room.id,
+        seq: 1,
+        type: "player_joined",
+        visibility: "public",
+        actorId: player.id,
+        payload: {
+          player,
+          joinedByUserId,
+        },
+        createdAt: new Date().toISOString(),
+      },
+    ]);
   }
 
   private emitSeatChangedEvent(

@@ -10,6 +10,10 @@ export function applyRoomEvent(
   event: GameEventDto
 ): GameRoom | null {
   if (!room) return room;
+  if (event.type === "player_joined") {
+    const player = roomPlayerPayload(event.payload?.player);
+    return player ? upsertRoomPlayers(room, [player]) : room;
+  }
   if (event.type === "player_removed") {
     const playerId = String(event.payload?.playerId ?? event.actorId ?? "");
     if (!playerId) return room;
@@ -170,6 +174,37 @@ export function applyProjectionEvent(
     };
   }
   return projection;
+}
+
+function roomPlayerPayload(value: unknown): RoomPlayer | null {
+  if (!value || typeof value !== "object") return null;
+  const player = value as Partial<RoomPlayer>;
+  if (
+    typeof player.id !== "string" ||
+    typeof player.displayName !== "string" ||
+    typeof player.seatNo !== "number" ||
+    (player.kind !== "user" && player.kind !== "agent") ||
+    typeof player.ready !== "boolean" ||
+    (player.onlineState !== "online" && player.onlineState !== "offline") ||
+    !("leftAt" in player)
+  ) {
+    return null;
+  }
+  return {
+    id: player.id,
+    displayName: player.displayName,
+    seatNo: player.seatNo,
+    kind: player.kind,
+    ready: player.ready,
+    onlineState: player.onlineState,
+    leftAt: typeof player.leftAt === "string" ? player.leftAt : null,
+    ...(typeof player.userId === "string" ? { userId: player.userId } : {}),
+    ...(typeof player.agentId === "string" ? { agentId: player.agentId } : {}),
+    ...(typeof player.invitedByUserId === "string"
+      ? { invitedByUserId: player.invitedByUserId }
+      : {}),
+    ...(typeof player.avatarUrl === "string" ? { avatarUrl: player.avatarUrl } : {}),
+  };
 }
 
 function deriveRoomFromTimeline(

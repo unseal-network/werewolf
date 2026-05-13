@@ -57,6 +57,67 @@ function passAgentTurn(input: RuntimeAgentTurnInput) {
 }
 
 describe("InMemoryGameService rules", () => {
+  it("emits lobby player join events for humans and agents", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+
+    const human = games.join(room.id, players[0][0], players[0][1]);
+    const agent = games.addAgentPlayer(
+      room.id,
+      players[0][0],
+      "@bot:example.com",
+      "Bot"
+    );
+
+    const joinEvents = room.events.filter((event) => event.type === "player_joined");
+    expect(joinEvents).toHaveLength(2);
+    expect(joinEvents[0]?.actorId).toBe(human.id);
+    expect(joinEvents[0]?.payload.player).toMatchObject({
+      id: human.id,
+      userId: players[0][0],
+      seatNo: 1,
+      kind: "user",
+    });
+    expect(joinEvents[1]?.actorId).toBe(agent.id);
+    expect(joinEvents[1]?.payload.player).toMatchObject({
+      id: agent.id,
+      agentId: "@bot:example.com",
+      seatNo: 2,
+      kind: "agent",
+    });
+  });
+
+  it("emits a player removed event when a user leaves the waiting room", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    const human = games.join(room.id, players[0][0], players[0][1]);
+
+    games.leave(room.id, players[0][0]);
+
+    const removed = room.events.find((event) => event.type === "player_removed");
+    expect(removed?.actorId).toBe(human.id);
+    expect(removed?.payload).toMatchObject({
+      playerId: human.id,
+      seatNo: 1,
+    });
+  });
+
   it("does not let users swap seats with another human player", () => {
     const games = new InMemoryGameService();
     const { room } = games.createGame(

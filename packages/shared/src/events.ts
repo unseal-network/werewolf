@@ -16,6 +16,7 @@ export const eventTypeSchema = z.enum([
   "phase_closed",
   "night_resolved",
   "player_eliminated",
+  "player_joined",
   "player_seat_changed",
   "player_removed",
   "game_ended",

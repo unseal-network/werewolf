@@ -172,6 +172,35 @@ describe("timeline state derivation", () => {
     expect(player6?.seatNo).toBe(6);
   });
 
+  it("applies live player join events to the room seats", () => {
+    const derived = deriveTimelineDisplayState(
+      room(),
+      projection(),
+      [
+        event(160, "player_joined", {
+          player: {
+            id: "player_3",
+            agentId: "@bot3:matrix",
+            displayName: "Bot 3",
+            seatNo: 3,
+            kind: "agent",
+            ready: true,
+            onlineState: "online",
+            leftAt: null,
+          },
+        }, { actorId: "player_3" }),
+      ],
+      159
+    );
+
+    expect(derived.room?.players.find((player) => player.id === "player_3")).toMatchObject({
+      agentId: "@bot3:matrix",
+      displayName: "Bot 3",
+      seatNo: 3,
+      kind: "agent",
+    });
+  });
+
   it("derives reusable display facts from private and action payloads", () => {
     const display = deriveTimelineDisplayState(
       room(),
