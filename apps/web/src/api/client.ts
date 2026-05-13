@@ -23,7 +23,10 @@ export interface JoinedPlayer {
   player: {
     id: string;
     userId?: string;
+    agentId?: string;
+    invitedByUserId?: string;
     displayName: string;
+    avatarUrl?: string;
     seatNo: number;
     kind: PlayerKind;
     ready: boolean;
@@ -64,7 +67,9 @@ export interface RoomPlayer {
   id: string;
   userId?: string;
   agentId?: string;
+  invitedByUserId?: string;
   displayName: string;
+  avatarUrl?: string;
   seatNo: number;
   kind: PlayerKind;
   ready: boolean;
@@ -110,17 +115,9 @@ export interface GameRoom {
     agentSpeechRate?: number;
   };
   createdFromMatrixRoomId: string;
-  allowedSourceMatrixRoomIds: string[];
   players: RoomPlayer[];
   projection: RoomProjection | null;
   sourceMatrixRoomId?: string;
-}
-
-export interface GetGameResponse {
-  room: GameRoom;
-  projection: RoomProjection | null;
-  privateStates: PlayerPrivateState[];
-  events: GameEventDto[];
 }
 
 export interface MatrixWhoAmI {
@@ -207,9 +204,10 @@ export function createApiClient(options: ApiClientOptions) {
         body: JSON.stringify(body),
       });
     },
-    joinGame(gameRoomId: string) {
+    joinGame(gameRoomId: string, seatNo?: number) {
       return request<JoinedPlayer>(`/games/${gameRoomId}/join`, {
         method: "POST",
+        body: JSON.stringify(seatNo ? { seatNo } : {}),
       });
     },
     leaveGame(gameRoomId: string) {
@@ -245,18 +243,20 @@ export function createApiClient(options: ApiClientOptions) {
         body: JSON.stringify(body),
       });
     },
-    getGame(gameRoomId: string) {
-      return request<GetGameResponse>(`/games/${gameRoomId}`);
-    },
     listAgentCandidates(gameRoomId: string) {
       return request<AgentCandidatesResponse>(
         `/games/${gameRoomId}/agent-candidates`
       );
     },
-    addAgentPlayer(gameRoomId: string, agentUserId: string, displayName?: string) {
+    addAgentPlayer(
+      gameRoomId: string,
+      agentUserId: string,
+      displayName?: string,
+      avatarUrl?: string
+    ) {
       return request<{ player: RoomPlayer }>(`/games/${gameRoomId}/agents`, {
         method: "POST",
-        body: JSON.stringify({ agentUserId, displayName }),
+        body: JSON.stringify({ agentUserId, displayName, avatarUrl }),
       });
     },
     removePlayer(gameRoomId: string, playerId: string) {
@@ -271,6 +271,9 @@ export function createApiClient(options: ApiClientOptions) {
         kind: "speech" | "speechComplete" | "vote" | "nightAction" | "pass";
         targetPlayerId?: string;
         speech?: string;
+        expectedPhase?: string | null;
+        expectedDay?: number;
+        expectedVersion?: number;
       }
     ) {
       return request<{ success: boolean; event?: GameEventDto }>(
@@ -287,8 +290,24 @@ export function createApiClient(options: ApiClientOptions) {
         serverUrl: string;
         room: string;
         identity: string;
+        canPublish?: boolean;
       }>(`/games/${gameRoomId}/livekit-token`, {
         method: "POST",
+      });
+    },
+    downloadTranscript(gameRoomId: string, eventId: string) {
+      return fetch(
+        `${baseUrl}/games/${encodeURIComponent(gameRoomId)}/events/${encodeURIComponent(eventId)}/transcript`,
+        {
+          headers: {
+            authorization: `Bearer ${options.getMatrixToken()}`,
+          },
+        }
+      ).then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Transcript download failed: HTTP ${response.status}`);
+        }
+        return response.text();
       });
     },
     subscribeUrl(gameRoomId: string) {

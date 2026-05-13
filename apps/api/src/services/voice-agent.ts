@@ -47,6 +47,15 @@ interface PlayerSttSession {
   active: boolean;
 }
 
+export interface VoiceTranscriptUpdate {
+  gameRoomId: string;
+  playerId: string;
+  text: string;
+  final: boolean;
+}
+
+export type VoiceTranscriptHandler = (update: VoiceTranscriptUpdate) => void;
+
 /**
  * VoiceAgentService bridges a LiveKit room (audio I/O) with the Unseal
  * STT/TTS WebSocket endpoints. One instance per game room.
@@ -59,9 +68,9 @@ interface PlayerSttSession {
  *  • Publishes a single shared "agent voice" track at 16 kHz mono — TTS
  *    chunks (requested as pcm_16000) are pushed straight into it without
  *    any decoding
- *  • speak(text) waits until the audio has had time to play out before
- *    resolving, so the caller can advance to the next speaker only after
- *    the agent has finished speaking
+ *  • speak(text) resolves after generated PCM has been handed to the LiveKit
+ *    audio track. The caller can then submit the speech turn immediately; it
+ *    does not wait for client-side playout.
  */
 export class VoiceAgentService {
   private room: Room | null = null;
@@ -78,13 +87,18 @@ export class VoiceAgentService {
   private connectPromise: Promise<void> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalDisconnect = false;
+  private transcriptHandler: VoiceTranscriptHandler | null = null;
   /** Serializes speak() so two simultaneous utterances don't interleave
    *  PCM into the shared audio track. */
-  private speakQueue: Promise<void> = Promise.resolve();
+  private speakQueue: Promise<unknown> = Promise.resolve();
 
   constructor(gameRoomId: string, config: VoiceAgentConfig) {
     this.gameRoomId = gameRoomId;
     this.config = config;
+  }
+
+  setTranscriptHandler(handler: VoiceTranscriptHandler | null): void {
+    this.transcriptHandler = handler;
   }
 
   /**
@@ -270,7 +284,7 @@ export class VoiceAgentService {
     text: string,
     playerId?: string | null,
     playbackRate = 1
-  ): Promise<void> {
+  ): Promise<boolean> {
     const next = this.speakQueue.then(() =>
       this.speakImpl(text, playerId, playbackRate)
     );
@@ -291,19 +305,19 @@ export class VoiceAgentService {
     text: string,
     playerId?: string | null,
     playbackRate = 1
-  ): Promise<void> {
+  ): Promise<boolean> {
     const inner = this.speakImplInner(text, playerId, playbackRate);
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<void>((resolve) => {
+    const timeout = new Promise<boolean>((resolve) => {
       timeoutId = setTimeout(() => {
         console.error(
           `[VoiceAgent] speak hard timeout (${VoiceAgentService.SPEAK_HARD_TIMEOUT_MS}ms) — abandoning utterance for ${playerId ?? "unknown"}`
         );
-        resolve();
+        resolve(false);
       }, VoiceAgentService.SPEAK_HARD_TIMEOUT_MS);
     });
     try {
-      await Promise.race([inner, timeout]);
+      return await Promise.race([inner, timeout]);
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
@@ -313,23 +327,23 @@ export class VoiceAgentService {
     text: string,
     playerId?: string | null,
     playbackRate = 1
-  ): Promise<void> {
+  ): Promise<boolean> {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
     try {
       await this.connect();
     } catch (err) {
       console.error("[VoiceAgent] reconnect before speak failed:", err);
       this.scheduleReconnect("speak connect failed");
-      return;
+      return false;
     }
     if (!this.connected || !this.audioSource) {
       this.scheduleReconnect("speak without connected audio source");
-      return;
+      return false;
     }
 
-    let publishedSamples = 0;
     const sampleRate = TTS_AUDIO_SOURCE_SAMPLE_RATE; // we always request pcm_16000
+    let capturedAny = false;
     // Serialize captureFrame calls — the LiveKit rtc-node AudioSource native
     // FFI rejects concurrent captures with "InvalidState - failed to capture
     // frame", so we feed PCM chunks one at a time through a Promise chain.
@@ -354,7 +368,7 @@ export class VoiceAgentService {
           .then(async () => {
             const cap = this.publishTtsPcm(playbackSamples, rate);
             if (cap && (await cap)) {
-              publishedSamples += playbackSamples.length;
+              capturedAny = true;
             }
           })
           .catch(() => undefined);
@@ -370,8 +384,8 @@ export class VoiceAgentService {
         flush: true,
         timeoutMs: TTS_SYNTH_TIMEOUT_MS,
       });
-      // Wait for the serialized capture chain so every PCM frame is queued in
-      // the AudioSource before we begin the duration wait below.
+      // Wait for the serialized capture chain so every PCM frame from the
+      // completed TTS WebSocket response is handed to the AudioSource.
       await captureChain;
     } catch (err) {
       console.error("[VoiceAgent] speak failed:", err);
@@ -379,21 +393,11 @@ export class VoiceAgentService {
       ttsClient.close();
     }
 
-    // Block the queue until the audio has had time to play out so that
-    // the game-service caller doesn't advance to the next speaker while
-    // the previous agent is still speaking.
-    if (publishedSamples > 0) {
-      const audioMs = (publishedSamples / sampleRate) * 1000;
-      // `captureFrame` only tells us the frame was accepted by LiveKit; it
-      // does not prove remote clients have played the queued PCM. Drain from
-      // the end of capture instead of subtracting TTS generation time, or the
-      // game can advance to voting while the final utterance is still audible.
-      const tailMs = 500;
-      const waitMs = audioMs + tailMs;
-      if (waitMs > 0) {
-        await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
-      }
-    }
+    // At this point the generated PCM has been handed to the LiveKit audio
+    // track. The game turn can be submitted immediately; do not wait for
+    // client-side playout here.
+    void sampleRate;
+    return capturedAny;
   }
 
   private async handlePlayerTrack(playerId: string, track: RemoteTrack): Promise<void> {
@@ -408,6 +412,22 @@ export class VoiceAgentService {
       apiBaseUrl: this.config.unsealApiBaseUrl,
       agentId: this.resolveAgentId(playerId),
       apiKey: this.config.unsealApiKey,
+      onPartialTranscript: (text) => {
+        this.transcriptHandler?.({
+          gameRoomId: this.gameRoomId,
+          playerId,
+          text,
+          final: false,
+        });
+      },
+      onCommittedTranscript: (text) => {
+        this.transcriptHandler?.({
+          gameRoomId: this.gameRoomId,
+          playerId,
+          text,
+          final: true,
+        });
+      },
       onError: (err) => console.error(`[VoiceAgent] STT error for ${playerId}:`, err),
     });
     try {
@@ -538,13 +558,22 @@ function withTimeout<T>(
 /** One VoiceAgentService per game room. */
 export class VoiceAgentRegistry {
   private agents = new Map<string, VoiceAgentService>();
+  private transcriptHandler: VoiceTranscriptHandler | null = null;
 
   constructor(private config: VoiceAgentConfig) {}
+
+  setTranscriptHandler(handler: VoiceTranscriptHandler | null): void {
+    this.transcriptHandler = handler;
+    for (const agent of this.agents.values()) {
+      agent.setTranscriptHandler(handler);
+    }
+  }
 
   async getOrCreate(gameRoomId: string): Promise<VoiceAgentService> {
     let agent = this.agents.get(gameRoomId);
     if (!agent) {
       agent = new VoiceAgentService(gameRoomId, this.config);
+      agent.setTranscriptHandler(this.transcriptHandler);
       this.agents.set(gameRoomId, agent);
       try {
         await agent.connect();

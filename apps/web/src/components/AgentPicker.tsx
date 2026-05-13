@@ -96,7 +96,11 @@ export function AgentPicker({
             agents.map((agent) => (
               <div className="agent-row" key={agent.userId}>
                 <div className="agent-avatar">
-                  {agent.displayName.slice(0, 2).toUpperCase()}
+                  {agent.avatarUrl ? (
+                    <img src={agent.avatarUrl} alt="" draggable={false} />
+                  ) : (
+                    agent.displayName.slice(0, 2).toUpperCase()
+                  )}
                 </div>
                 <div className="agent-meta">
                   <div className="agent-name">{agent.displayName}</div>

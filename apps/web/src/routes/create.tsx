@@ -5,8 +5,12 @@ import {
   DEFAULT_SOURCE_ROOM_ID,
   MATRIX_USER_ID_STORAGE_KEY,
   SOURCE_ROOM_STORAGE_KEY,
+  clearMatrixSession,
   matrixServerBaseFromToken,
+  readStoredMatrixDisplayName,
+  readStoredMatrixUserId,
   readMatrixToken,
+  writeMatrixIdentity,
   writeMatrixToken,
 } from "../matrix/session";
 
@@ -19,6 +23,12 @@ export function CreateGamePage({
   const [title, setTitle] = useState(t("create.gameTitleDefault"));
   const defaultRoom = import.meta.env.VITE_DEMO_ROOM ?? DEFAULT_SOURCE_ROOM_ID;
   const [matrixToken, setMatrixToken] = useState(() => readMatrixToken());
+  const [selectedUserId, setSelectedUserId] = useState(
+    () => readStoredMatrixUserId() ?? ""
+  );
+  const [selectedDisplayName, setSelectedDisplayName] = useState(
+    () => readStoredMatrixDisplayName() ?? ""
+  );
   const [sourceMatrixRoomId, setSourceMatrixRoomId] = useState(
     () => localStorage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? defaultRoom
   );
@@ -69,6 +79,12 @@ export function CreateGamePage({
       ]);
       if (whoami.user_id) {
         localStorage.setItem(MATRIX_USER_ID_STORAGE_KEY, whoami.user_id);
+        writeMatrixIdentity(
+          whoami.user_id,
+          whoami.display_name ?? whoami.user_id
+        );
+        setSelectedUserId(whoami.user_id);
+        setSelectedDisplayName(whoami.display_name ?? whoami.user_id);
       }
       const nextRooms = rooms.joined_rooms ?? [];
       setJoinedRooms(nextRooms);
@@ -149,7 +165,6 @@ export function CreateGamePage({
           voteSeconds: 30,
           agentSpeechRate,
         },
-        allowedSourceMatrixRoomIds: [],
       });
       const url = `${window.location.pathname}?gameRoomId=${result.gameRoomId}`;
       window.location.href = url;
@@ -158,26 +173,44 @@ export function CreateGamePage({
     }
   }
 
+  function logout() {
+    clearMatrixSession();
+    window.location.href = `${window.location.pathname}?chooseUser=1`;
+  }
+
   return (
     <section className="create-page">
       <div className="create-card">
         <header className="create-header">
-          <h1>{t("create.title")}</h1>
-          <div className="locale-switcher inline" role="group" aria-label={t("common.languageLabel")}>
-            <button
-              type="button"
-              className={locale === "zh-CN" ? "active" : ""}
-              onClick={() => setLocale("zh-CN")}
-            >
-              中
+          <div className="create-heading">
+            <h1>{t("create.title")}</h1>
+            {selectedUserId ? (
+              <div className="create-session-chip">
+                <strong>{selectedDisplayName || selectedUserId}</strong>
+                <span>{selectedUserId}</span>
+              </div>
+            ) : null}
+          </div>
+          <div className="create-header-actions">
+            <button type="button" className="action secondary" onClick={logout}>
+              {t("create.logout")}
             </button>
-            <button
-              type="button"
-              className={locale === "en" ? "active" : ""}
-              onClick={() => setLocale("en")}
-            >
-              EN
-            </button>
+            <div className="locale-switcher inline" role="group" aria-label={t("common.languageLabel")}>
+              <button
+                type="button"
+                className={locale === "zh-CN" ? "active" : ""}
+                onClick={() => setLocale("zh-CN")}
+              >
+                中
+              </button>
+              <button
+                type="button"
+                className={locale === "en" ? "active" : ""}
+                onClick={() => setLocale("en")}
+              >
+                EN
+              </button>
+            </div>
           </div>
         </header>
         <form onSubmit={submit} className="create-form">

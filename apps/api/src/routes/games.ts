@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import { listRoomAgents } from "@werewolf/agent-client";
+import { AppError, gamePhaseSchema, type GameEvent } from "@werewolf/shared";
 import {
-  listRoomAgents,
-} from "@werewolf/agent-client";
-import { AppError, type GameEvent } from "@werewolf/shared";
-import { authenticateRequest, type MatrixAuthClient } from "../context/auth";
+  authenticateRequest,
+  type MatrixAuthClient,
+  type MatrixProfileCache,
+} from "../context/auth";
 import type {
   InMemoryGameService,
   PlayerSubmittedAction,
@@ -13,6 +15,7 @@ import type {
 
 export interface GamesRouteDeps {
   matrix: MatrixAuthClient;
+  profileCache?: MatrixProfileCache | undefined;
   games: InMemoryGameService;
   matrixHomeserverUrl?: string;
   runAgentTurn?: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>;
@@ -31,9 +34,24 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     );
   }
 
+  function matrixMediaUrl(uri: string | undefined): string | undefined {
+    if (!uri) return undefined;
+    if (!uri.startsWith("mxc://")) return uri;
+    const homeserverUrl =
+      deps.matrixHomeserverUrl ??
+      process.env.MATRIX_BASE_URL ??
+      "https://keepsecret.io";
+    const path = uri.slice("mxc://".length);
+    const slash = path.indexOf("/");
+    if (slash <= 0 || slash === path.length - 1) return undefined;
+    return `${homeserverUrl.replace(/\/+$/, "")}/_matrix/media/v3/download/${encodeURIComponent(
+      path.slice(0, slash)
+    )}/${encodeURIComponent(path.slice(slash + 1))}`;
+  }
+
   app.post("/", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = await c.req.json();
       const { room, card } = deps.games.createGame(body, user.id);
       return c.json({ gameRoomId: room.id, card }, 201);
@@ -50,11 +68,15 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/join", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const body = await readOptionalJson(c.req.raw);
+      const seatNo = numberValue(body.seatNo);
       const player = deps.games.join(
         c.req.param("gameRoomId"),
         user.id,
-        user.displayName
+        user.displayName,
+        user.avatarUrl,
+        seatNo
       );
       return c.json({ player });
     } catch (error) {
@@ -68,7 +90,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/leave", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const player = deps.games.leave(c.req.param("gameRoomId"), user.id);
       return c.json({ player });
     } catch (error) {
@@ -82,7 +104,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/start", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const started = deps.games.start(c.req.param("gameRoomId"), user.id);
       // runAgentTurn is set globally at server startup (server.ts) so the
       // tick worker can advance rooms even after a restart without waiting
@@ -116,7 +138,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/actions", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const player = room.players.find(
@@ -142,6 +164,15 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
               : kind === "nightAction"
                 ? { kind: "nightAction", targetPlayerId: String(body.targetPlayerId ?? "") }
                 : { kind: "pass" };
+      const expectedPhaseRaw = stringValue(body.expectedPhase);
+      const expectedPhase = expectedPhaseRaw
+        ? gamePhaseSchema.parse(expectedPhaseRaw)
+        : undefined;
+      const expectedDay = optionalPositiveInteger(body, "expectedDay");
+      const expectedVersion = optionalPositiveInteger(body, "expectedVersion");
+      if (expectedPhase !== undefined) action.expectedPhase = expectedPhase;
+      if (expectedDay !== undefined) action.expectedDay = expectedDay;
+      if (expectedVersion !== undefined) action.expectedVersion = expectedVersion;
       const event = await deps.games.submitAction(
         c.req.param("gameRoomId"),
         player.id,
@@ -159,7 +190,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/runtime/tick", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       if (!deps.games.hasRunAgentTurn()) {
         throw new AppError("conflict", "Runtime agent turn runner is not configured", 409);
       }
@@ -203,9 +234,58 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     }
   });
 
+  app.get("/:gameRoomId/events/:eventId/transcript", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const room = deps.games.snapshot(c.req.param("gameRoomId"));
+      const eventId = c.req.param("eventId");
+      const event = room.events.find((candidate) => candidate.id === eventId);
+      if (!event) {
+        throw new AppError("not_found", "Transcript event not found", 404);
+      }
+      const myPlayer = room.players.find(
+        (p) => p.userId === user.id && !p.leftAt
+      );
+      const myPrivateState = myPlayer
+        ? room.privateStates.find((s) => s.playerId === myPlayer.id)
+        : undefined;
+      const visible = filterEventsForUser(
+        [event],
+        myPlayer?.id,
+        Boolean(myPrivateState?.team === "wolf" && myPrivateState.alive),
+        room.status === "ended" || room.projection?.status === "ended"
+      );
+      if (visible.length === 0) {
+        throw new AppError("not_found", "Transcript event not found", 404);
+      }
+      const text =
+        typeof event.payload.text === "string"
+          ? event.payload.text
+          : typeof event.payload.speech === "string"
+            ? event.payload.speech
+            : "";
+      if (!text.trim()) {
+        throw new AppError("not_found", "Transcript text not found", 404);
+      }
+      console.log(`[TranscriptDownload] ${room.id} ${event.id}: ${text}`);
+      return new Response(`${text}\n`, {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "content-disposition": `attachment; filename="${event.id}.txt"`,
+        },
+      });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
   app.get("/:gameRoomId", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const myPlayer = room.players.find(
         (p) => p.userId === user.id && !p.leftAt
@@ -241,7 +321,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.get("/:gameRoomId/agent-candidates", async (c) => {
     try {
-      await authenticateRequest(c.req.raw, deps.matrix);
+      await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const homeserverUrl =
         deps.matrixHomeserverUrl ??
@@ -267,7 +347,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         agents: result.agents.map((agent) => ({
           userId: agent.userId,
           displayName: agent.displayName,
-          avatarUrl: agent.avatarUrl,
+          avatarUrl: matrixMediaUrl(agent.avatarUrl),
           userType: agent.userType,
           membership: agent.membership,
           alreadyJoined: seenAgentIds.has(agent.userId),
@@ -286,10 +366,9 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/agents", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
       const agentUserId = stringValue(body.agentUserId);
-      const displayName = stringValue(body.displayName) ?? agentUserId ?? "";
       if (!agentUserId) {
         throw new AppError("invalid_action", "agentUserId is required", 400);
       }
@@ -297,7 +376,8 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         c.req.param("gameRoomId"),
         user.id,
         agentUserId,
-        displayName
+        stringValue(body.displayName) ?? agentUserId,
+        matrixMediaUrl(stringValue(body.avatarUrl))
       );
       return c.json({ player }, 201);
     } catch (error) {
@@ -311,7 +391,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/seat", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
       const seatNo = numberValue(body.seatNo);
       if (!seatNo) {
@@ -334,7 +414,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.delete("/:gameRoomId/players/:playerId", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const player = deps.games.removePlayer(
         c.req.param("gameRoomId"),
         user.id,
@@ -385,6 +465,22 @@ function numberValue(value: unknown): number | undefined {
         ? Number(value)
         : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function optionalPositiveInteger(
+  body: Record<string, unknown>,
+  key: string
+): number | undefined {
+  if (!Object.prototype.hasOwnProperty.call(body, key)) return undefined;
+  const value = body[key];
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string"
+        ? Number(value)
+        : NaN;
+  if (Number.isInteger(parsed) && parsed > 0) return parsed;
+  throw new AppError("invalid_action", `${key} must be a positive integer`, 400);
 }
 
 export function filterEventsForUser(

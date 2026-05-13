@@ -1,0 +1,14 @@
+{
+  "users": [
+    {
+      "userId": "@agent_demo_a:keepsecret.io",
+      "displayName": "Demo Agent A",
+      "accessToken": "replace-with-local-test-token"
+    },
+    {
+      "userId": "@agent_demo_b:keepsecret.io",
+      "displayName": "Demo Agent B",
+      "accessToken": "replace-with-local-test-token"
+    }
+  ]
+}

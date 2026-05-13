@@ -13,6 +13,7 @@ export const gameUsers = pgTable("game_users", {
   matrixUserId: text("matrix_user_id").notNull().unique(),
   displayName: text("display_name").notNull(),
   avatarUrl: text("avatar_url"),
+  profileSyncedAt: timestamp("profile_synced_at", { withTimezone: true }),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
 });
 
@@ -24,7 +25,6 @@ export const gameRooms = pgTable("game_rooms", {
   targetPlayerCount: integer("target_player_count").notNull(),
   timing: jsonb("timing").notNull(),
   createdFromMatrixRoomId: text("created_from_matrix_room_id").notNull(),
-  allowedSourceMatrixRoomIds: jsonb("allowed_source_matrix_room_ids").notNull(),
   agentSourceMatrixRoomId: text("agent_source_matrix_room_id").notNull(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   pausedAt: timestamp("paused_at", { withTimezone: true }),
@@ -43,7 +43,9 @@ export const gameRoomPlayers = pgTable(
     kind: text("kind").notNull(),
     userId: text("user_id"),
     agentId: text("agent_id"),
+    invitedByUserId: text("invited_by_user_id"),
     displayName: text("display_name").notNull(),
+    avatarUrl: text("avatar_url"),
     seatNo: integer("seat_no").notNull(),
     ready: boolean("ready").notNull(),
     onlineState: text("online_state").notNull(),

@@ -1,11 +1,18 @@
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { LOGO_IMG, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG, ROLE_LABEL } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
+import { PlayerRadialPicker } from "./PlayerRadialPicker";
+import { StageActionButton } from "./StageActionButton";
 import { VoicePanel } from "./VoicePanel";
 
 export interface StageSeat {
   seatNo: number;
   playerId: string;
   displayName: string;
+  userId?: string | undefined;
+  agentId?: string | undefined;
+  avatarUrl?: string | undefined;
+  visibleRole?: string | undefined;
 }
 
 export type ActionMode =
@@ -82,6 +89,60 @@ const PRIMARY_KEY: Record<ConfirmMode, string> = {
   vote: "stage.primary.vote",
 };
 
+export function shouldShowCenterPhaseSummary({
+  actionMode,
+  isConfirmingTarget,
+}: {
+  actionMode: ActionMode;
+  isConfirmingTarget: boolean;
+}) {
+  if (isConfirmingTarget) return false;
+  return actionMode === "lobby" || actionMode === "end";
+}
+
+export function shouldStartActionBubbleCollapsed(actionMode: ActionMode) {
+  return actionMode !== "lobby" && actionMode !== "deal" && actionMode !== "end";
+}
+
+export function shouldAutoOpenActionBubble({
+  actionMode,
+  canCurrentUserAct,
+}: {
+  actionMode: ActionMode;
+  canCurrentUserAct: boolean;
+}) {
+  return shouldStartActionBubbleCollapsed(actionMode) && canCurrentUserAct;
+}
+
+export function getActionBubbleTriggerVisibility({ isOpen }: { isOpen: boolean }) {
+  return isOpen ? "hidden" : "visible";
+}
+
+export function shouldShowActionBubbleCopy({
+  actionMode,
+  copy,
+}: {
+  actionMode: ActionMode;
+  copy: string;
+}) {
+  return shouldStartActionBubbleCollapsed(actionMode) && copy.trim().length > 0;
+}
+
+export function shouldPinActionBubbleOpen({
+  actionMode,
+  canCurrentUserAct,
+}: {
+  actionMode: ActionMode;
+  canCurrentUserAct: boolean;
+}) {
+  if (!shouldStartActionBubbleCollapsed(actionMode) || !canCurrentUserAct) {
+    return false;
+  }
+  return true;
+}
+
+const ACTION_DRAWER_OPEN_DRAG_PX = 18;
+
 export function CenterStage({
   kicker,
   title,
@@ -117,6 +178,14 @@ export function CenterStage({
   onSkip,
 }: CenterStageProps) {
   const t = useT();
+  const actionBubbleRef = useRef<HTMLElement | null>(null);
+  const actionBubbleDragStartRef = useRef<{ pointerId: number; y: number } | null>(
+    null
+  );
+  const [actionBubbleOpen, setActionBubbleOpen] = useState(
+    () => !shouldStartActionBubbleCollapsed(actionMode)
+  );
+  const [wolfActionMode, setWolfActionMode] = useState<"target" | "speech">("target");
   const selectedTarget = legalTargets.find((s) => s.playerId === selectedTargetId);
   const displayRole = myRoleId ? normalizeDisplayRole(myRoleId) : undefined;
   const roleImg = displayRole ? ROLE_IMG[displayRole] : LOGO_IMG;
@@ -147,6 +216,38 @@ export function CenterStage({
     </div>
   ) : null;
 
+  const shouldLockActionBubbleOpen = shouldPinActionBubbleOpen({
+    actionMode,
+    canCurrentUserAct,
+  });
+
+  useEffect(() => {
+    setActionBubbleOpen(
+      !shouldStartActionBubbleCollapsed(actionMode) ||
+        shouldAutoOpenActionBubble({ actionMode, canCurrentUserAct }) ||
+        shouldLockActionBubbleOpen
+    );
+  }, [actionMode, canCurrentUserAct, confirmMode, shouldLockActionBubbleOpen]);
+
+  useEffect(() => {
+    setWolfActionMode("target");
+  }, [actionMode, confirmMode]);
+
+  useEffect(() => {
+    if (
+      !actionBubbleOpen ||
+      shouldLockActionBubbleOpen ||
+      !shouldStartActionBubbleCollapsed(actionMode)
+    ) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const root = actionBubbleRef.current;
+      if (!root || root.contains(event.target as Node)) return;
+      setActionBubbleOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [actionBubbleOpen, actionMode, shouldLockActionBubbleOpen]);
+
   // Lobby: only the start button + status copy
   if (actionMode === "lobby") {
     const primaryLabel = isCreator ? t("stage.startButton") : t("stage.readyButton");
@@ -156,23 +257,21 @@ export function CenterStage({
         <div className="phase-title">{title}</div>
         {statusText ? <div className="phase-copy">{statusText}</div> : null}
         <div className="target-row">
-          <button
-            type="button"
+          <StageActionButton
             className="stage-start"
+            label={primaryLabel}
+            variant="primary"
             onClick={isCreator ? onStart : undefined}
             disabled={!isCreator}
-          >
-            {primaryLabel}
-          </button>
-          {isCreator && onAddAgent && canAddAgent ? (
-            <button
-              type="button"
+          />
+          {onAddAgent && canAddAgent ? (
+            <StageActionButton
               className="stage-skip stage-add-player"
+              label="+"
+              variant="secondary"
               onClick={onAddAgent}
               aria-label={t("stage.addAgentButton")}
-            >
-              +
-            </button>
+            />
           ) : null}
         </div>
       </article>
@@ -187,13 +286,6 @@ export function CenterStage({
         <div className="phase-kicker">{kicker}</div>
         <div className="phase-title">{title}</div>
         <div className="phase-copy">{copy || t("stage.prompt.deal")}</div>
-        {isCreator && canProgress ? (
-          <div className="target-row">
-            <button type="button" className="stage-skip" onClick={onRunRuntime}>
-              {t("stage.runtimeButton")}
-            </button>
-          </div>
-        ) : null}
       </article>
     );
   }
@@ -201,12 +293,12 @@ export function CenterStage({
   // End
   if (actionMode === "end") {
     return (
-      <article className="phase-card">
+      <article className="phase-card endgame-phase-card" role="dialog" aria-live="polite">
         {identity}
-        <div className="phase-kicker">{kicker}</div>
-        <div className="phase-title">{title}</div>
-        {winnerText ? <div className="phase-copy" style={{ color: "var(--accent)" }}>{winnerText}</div> : null}
-        {copy ? <div className="phase-copy">{copy}</div> : null}
+        <div className="endgame-kicker">GAME OVER</div>
+        <div className="endgame-title">{title}</div>
+        {winnerText ? <div className="endgame-winner">{winnerText}</div> : null}
+        {copy ? <div className="endgame-copy">{copy}</div> : null}
       </article>
     );
   }
@@ -220,11 +312,207 @@ export function CenterStage({
     canCurrentUserAct && isWitchSave ? legalTargets[0] : undefined;
   const showWitchSaveChoice = Boolean(witchSaveTarget);
   const showSpeechInput = isMyTurnToSpeak;
-  const showPrimarySkip = canCurrentUserAct && !hasTargets && !showSpeechInput;
-  const showWaitingChip = !canCurrentUserAct;
+  const showPassOnlyAction = canCurrentUserAct && !hasTargets && !showSpeechInput;
+  const showLockedDrawer = !canCurrentUserAct;
+  const showWolfCombinedActions =
+    canCurrentUserAct && confirmMode === "wolf" && hasTargets && showSpeechInput;
+  const containsRadialPicker =
+    !showLockedDrawer &&
+    (((showSelect || showConfirm) && !showWitchSaveChoice && !showWolfCombinedActions) ||
+      (showWolfCombinedActions && wolfActionMode === "target"));
+  const containsVoicePanel = !showLockedDrawer && showSpeechInput && !showWolfCombinedActions;
+  const hasPrivateCopy = shouldShowActionBubbleCopy({ actionMode, copy });
 
-  // While in confirm state, hide kicker/title/copy per spec
-  const headerVisible = !showConfirm;
+  const headerVisible = shouldShowCenterPhaseSummary({
+    actionMode,
+    isConfirmingTarget: showConfirm,
+  });
+  const isActionBubble = shouldStartActionBubbleCollapsed(actionMode);
+  const actionBubbleLabel = showLockedDrawer
+    ? t("stage.actionPanel")
+    : showSpeechInput
+      ? t("stage.speakButton")
+      : showSelect
+        ? t("stage.selectPlayer")
+      : showConfirm
+          ? t(PRIMARY_KEY[confirmMode])
+          : showWitchSaveChoice
+            ? t("stage.primary.witchSave")
+            : showPassOnlyAction
+              ? t("stage.skipButton")
+              : t("stage.actionPanel");
+
+  const voiceControl = (
+    <VoicePanel
+      enabled={Boolean(showSpeechInput)}
+      textDraft={speechInput ?? ""}
+      onTextChange={(value) => onSpeechChange?.(value)}
+      onSubmitText={(text) => onSpeak(text)}
+      onSpeechComplete={() => (onSpeechComplete ? onSpeechComplete() : onSpeak())}
+      actionLoading={Boolean(actionLoading)}
+      submitLabel={t("stage.submitSpeech")}
+      placeholder={t("stage.speakPlaceholder")}
+      holdToSpeakLabel={t("stage.holdToSpeak")}
+      releaseToSendLabel={t("stage.releaseToSend")}
+      switchToVoiceLabel={t("stage.switchToVoice")}
+      switchToTextLabel={t("stage.switchToText")}
+    />
+  );
+
+  const pickerControl = (
+    <PlayerRadialPicker
+      targets={legalTargets}
+      selectedTargetId={selectedTargetId}
+      confirmLabel={t(PRIMARY_KEY[confirmMode])}
+      skipLabel={t("stage.skipButton")}
+      actionLoading={Boolean(actionLoading)}
+      onSelect={onTargetSelect}
+      onClear={onClearTarget}
+      onConfirm={() => onConfirmTarget()}
+      onSkip={onSkip}
+    />
+  );
+
+  const actionControls = (
+    <>
+      <div className="target-row action-control-stack">
+        {!showLockedDrawer && (showWitchSaveChoice || (canCurrentUserAct && isWitchSave)) ? (
+          <div className="binary-action">
+            {witchSaveTarget ? (
+              <StageActionButton
+                className="stage-confirm"
+                label={t("stage.primary.witchSave")}
+                variant="primary"
+                onClick={() => onConfirmTarget(witchSaveTarget.playerId)}
+                loading={Boolean(actionLoading)}
+              />
+            ) : null}
+            <StageActionButton
+              className="stage-skip"
+              label={witchSaveTarget ? t("stage.primary.witchPass") : t("stage.skipButton")}
+              variant="secondary"
+              onClick={onSkip}
+              loading={Boolean(actionLoading)}
+            />
+          </div>
+        ) : null}
+
+        {!showLockedDrawer && showWolfCombinedActions ? (
+          <>
+            <div className="action-mode-switch" role="group" aria-label="wolf-actions">
+              <button
+                type="button"
+                className={wolfActionMode === "target" ? "active" : ""}
+                onClick={() => setWolfActionMode("target")}
+              >
+                {t("stage.selectPlayer")}
+              </button>
+              <button
+                type="button"
+                className={wolfActionMode === "speech" ? "active" : ""}
+                onClick={() => setWolfActionMode("speech")}
+              >
+                {t("stage.speakButton")}
+              </button>
+            </div>
+            {wolfActionMode === "target" ? pickerControl : voiceControl}
+          </>
+        ) : null}
+
+        {!showLockedDrawer && (showSelect || showConfirm) && !showWitchSaveChoice && !showWolfCombinedActions ? pickerControl : null}
+
+        {!showLockedDrawer && showSpeechInput && !showWolfCombinedActions ? voiceControl : null}
+
+        {!showLockedDrawer && showPassOnlyAction ? (
+          <StageActionButton
+            className="stage-confirm"
+            label={t("stage.skipButton")}
+            variant="primary"
+            onClick={onSkip}
+            loading={Boolean(actionLoading)}
+          />
+        ) : null}
+
+        {showLockedDrawer ? (
+          <div className="action-drawer-locked" aria-disabled="true">
+            <strong>{t("stage.actionPanelLocked")}</strong>
+            {currentSpeakerSeatNo ? (
+              <span>{t("stage.currentSpeaker", { seat: currentSpeakerSeatNo })}</span>
+            ) : statusText ? (
+              <span>{statusText}</span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+    </>
+  );
+
+  if (isActionBubble) {
+    const triggerVisibility = getActionBubbleTriggerVisibility({ isOpen: actionBubbleOpen });
+
+    function openActionBubble() {
+      setActionBubbleOpen(true);
+      actionBubbleDragStartRef.current = null;
+    }
+
+    function onTriggerPointerDown(event: ReactPointerEvent<HTMLButtonElement>) {
+      actionBubbleDragStartRef.current = {
+        pointerId: event.pointerId,
+        y: event.clientY,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    function onTriggerPointerMove(event: ReactPointerEvent<HTMLButtonElement>) {
+      const drag = actionBubbleDragStartRef.current;
+      if (!drag || drag.pointerId !== event.pointerId) return;
+      if (drag.y - event.clientY >= ACTION_DRAWER_OPEN_DRAG_PX) {
+        openActionBubble();
+      }
+    }
+
+    function onTriggerPointerEnd(event: ReactPointerEvent<HTMLButtonElement>) {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+      actionBubbleDragStartRef.current = null;
+    }
+
+    return (
+      <article
+        ref={actionBubbleRef}
+        className={`phase-card action-bubble ${actionBubbleOpen ? "is-open" : "is-collapsed"}`}
+        data-radial={containsRadialPicker ? "true" : "false"}
+        data-voice={containsVoicePanel ? "true" : "false"}
+        data-private-copy={hasPrivateCopy ? "true" : "false"}
+        data-locked={showLockedDrawer ? "true" : "false"}
+      >
+        {triggerVisibility === "visible" && !shouldLockActionBubbleOpen ? (
+          <button
+            type="button"
+            className="action-bubble-trigger"
+            aria-expanded={false}
+            aria-label={actionBubbleLabel}
+            onClick={openActionBubble}
+            onPointerDown={onTriggerPointerDown}
+            onPointerMove={onTriggerPointerMove}
+            onPointerUp={onTriggerPointerEnd}
+            onPointerCancel={onTriggerPointerEnd}
+          >
+            <span className="action-bubble-grip" aria-hidden />
+            <span className="action-bubble-label">{actionBubbleLabel}</span>
+          </button>
+        ) : null}
+        <div className="action-bubble-panel" aria-hidden={!actionBubbleOpen}>
+          {shouldShowActionBubbleCopy({ actionMode, copy }) ? (
+            <div className="phase-copy phase-action-copy phase-private-result">{copy}</div>
+          ) : null}
+          {actionControls}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article className="phase-card">
@@ -242,112 +530,19 @@ export function CenterStage({
           {statusText ? <div className="phase-copy">{statusText}</div> : null}
         </>
       ) : null}
-
-      <div className="target-row">
-        {showWaitingChip ? (
-          <div className="target-chip">{t("stage.waiting")}</div>
-        ) : null}
-
-        {showWitchSaveChoice && witchSaveTarget ? (
-          <>
-            <button
-              type="button"
-              className="stage-confirm"
-              onClick={() => onConfirmTarget(witchSaveTarget.playerId)}
-              disabled={actionLoading}
-            >
-              {actionLoading ? "..." : t("stage.primary.witchSave")}
-            </button>
-            <button
-              type="button"
-              className="stage-skip"
-              onClick={onSkip}
-              disabled={actionLoading}
-            >
-              {t("stage.primary.witchPass")}
-            </button>
-          </>
-        ) : null}
-
-        {showSelect && !showWitchSaveChoice ? (
-          <select
-            className="target-select"
-            value=""
-            onChange={(event) => {
-              const value = event.target.value;
-              if (value) onTargetSelect(value);
-            }}
-          >
-            <option value="">{t("stage.selectPlayer")}</option>
-            {legalTargets.map((option) => (
-              <option key={option.playerId} value={option.playerId}>
-                {t("seat.numberLabel", { n: option.seatNo })} · {option.displayName}
-              </option>
-            ))}
-          </select>
-        ) : null}
-
-        {showConfirm && selectedTarget ? (
-          <div className="target-confirm">
-            <button
-              type="button"
-              className="target-confirm-avatar"
-              onClick={onClearTarget}
-              aria-label={t("confirm.cancel")}
-            >
-              {selectedTarget.seatNo}
-            </button>
-            <div className="target-confirm-name">
-              {t("seat.numberLabel", { n: selectedTarget.seatNo })}
+      {!headerVisible ? (
+        <>
+          {identity}
+          {copy ? <div className="phase-copy phase-action-copy">{copy}</div> : null}
+          {currentSpeakerSeatNo ? (
+            <div className="phase-copy phase-action-copy">
+              {t("stage.currentSpeaker", { seat: currentSpeakerSeatNo })}
             </div>
-            <div className="target-confirm-copy">
-              {t(CONFIRM_KEY[confirmMode], { n: selectedTarget.seatNo })}
-            </div>
-            <button
-              type="button"
-              className="stage-confirm"
-              onClick={() => onConfirmTarget()}
-              disabled={actionLoading}
-            >
-              {actionLoading ? "..." : t(PRIMARY_KEY[confirmMode])}
-            </button>
-          </div>
-        ) : null}
-
-        {showSpeechInput ? (
-          <VoicePanel
-            enabled={Boolean(showSpeechInput)}
-            textDraft={speechInput ?? ""}
-            onTextChange={(value) => onSpeechChange?.(value)}
-            onSubmitText={(text) => onSpeak(text)}
-            onSpeechComplete={() => (onSpeechComplete ? onSpeechComplete() : onSpeak())}
-            onSkip={onSkip}
-            actionLoading={Boolean(actionLoading)}
-            submitLabel={t("stage.submitSpeech")}
-            skipLabel={t("stage.skipButton")}
-            placeholder={t("stage.speakPlaceholder")}
-          />
-        ) : null}
-
-        {showPrimarySkip ? (
-          <>
-            <button type="button" className="stage-confirm" onClick={() => onSpeak()}>
-              {t("stage.speakButton")}
-            </button>
-            <button type="button" className="stage-skip" onClick={onSkip}>
-              {t("stage.skipButton")}
-            </button>
-          </>
-        ) : null}
-      </div>
-
-      {isCreator && canProgress ? (
-        <div className="target-row" style={{ marginTop: 4 }}>
-          <button type="button" className="stage-skip" onClick={onRunRuntime}>
-            {t("stage.runtimeButton")}
-          </button>
-        </div>
+          ) : null}
+        </>
       ) : null}
+
+      {actionControls}
     </article>
   );
 }

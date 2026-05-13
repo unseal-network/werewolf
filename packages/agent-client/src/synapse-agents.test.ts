@@ -33,4 +33,19 @@ describe("listRoomAgents", () => {
     );
     expect(result.agents[0]?.userId).toBe("@bot:test");
   });
+
+  it("includes the requested Synapse URL when fetch fails", async () => {
+    await expect(
+      listRoomAgents({
+        homeserverUrl: "http://localhost:8008",
+        roomId: "!room:test",
+        matrixToken: "token",
+        fetchImpl: vi.fn(async () => {
+          throw new Error("fetch failed");
+        }) as unknown as typeof fetch,
+      })
+    ).rejects.toThrow(
+      "Synapse room agents request failed: http://localhost:8008/chatbot/v1/rooms/!room%3Atest/agents?membership=join: fetch failed"
+    );
+  });
 });

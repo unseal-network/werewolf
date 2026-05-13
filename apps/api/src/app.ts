@@ -6,12 +6,14 @@ import { createLivekitRoutes } from "./routes/livekit";
 import { createWebhookRoutes } from "./routes/webhook";
 import { SseBroker } from "./services/sse-broker";
 import type { GameStore } from "./services/game-store";
+import type { MatrixProfileCache } from "./context/auth";
 
 export type AppDeps = GamesRouteDeps & {
   broker?: SseBroker;
   /** Optional DB-backed store so the SSE route can replay events even
    *  after a process restart (when the broker's in-memory history is empty). */
   store?: GameStore | null;
+  profileCache?: MatrixProfileCache | undefined;
 };
 
 export function createApp(deps: AppDeps): Hono {
@@ -31,6 +33,7 @@ export function createApp(deps: AppDeps): Hono {
       store: deps.store ?? null,
       games: deps.games,
       matrix: deps.matrix,
+      profileCache: deps.profileCache,
     })
   );
   app.route("/games", createLivekitRoutes(deps));

@@ -9,7 +9,7 @@ dist
 coverage
 .gstack/
 apps/web/public/verify-config.local.json
+apps/web/public/test-users.local.json
 tmp-screens/
 *.heapsnapshot
 livekit.yaml
-

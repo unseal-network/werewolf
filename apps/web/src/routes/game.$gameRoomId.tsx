@@ -7,6 +7,7 @@ import { RoleCardLayer } from "../components/RoleCardLayer";
 import { UserInfoPanel } from "../components/UserInfoPanel";
 import { StartDialog } from "../components/StartDialog";
 import { AgentPicker } from "../components/AgentPicker";
+import { SeerResultDialog } from "../components/SeerResultDialog";
 import { VoiceRoomProvider } from "../components/VoiceRoom";
 import type { AgentCandidate } from "../api/client";
 import { getPhaseAnimationCue } from "../animation/phaseCatalog";
@@ -14,11 +15,22 @@ import { useT } from "../i18n/I18nProvider";
 import type { SceneId } from "../components/GameRoomShell";
 import type { EngineGameState } from "../engine/GameEngine";
 import {
+  actorDayKey,
+  actorPhaseDayKey,
+  deriveTimelineDisplayState,
+  computeTimelineBaseSeq,
+  seerDayKey,
+  upsertRoomPlayers,
+} from "../game/timelineState";
+import { canUseActionPanel } from "../game/actionAvailability";
+import {
   DEMO_DISPLAY_NAME,
   DEMO_USER_ID,
-  MATRIX_USER_ID_STORAGE_KEY,
   matrixServerBaseFromToken,
+  readStoredMatrixDisplayName,
+  readStoredMatrixUserId,
   readMatrixToken,
+  writeMatrixIdentity,
 } from "../matrix/session";
 
 interface PhaseDressing {
@@ -48,7 +60,11 @@ const PHASE_DRESSING: Record<string, PhaseDressing> = {
 interface UserSeatState {
   seatNo: number;
   playerId: string | undefined;
+  userId: string | undefined;
+  agentId: string | undefined;
+  invitedByUserId: string | undefined;
   displayName: string | undefined;
+  avatarUrl: string | undefined;
   isEmpty: boolean;
   kind: RoomPlayer["kind"] | undefined;
   isDead: boolean;
@@ -117,6 +133,35 @@ function parseSseEvent(raw: string): GameEventDto | undefined {
     return undefined;
   }
   return undefined;
+}
+
+interface SubscribeSnapshot {
+  room: GameRoom;
+  projection: RoomProjection | null;
+  privateStates: PlayerPrivateState[];
+  events: GameEventDto[];
+}
+
+type SubscribeMessage =
+  | { kind: "snapshot"; snapshot: SubscribeSnapshot }
+  | { kind: "event"; event: GameEventDto };
+
+function parseSubscribeMessage(raw: string): SubscribeMessage | undefined {
+  if (!raw.trim()) return undefined;
+  try {
+    const candidate = JSON.parse(raw) as unknown;
+    if (!candidate || typeof candidate !== "object") return undefined;
+    if ("snapshot" in candidate) {
+      return {
+        kind: "snapshot",
+        snapshot: (candidate as { snapshot: SubscribeSnapshot }).snapshot,
+      };
+    }
+    const event = parseSseEvent(raw);
+    return event ? { kind: "event", event } : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -344,7 +389,11 @@ function buildSeatView(
       isWolfTeammate: false,
       visibleRole: undefined,
       playerId: undefined,
+      userId: undefined,
+      agentId: undefined,
+      invitedByUserId: undefined,
       displayName: undefined,
+      avatarUrl: undefined,
       kind: undefined,
     }));
   }
@@ -360,7 +409,11 @@ function buildSeatView(
     seats.push({
       seatNo,
       playerId,
+      userId: player?.userId,
+      agentId: player?.agentId,
+      invitedByUserId: player?.invitedByUserId,
       displayName: player?.displayName,
+      avatarUrl: player?.avatarUrl,
       kind: player?.kind,
       isEmpty: !player,
       isDead: isGameActive && player ? !alive.has(player.id) : false,
@@ -374,31 +427,6 @@ function buildSeatView(
   }
 
   return seats;
-}
-
-function parseTieCandidateIds(events: GameEventDto[]): string[] {
-  for (let index = events.length - 1; index >= 0; index -= 1) {
-    const event = events[index];
-    if (!event || event.type !== "phase_closed") continue;
-    const tiedPlayerIds = event.payload?.tiedPlayerIds;
-    if (Array.isArray(tiedPlayerIds)) {
-      return tiedPlayerIds.filter((value): value is string => typeof value === "string");
-    }
-  }
-  return [];
-}
-
-function parseSeerCheckedIds(events: GameEventDto[], seerId?: string): Set<string> {
-  const checked = new Set<string>();
-  for (const event of events) {
-    if (event.type !== "seer_result_revealed") continue;
-    if (seerId && event.actorId && event.actorId !== seerId) continue;
-    const inspectedPlayerId = event.payload?.inspectedPlayerId;
-    if (typeof inspectedPlayerId === "string") {
-      checked.add(inspectedPlayerId);
-    }
-  }
-  return checked;
 }
 
 function parseCurrentSpeakerSeat(
@@ -415,18 +443,23 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   const t = useT();
   const [matrixToken] = useState(() => readMatrixToken());
   const [matrixUserId, setMatrixUserId] = useState(
-    () => localStorage.getItem(MATRIX_USER_ID_STORAGE_KEY) ?? DEMO_USER_ID
+    () => readStoredMatrixUserId() ?? DEMO_USER_ID
   );
-  const [matrixDisplayName, setMatrixDisplayName] = useState(DEMO_DISPLAY_NAME);
-  const [room, setRoom] = useState<GameRoom | null>(null);
-  const [projection, setProjection] = useState<RoomProjection | null>(null);
+  const [matrixDisplayName, setMatrixDisplayName] = useState(
+    () => readStoredMatrixDisplayName() ?? DEMO_DISPLAY_NAME
+  );
+  const [roomSnapshot, setRoomSnapshot] = useState<GameRoom | null>(null);
+  const [projectionSnapshot, setProjectionSnapshot] =
+    useState<RoomProjection | null>(null);
   const [privateStates, setPrivateStates] = useState<PlayerPrivateState[]>([]);
-  const [events, setEvents] = useState<GameEventDto[]>([]);
+  const [timeline, setTimeline] = useState<GameEventDto[]>([]);
+  const [timelineBaseSeq, setTimelineBaseSeq] = useState(0);
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [runtimeInProgress, setRuntimeInProgress] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [showFillPrompt, setShowFillPrompt] = useState(false);
   const [showAgentPicker, setShowAgentPicker] = useState(false);
+  const [seerResultOpen, setSeerResultOpen] = useState(false);
   const [agentCandidates, setAgentCandidates] = useState<AgentCandidate[]>([]);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState<string | undefined>(undefined);
@@ -445,6 +478,21 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const sseReconnectTimerRef = useRef<number | null>(null);
   const autoTickPhaseRef = useRef<string>("");
+  const seerResultTimeoutRef = useRef<number | null>(null);
+  const lastShownSeerResultKeyRef = useRef<string | null>(null);
+  const timelineDisplayState = useMemo(
+    () =>
+      deriveTimelineDisplayState(
+        roomSnapshot,
+        projectionSnapshot,
+        timeline,
+        timelineBaseSeq
+      ),
+    [roomSnapshot, projectionSnapshot, timeline, timelineBaseSeq]
+  );
+  const room = timelineDisplayState.room;
+  const projection = timelineDisplayState.projection;
+  const events = timeline;
   const isDevMode = useMemo(
     () => new URLSearchParams(window.location.search).get("dev") === "1",
     []
@@ -465,7 +513,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       .whoAmI(matrixServerBaseFromToken(matrixToken))
       .then((whoami) => {
         if (cancelled || !whoami.user_id) return;
-        localStorage.setItem(MATRIX_USER_ID_STORAGE_KEY, whoami.user_id);
+        writeMatrixIdentity(
+          whoami.user_id,
+          whoami.display_name ?? whoami.user_id
+        );
         setMatrixUserId(whoami.user_id);
         setMatrixDisplayName(whoami.display_name ?? whoami.user_id);
       })
@@ -475,91 +526,35 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     };
   }, [client, matrixToken]);
 
-  const refreshGame = useCallback(async () => {
-    try {
-      const result = await client.getGame(gameRoomId);
-      setRoom(result.room);
-      setProjection(result.projection);
-      setPrivateStates(result.privateStates);
-      setEvents(result.events);
-      return result;
-    } catch (error) {
-      // Silently keep retrying; surface only meaningful changes via setErrorMessage when a user
-      // action triggers a request directly.
-      void error;
-      return null;
-    }
-  }, [client, gameRoomId]);
-
   const applyServerEvent = useCallback(
     (event: GameEventDto) => {
-      setEvents((current) => {
+      setTimeline((current) => {
         if (current.some((candidate) => candidate.id === event.id)) return current;
-        const next = [...current, event];
+        const sameSpeechStream = (candidate: GameEventDto) =>
+          candidate.type === "speech_transcript_delta" &&
+          candidate.actorId === event.actorId &&
+          candidate.payload.day === event.payload.day &&
+          candidate.payload.phase === event.payload.phase;
+        const next =
+          event.type === "speech_transcript_delta"
+            ? [...current.filter((candidate) => !sameSpeechStream(candidate)), event]
+            : event.type === "speech_submitted"
+              ? [
+                  ...current.filter(
+                    (candidate) =>
+                      !(
+                        candidate.type === "speech_transcript_delta" &&
+                        candidate.actorId === event.actorId &&
+                        candidate.payload.day === event.payload.day
+                      )
+                  ),
+                  event,
+                ]
+              : [...current, event];
         return next.length <= 260 ? next : next.slice(-260);
       });
-      setProjection((current) => {
-        if (!current) return current;
-        if (event.type === "phase_started") {
-          return {
-            ...current,
-            phase: String(event.payload.phase ?? current.phase),
-            day: Number(event.payload.day ?? current.day),
-            deadlineAt:
-              typeof event.payload.deadlineAt === "string"
-                ? event.payload.deadlineAt
-                : null,
-            currentSpeakerPlayerId: null,
-            version: event.seq,
-          };
-        }
-        if (event.type === "turn_started") {
-          return {
-            ...current,
-            phase: String(event.payload.phase ?? current.phase),
-            day: Number(event.payload.day ?? current.day),
-            deadlineAt:
-              typeof event.payload.deadlineAt === "string"
-                ? event.payload.deadlineAt
-                : current.deadlineAt,
-            currentSpeakerPlayerId:
-              typeof event.payload.currentSpeakerPlayerId === "string"
-                ? event.payload.currentSpeakerPlayerId
-                : event.subjectId ?? current.currentSpeakerPlayerId,
-            version: event.seq,
-          };
-        }
-        if (event.type === "player_eliminated") {
-          const playerId = String(event.payload.playerId ?? event.subjectId ?? "");
-          if (!playerId) return current;
-          return {
-            ...current,
-            alivePlayerIds: current.alivePlayerIds.filter((id) => id !== playerId),
-            version: event.seq,
-          };
-        }
-        if (event.type === "game_ended") {
-          return {
-            ...current,
-            status: "ended",
-            phase: "post_game",
-            winner:
-              event.payload.winner === "wolf" || event.payload.winner === "good"
-                ? event.payload.winner
-                : current.winner,
-            deadlineAt: null,
-            currentSpeakerPlayerId: null,
-            version: event.seq,
-          };
-        }
-        return current;
-      });
-
-      if (event.type === "game_ended") {
-        void refreshGame();
-      }
     },
-    [refreshGame]
+    []
   );
 
   const connectSSE = useCallback(() => {
@@ -571,12 +566,22 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
     }
+    // Page-scoped read model: /subscribe is the only game-room read source.
+    // Do not add GET /games/:id refresh calls or state-driven reconnects here.
     const source = new EventSource(client.subscribeUrl(gameRoomId));
     source.onmessage = (event) => {
-      const parsed = parseSseEvent(stripPayloadFromEvent(event.data));
+      const parsed = parseSubscribeMessage(stripPayloadFromEvent(event.data));
       if (!parsed) return;
-      if (sseEventVisibleToMe(parsed, myPrivateStateRef.current)) {
-        applyServerEvent(parsed);
+      if (parsed.kind === "snapshot") {
+        setRoomSnapshot(parsed.snapshot.room);
+        setProjectionSnapshot(parsed.snapshot.projection);
+        setPrivateStates(parsed.snapshot.privateStates);
+        setTimeline(parsed.snapshot.events);
+        setTimelineBaseSeq(computeTimelineBaseSeq(parsed.snapshot.events));
+        return;
+      }
+      if (sseEventVisibleToMe(parsed.event, myPrivateStateRef.current)) {
+        applyServerEvent(parsed.event);
       }
     };
     source.onerror = () => {
@@ -596,11 +601,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   useEffect(() => {
     let mounted = true;
-    void refreshGame().then(() => {
-      if (mounted) {
-        connectSSE();
-      }
-    });
+    if (mounted) connectSSE();
     return () => {
       mounted = false;
       if (eventSourceRef.current) {
@@ -610,28 +611,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         window.clearTimeout(sseReconnectTimerRef.current);
       }
     };
-  }, [refreshGame, connectSSE]);
-
-  useEffect(() => {
-    if (!room || !matrixUserId) return;
-    if (
-      projection?.status !== "waiting" &&
-      projection?.status !== "created" &&
-      projection !== null
-    ) {
-      return;
-    }
-    const alreadyIn = room.players.some(
-      (player) => player.userId === matrixUserId && !player.leftAt
-    );
-    if (alreadyIn) return;
-    const activeCount = room.players.filter((player) => !player.leftAt).length;
-    if (activeCount >= room.targetPlayerCount) return;
-    void client
-      .joinGame(gameRoomId)
-      .then(() => refreshGame())
-      .catch(() => {});
-  }, [room, matrixUserId, projection?.status, client, gameRoomId, refreshGame]);
+  }, [connectSSE]);
 
   // Seat layout grows from 6 (lobby default) up to the room's max as more
   // players join. Capped at targetPlayerCount (12) so we never show more
@@ -674,8 +654,12 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   // turn would cause VoiceRoomProvider to tear down and re-establish the
   // LiveKit connection. With the stable id, we fetch once per game session.
   const myPlayerId = myPlayer?.id;
+  const roomIdForVoice = room?.id;
+  const voiceIdentityMode = roomIdForVoice
+    ? `${roomIdForVoice}:${myPlayerId ?? "spectator"}`
+    : "";
   useEffect(() => {
-    if (!myPlayerId) {
+    if (!room || !matrixUserId) {
       setLivekitToken(null);
       setLivekitServerUrl(null);
       return;
@@ -697,7 +681,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [myPlayerId, client, gameRoomId]);
+  }, [voiceIdentityMode, matrixUserId, client, gameRoomId, roomIdForVoice]);
 
   // Drive a 1Hz tick so the countdown re-renders even when no SSE event
   // arrives. Only active when a deadline exists, to avoid useless renders
@@ -717,14 +701,9 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     const deadlineMs = new Date(projection.deadlineAt).getTime();
     if (!Number.isFinite(deadlineMs)) return;
     const delayMs = Math.max(0, deadlineMs - Date.now() + 750);
-    const id = window.setTimeout(() => {
-      if (!eventSourceRef.current) {
-        connectSSE();
-      }
-    }, delayMs);
+    const id = window.setTimeout(() => setNowTick((v) => v + 1), delayMs);
     return () => window.clearTimeout(id);
   }, [
-    connectSSE,
     projection?.deadlineAt,
     projection?.phase,
     projection?.status,
@@ -736,10 +715,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     return { ...spec, label };
   }, [projection?.phase, projection?.day, t]);
 
-  const tieCandidates = useMemo(() => parseTieCandidateIds(events), [events]);
+  const tieCandidates = timelineDisplayState.facts.tieCandidateIds;
   const seerChecked = useMemo(
-    () => parseSeerCheckedIds(events, myPlayer?.id),
-    [events, myPlayer?.id]
+    () =>
+      myPlayer?.id
+        ? (timelineDisplayState.facts.seerCheckedTargetIdsBySeerId.get(
+            myPlayer.id
+          ) ?? new Set<string>())
+        : new Set<string>(),
+    [myPlayer?.id, timelineDisplayState.facts]
   );
   const currentSpeakerSeatNo = useMemo(
     () => parseCurrentSpeakerSeat(room?.players ?? [], projection),
@@ -754,16 +738,16 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     if (projection?.phase !== "night_witch_heal" || myPrivateState?.role !== "witch") {
       return null;
     }
-    const wolfKill = [...events]
-      .reverse()
-      .find(
-        (event) =>
-          event.type === "witch_kill_revealed" &&
-          Number(event.payload?.day) === projection.day
-      );
-    const targetId = String(wolfKill?.payload?.targetPlayerId ?? "");
-    return targetId || null;
-  }, [events, myPrivateState?.role, projection?.day, projection?.phase]);
+    return (
+      timelineDisplayState.facts.witchKillTargetIdByDay.get(projection.day) ??
+      null
+    );
+  }, [
+    myPrivateState?.role,
+    projection?.day,
+    projection?.phase,
+    timelineDisplayState.facts,
+  ]);
 
   const legalTargetIds = useMemo(() => {
     const alive = new Set(projection?.alivePlayerIds ?? []);
@@ -788,7 +772,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
     if (projection?.phase === "night_guard" && myPrivateState?.role === "guard") {
       for (const player of room.players) {
-        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
+        if (!player.leftAt && alive.has(player.id)) {
           out.add(player.id);
         }
       }
@@ -796,7 +780,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     }
     if (projection?.phase === "night_wolf" && myPrivateState?.role === "werewolf") {
       for (const player of room.players) {
-        if (!player.leftAt && alive.has(player.id) && player.id !== myPlayer.id) {
+        if (!player.leftAt && alive.has(player.id)) {
           out.add(player.id);
         }
       }
@@ -827,7 +811,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       return out;
     }
     return out;
-  }, [myPlayer, myIsAlive, room, projection, seerChecked, myPrivateState]);
+  }, [
+    myPlayer,
+    myIsAlive,
+    room,
+    projection,
+    seerChecked,
+    myPrivateState,
+    tieCandidates,
+  ]);
 
   const centerActionTargetIds = useMemo(() => {
     const out = new Set(legalTargetIds);
@@ -892,6 +884,20 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     () => seatView.find((seat) => seat.seatNo === viewingSeatNo) ?? null,
     [seatView, viewingSeatNo]
   );
+  const canRemoveViewingSeat = useMemo(() => {
+    if (!viewingSeat || viewingSeat.isEmpty || !room || !matrixUserId) return false;
+    const isLobby =
+      (room.status === "waiting" || room.status === "created") &&
+      (projection === null ||
+        projection.status === "waiting" ||
+        projection.status === "created");
+    if (!isLobby) return false;
+    if (isCreator) return true;
+    return (
+      viewingSeat.kind === "agent" &&
+      viewingSeat.invitedByUserId === matrixUserId
+    );
+  }, [isCreator, matrixUserId, projection, room, viewingSeat]);
 
   const hasEnoughPlayers = activeSeatCount >= 6;
 
@@ -903,9 +909,13 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         .map((player) => ({
           seatNo: player.seatNo,
           playerId: player.id,
+          userId: player.userId,
+          agentId: player.agentId,
           displayName: player.displayName,
+          avatarUrl: player.avatarUrl,
+          visibleRole: visibleRolesByPlayerId.get(player.id),
         })),
-    [centerActionTargetIds, room?.players]
+    [centerActionTargetIds, room?.players, visibleRolesByPlayerId]
   );
 
   const actionCanRun = isCreator && uiProjection.canProgress;
@@ -963,11 +973,8 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       return projection.currentSpeakerPlayerId !== myPlayer.id;
     }
     if (phase === "day_vote" || phase === "tie_vote") {
-      return events.some(
-        (e) =>
-          e.type === "vote_submitted" &&
-          e.actorId === myPlayer.id &&
-          Number(e.payload?.day) === day
+      return timelineDisplayState.facts.voteSubmittedByActorDay.has(
+        actorDayKey(myPlayer.id, day)
       );
     }
     const nightPhases = [
@@ -978,96 +985,88 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       "night_seer",
     ];
     if (nightPhases.includes(phase)) {
-      return events.some(
-        (e) =>
-          e.type === "night_action_submitted" &&
-          e.actorId === myPlayer.id &&
-          String(e.payload?.phase) === phase &&
-          Number(e.payload?.day) === day
+      return timelineDisplayState.facts.nightActionSubmittedByActorPhaseDay.has(
+        actorPhaseDayKey(myPlayer.id, phase, day)
       );
     }
     return false;
-  }, [events, myPlayer, projection]);
+  }, [myPlayer, projection, timelineDisplayState.facts]);
 
   const canCurrentUserAct = useMemo(() => {
-    if (!myPlayer) return false;
-    if (!myIsAlive) return false;
-    if (uiProjection.actionMode === "lobby" || uiProjection.actionMode === "deal" || uiProjection.actionMode === "end" || uiProjection.actionMode === "waiting") {
-      return false;
-    }
-    if (hasActedThisPhase) return false;
-    if (centerActionTargetIds.size > 0) return true;
-    if (isMyTurnToSpeak) return true;
-    return false;
-  }, [myPlayer, myIsAlive, uiProjection.actionMode, centerActionTargetIds.size, isMyTurnToSpeak, hasActedThisPhase]);
+    return canUseActionPanel({
+      hasPlayer: Boolean(myPlayer),
+      isAlive: myIsAlive,
+      actionMode: uiProjection.actionMode,
+      hasActedThisPhase,
+      hasActionTargets: centerActionTargetIds.size > 0,
+      isMyTurnToSpeak,
+      phase: projection?.phase,
+      role: myPrivateState?.role,
+    });
+  }, [
+    myPlayer,
+    myIsAlive,
+    uiProjection.actionMode,
+    hasActedThisPhase,
+    centerActionTargetIds.size,
+    isMyTurnToSpeak,
+    projection?.phase,
+    myPrivateState?.role,
+  ]);
 
   const privateResultCopy = useMemo(() => {
     if (!myPlayer || !myPrivateState || !projection) return "";
     const phase = projection.phase ?? "";
     const currentDay = projection.day;
 
-    const currentDayEvents = events.filter((e) => Number(e.payload?.day) === currentDay);
-
-    // Find the most recent seer_result_revealed for this player
-    if (phase === "night_seer" && myPrivateState.role === "seer") {
-      const seerResult = [...currentDayEvents].reverse().find(
-        (e) => e.type === "seer_result_revealed" && e.payload?.seerPlayerId === myPlayer.id
+    // Find the most recent seer_result_revealed for this player. Keep this
+    // visible for the rest of the day because the server may auto-advance
+    // immediately after the inspect action lands.
+    if (myPrivateState.role === "seer") {
+      const seerResult = timelineDisplayState.facts.latestSeerResultBySeerDay.get(
+        seerDayKey(myPlayer.id, currentDay)
       );
       if (!seerResult) return "";
-      const inspectedId = String(seerResult.payload?.inspectedPlayerId ?? "");
-      const inspectedSeat = room?.players.find((p) => p.id === inspectedId)?.seatNo ?? 0;
-      const alignment = String(seerResult.payload?.alignment ?? "good");
+      const inspectedSeat =
+        room?.players.find((p) => p.id === seerResult.inspectedPlayerId)
+          ?.seatNo ?? 0;
       return t("stage.privateResult.seer", {
         seat: inspectedSeat,
-        alignment: t(`alignment.${alignment}`),
+        alignment: t(`alignment.${seerResult.alignment}`),
       });
     }
 
     // Find witch_kill_revealed for witch
     if (phase === "night_witch_heal" && myPrivateState.role === "witch") {
-      const witchKill = [...currentDayEvents].reverse().find(
-        (e) => e.type === "witch_kill_revealed"
+      const targetId = timelineDisplayState.facts.witchKillTargetIdByDay.get(
+        currentDay
       );
-      if (witchKill) {
-        const targetId = String(witchKill.payload?.targetPlayerId ?? "");
+      if (targetId) {
         const targetSeat = room?.players.find((p) => p.id === targetId)?.seatNo ?? 0;
         return t("stage.privateResult.witch", { seat: targetSeat });
       }
+      return t("stage.privateResult.witchNone");
     }
 
     // Find guardProtect from night_action_submitted (now private:user)
     if (phase === "night_guard" && myPrivateState.role === "guard") {
-      const guardAction = [...currentDayEvents].reverse().find(
-        (e) => e.type === "night_action_submitted" && e.actorId === myPlayer.id
+      const targetId = timelineDisplayState.facts.guardProtectTargetIdByActorDay.get(
+        actorDayKey(myPlayer.id, currentDay)
       );
-      if (guardAction) {
-        const targetId = String((guardAction.payload?.action as Record<string, unknown>)?.targetPlayerId ?? "");
+      if (targetId) {
         const targetSeat = room?.players.find((p) => p.id === targetId)?.seatNo ?? 0;
         return t("stage.privateResult.guard", { seat: targetSeat });
       }
     }
 
     return "";
-  }, [events, myPlayer, myPrivateState, projection, room?.players, t]);
+  }, [myPlayer, myPrivateState, projection, room?.players, t, timelineDisplayState.facts]);
 
-  async function joinGame() {
+  async function joinGame(seatNo?: number) {
     setErrorMessage("");
     try {
-      const joined = await client.joinGame(gameRoomId);
-      setRoom((current) => {
-        if (!current) return current;
-        const players = current.players.filter(
-          (player) => !(player.userId === joined.player.userId && player.leftAt)
-        );
-        const next = players.find((player) => player.id === joined.player.id);
-        if (next) {
-          next.leftAt = null;
-          next.onlineState = "online";
-          return { ...current, players: [...players] };
-        }
-        return { ...current, players: [...players, joined.player] };
-      });
-      await refreshGame();
+      const joined = await client.joinGame(gameRoomId, seatNo);
+      setRoomSnapshot((current) => upsertRoomPlayers(current, [joined.player]));
       return joined;
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
@@ -1078,9 +1077,21 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   async function leaveCurrentSeat() {
     if (!myPlayer) return;
     try {
-      await client.leaveGame(gameRoomId);
+      const left = await client.leaveGame(gameRoomId);
+      setRoomSnapshot((current) => upsertRoomPlayers(current, [left.player]));
       setSelectedTargetId(null);
-      await refreshGame();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  async function removeViewingSeat() {
+    if (!viewingSeat?.playerId) return;
+    setErrorMessage("");
+    try {
+      const removed = await client.removePlayer(gameRoomId, viewingSeat.playerId);
+      setRoomSnapshot((current) => upsertRoomPlayers(current, [removed.player]));
+      setViewingSeatNo(null);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     }
@@ -1097,8 +1108,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     if (!canSwapSeats) return;
     setErrorMessage("");
     try {
-      await client.swapSeat(gameRoomId, seatNo);
-      await refreshGame();
+      const result = await client.swapSeat(gameRoomId, seatNo);
+      setRoomSnapshot((current) =>
+        upsertRoomPlayers(
+          current,
+          [result.player, result.swappedWith].filter(
+            (player): player is RoomPlayer => Boolean(player)
+          )
+        )
+      );
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error));
     }
@@ -1108,15 +1126,24 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     setErrorMessage("");
     try {
       const started = await client.startGame(gameRoomId);
-      setProjection(started.projection);
+      setProjectionSnapshot(started.projection);
       setPrivateStates(started.privateStates);
-      setEvents((current) => {
+      setTimeline((current) => {
         const byId = new Map(current.map((event) => [event.id, event]));
         for (const event of started.events) {
           byId.set(event.id, event);
         }
         return Array.from(byId.values()).slice(-260);
       });
+      setTimelineBaseSeq((current) =>
+        Math.max(
+          current,
+          started.events.reduce(
+            (maxSeq, event) => Math.max(maxSeq, event.seq),
+            started.projection.version
+          )
+        )
+      );
       setShowFillPrompt(false);
       setShowAgentPicker(false);
       return started;
@@ -1142,8 +1169,13 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   async function addAgentToSeat(agent: AgentCandidate) {
     try {
-      await client.addAgentPlayer(gameRoomId, agent.userId, agent.displayName);
-      await refreshGame();
+      const added = await client.addAgentPlayer(
+        gameRoomId,
+        agent.userId,
+        agent.displayName,
+        agent.avatarUrl
+      );
+      setRoomSnapshot((current) => upsertRoomPlayers(current, [added.player]));
       await refreshAgentCandidates();
     } catch (error) {
       setAgentError(error instanceof Error ? error.message : String(error));
@@ -1192,13 +1224,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     if (seat.isEmpty) {
       if (!isLobby) return;
       if (!myPlayer) {
-        // First click — auto-join as the user. Server picks seat number,
-        // then a follow-up swapSeat could move them to the clicked spot.
-        void joinGame().then((joined) => {
-          if (joined && joined.player.seatNo !== seatNo) {
-            void swapToSeat(seatNo);
-          }
-        });
+        void joinGame(seatNo);
         setViewingSeatNo(null);
       } else {
         // Already in the room — request to move into that empty seat.
@@ -1215,14 +1241,6 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       return;
     }
 
-    // Lobby: clicking an occupied agent seat swaps identities. Human seats
-    // open the profile only; the server enforces the same rule.
-    if (isLobby && myPlayer && !seat.isCurrentUser && seat.kind === "agent") {
-      void swapToSeat(seatNo);
-      setViewingSeatNo(null);
-      return;
-    }
-
     setViewingSeatNo(seatNo);
   }
 
@@ -1235,6 +1253,20 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     setSelectedTargetId(null);
   }
 
+  function actionExpectation() {
+    const expectation: {
+      expectedPhase?: string | null;
+      expectedDay?: number;
+      expectedVersion?: number;
+    } = {};
+    if (projection?.phase !== undefined) expectation.expectedPhase = projection.phase;
+    if (projection?.day !== undefined) expectation.expectedDay = projection.day;
+    if (projection?.version !== undefined) {
+      expectation.expectedVersion = projection.version;
+    }
+    return expectation;
+  }
+
   async function onConfirmTarget(explicitTargetId?: string) {
     const targetPlayerId = explicitTargetId ?? selectedTargetId;
     if (!targetPlayerId || !myPlayer) return;
@@ -1244,7 +1276,11 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       const phase = projection?.phase;
       const kind: "nightAction" | "vote" =
         phase === "day_vote" || phase === "tie_vote" ? "vote" : "nightAction";
-      const result = await client.submitAction(gameRoomId, { kind, targetPlayerId });
+      const result = await client.submitAction(gameRoomId, {
+        kind,
+        targetPlayerId,
+        ...actionExpectation(),
+      });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
         applyServerEvent(result.event);
       }
@@ -1264,12 +1300,19 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     try {
       const text = (speech ?? speechDraft).trim();
       if (!text) {
-        const result = await client.submitAction(gameRoomId, { kind: "pass" });
+        const result = await client.submitAction(gameRoomId, {
+          kind: "pass",
+          ...actionExpectation(),
+        });
         if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
           applyServerEvent(result.event);
         }
       } else {
-        const result = await client.submitAction(gameRoomId, { kind: "speech", speech: text });
+        const result = await client.submitAction(gameRoomId, {
+          kind: "speech",
+          speech: text,
+          ...actionExpectation(),
+        });
         if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
           applyServerEvent(result.event);
         }
@@ -1284,11 +1327,14 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   }
 
   async function onSkip() {
-    if (!myPlayer) return;
+    if (!myPlayer || !canCurrentUserAct) return;
     setErrorMessage("");
     setActionLoading(true);
     try {
-      const result = await client.submitAction(gameRoomId, { kind: "pass" });
+      const result = await client.submitAction(gameRoomId, {
+        kind: "pass",
+        ...actionExpectation(),
+      });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
         applyServerEvent(result.event);
       }
@@ -1307,7 +1353,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     setErrorMessage("");
     setActionLoading(true);
     try {
-      const result = await client.submitAction(gameRoomId, { kind: "speechComplete" });
+      const result = await client.submitAction(gameRoomId, {
+        kind: "speechComplete",
+        ...actionExpectation(),
+      });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
         applyServerEvent(result.event);
       }
@@ -1415,8 +1464,8 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         playerCount={activeSeatCount}
         targetPlayerCount={targetCount}
         phaseLabel={uiProjection.label}
-        rawPhase={projection?.phase ?? null}
         day={projection?.day}
+        rawPhase={projection?.phase ?? null}
         deadlineAt={projection?.deadlineAt}
         aliveCount={projection?.alivePlayerIds.length ?? activeSeatCount}
         scene={dressing.scene}
@@ -1485,7 +1534,12 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         }
         overlays={
           <>
-            <UserInfoPanel seat={viewingSeat} onClose={() => setViewingSeatNo(null)} />
+            <UserInfoPanel
+              seat={viewingSeat}
+              canRemove={canRemoveViewingSeat}
+              onRemove={removeViewingSeat}
+              onClose={() => setViewingSeatNo(null)}
+            />
             <StartDialog
               open={showFillPrompt}
               filled={activeSeatCount}

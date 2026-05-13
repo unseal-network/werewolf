@@ -14,7 +14,6 @@ async function createGame(app: ReturnType<typeof createApp>) {
       title: "Lifecycle",
       targetPlayerCount: 6,
       timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      allowedSourceMatrixRoomIds: [],
     }),
   });
   return (await response.json()).gameRoomId as string;

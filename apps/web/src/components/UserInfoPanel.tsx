@@ -3,10 +3,17 @@ import { useT } from "../i18n/I18nProvider";
 
 interface UserInfoPanelProps {
   seat: SeatData | null;
+  canRemove?: boolean;
+  onRemove?: () => void;
   onClose: () => void;
 }
 
-export function UserInfoPanel({ seat, onClose }: UserInfoPanelProps) {
+export function UserInfoPanel({
+  seat,
+  canRemove = false,
+  onRemove,
+  onClose,
+}: UserInfoPanelProps) {
   const t = useT();
   const open = Boolean(seat);
   const fallbackName = t("seat.fallbackName", { n: seat?.seatNo ?? 0 });
@@ -39,7 +46,13 @@ export function UserInfoPanel({ seat, onClose }: UserInfoPanelProps) {
           <>
             <div className="profile-head">
               <div className="profile-avatar">
-                {seat.isEmpty ? "+" : seat.seatNo}
+                {seat.avatarUrl && !seat.isEmpty ? (
+                  <img src={seat.avatarUrl} alt="" draggable={false} />
+                ) : seat.isEmpty ? (
+                  "+"
+                ) : (
+                  seat.seatNo
+                )}
               </div>
               <div>
                 <div className="profile-name">{title}</div>
@@ -74,6 +87,15 @@ export function UserInfoPanel({ seat, onClose }: UserInfoPanelProps) {
                 <span>{kind}</span>
               </div>
             </div>
+            {canRemove && !seat.isEmpty ? (
+              <button
+                type="button"
+                className="stage-skip profile-remove"
+                onClick={onRemove}
+              >
+                {t("user.removeFromSeat")}
+              </button>
+            ) : null}
           </>
         ) : null}
       </section>

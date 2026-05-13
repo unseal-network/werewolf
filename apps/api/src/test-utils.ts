@@ -20,6 +20,13 @@ export function createTestDeps() {
         }
         throw new Error("invalid token");
       },
+      async profile(userId: string) {
+        const localpart = userId.split(":")[0]?.replace(/^@/, "") || userId;
+        return {
+          displayname: localpart.charAt(0).toUpperCase() + localpart.slice(1),
+          avatarUrl: `https://example.com/${encodeURIComponent(localpart)}.png`,
+        };
+      },
     },
   };
 }

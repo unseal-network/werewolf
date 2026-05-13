@@ -17,7 +17,6 @@ describe("werewolf vertical smoke", () => {
         title: "Smoke Game",
         targetPlayerCount: 6,
         timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-        allowedSourceMatrixRoomIds: [],
       }),
     });
     expect(create.status).toBe(201);

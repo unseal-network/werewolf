@@ -18,6 +18,21 @@ describe("werewolf runtime night flow", () => {
       gameRoomId: "game_1",
       day: 1,
       alivePlayerIds: ["wolf", "guard", "witch", "seer", "villager", "v2"],
+      privateStates: [
+        { playerId: "wolf", role: "werewolf", team: "wolf", alive: true, knownTeammatePlayerIds: [] },
+        { playerId: "guard", role: "guard", team: "good", alive: true, knownTeammatePlayerIds: [] },
+        {
+          playerId: "witch",
+          role: "witch",
+          team: "good",
+          alive: true,
+          knownTeammatePlayerIds: [],
+          witchItems: { healAvailable: true, poisonAvailable: true },
+        },
+        { playerId: "seer", role: "seer", team: "good", alive: true, knownTeammatePlayerIds: [] },
+        { playerId: "villager", role: "villager", team: "good", alive: true, knownTeammatePlayerIds: [] },
+        { playerId: "v2", role: "villager", team: "good", alive: true, knownTeammatePlayerIds: [] },
+      ],
       actions: [
         { actorPlayerId: "guard", kind: "guardProtect", targetPlayerId: "seer" },
         { actorPlayerId: "wolf", kind: "wolfKill", targetPlayerId: "villager" },

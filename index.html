@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>狼人杀 - 沉浸式推理游戏</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0c0f1a;
+            --bg-panel: #141824;
+            --bg-card: #1a1f2e;
+            --bg-card-hover: #222838;
+            --accent-gold: #c9a84c;
+            --accent-gold-light: #e8d5a3;
+            --accent-red: #e74c3c;
+            --accent-blue: #3498db;
+            --accent-green: #2ecc71;
+            --accent-purple: #9b59b6;
+            --accent-orange: #e67e22;
+            --text-primary: #e8e8e8;
+            --text-secondary: #7a8199;
+            --border-color: #2a3045;
+            --border-gold: rgba(201, 168, 76, 0.3);
+        }
+
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== 星空背景 ===== */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 3s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 1; }
+        }
+
+        /* ===== 顶部状态栏 ===== */
+        .top-bar {
+            position: relative;
+            z-index: 10;
+            background: linear-gradient(180deg, rgba(12,15,26,0.95) 0%, rgba(12,15,26,0.8) 100%);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-gold);
+            padding: 12px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .game-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 200px;
+        }
+
+        .game-title h1 {
+            font-size: 1.6em;
+            color: var(--accent-gold);
+            text-shadow: 0 0 20px rgba(201, 168, 76, 0.4);
+            letter-spacing: 4px;
+        }
+
+        .game-title .wolf-icon {
+            font-size: 2em;
+            animation: wolfBreath 3s ease infinite;
+        }
+
+        @keyframes wolfBreath {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.1); filter: brightness(1.3); }
+        }
+
+        /* 阶段指示器 - 中央 */
+        .phase-center {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .phase-badge {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 30px;
+            background: rgba(201, 168, 76, 0.1);
+            border: 1px solid var(--border-gold);
+            border-radius: 30px;
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--accent-gold);
+            letter-spacing: 2px;
+            animation: phasePulse 2s infinite;
+        }
+
+        @keyframes phasePulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(201, 168, 76, 0.2); }
+            50% { box-shadow: 0 0 20px rgba(201, 168, 76, 0.5); }
+        }
+
+        .phase-sub {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+        }
+
+        /* 右侧状态信息 */
+        .status-right {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            min-width: 280px;
+            justify-content: flex-end;
+        }
+
+        .status-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .status-label {
+            font-size: 0.7em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .timer-display {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: var(--accent-red);
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+        }
+
+        /* ===== 主游戏区 - 三栏布局 ===== */
+        .game-layout {
+            position: relative;
+            z-index: 5;
+            display: grid;
+            grid-template-columns: 280px 1fr 280px;
+            gap: 0;
+            min-height: calc(100vh - 70px);
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* ===== 侧边玩家栏 ===== */
+        .side-panel {
+            padding: 20px 15px;
+            overflow-y: auto;
+            max-height: calc(100vh - 70px);
+        }
+
+        .side-panel.left {
+            border-right: 1px solid var(--border-color);
+        }
+
+        .side-panel.right {
+            border-left: 1px solid var(--border-color);
+        }
+
+        .side-title {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 15px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .player-slot {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .player-slot:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-gold);
+            transform: translateX(3px);
+        }
+
+        .side-panel.left .player-slot:hover {
+            transform: translateX(3px);
+        }
+
+        .side-panel.right .player-slot:hover {
+            transform: translateX(-3px);
+        }
+
+        .player-slot.selected {
+            border-color: var(--accent-gold);
+            background: rgba(201, 168, 76, 0.1);
+            box-shadow: 0 0 15px rgba(201, 168, 76, 0.2);
+        }
+
+        .player-slot.dead {
+            opacity: 0.4;
+            filter: grayscale(100%);
+        }
+
+        .player-slot.dead::after {
+            content: '☠️';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2em;
+            z-index: 10;
+        }
+
+        .player-avatar-small {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6em;
+            border: 3px solid var(--border-color);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .player-avatar-small .number-badge {
+            position: absolute;
+            bottom: -4px;
+            right: -4px;
+            width: 20px;
+            height: 20px;
+            background: var(--accent-gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7em;
+            font-weight: bold;
+            color: var(--bg-dark);
+            border: 2px solid var(--bg-card);
+        }
+
+        .player-info-small {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .player-name-small {
+            font-weight: bold;
+            font-size: 0.95em;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .player-role-small {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+        }
+
+        .player-tags {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 6px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+        }
+
+        .tag.sheriff {
+            background: rgba(241, 196, 15, 0.15);
+            color: #f1c40f;
+            border-color: #f1c40f;
+        }
+
+        .tag.dying {
+            background: rgba(231, 76, 60, 0.15);
+            color: var(--accent-red);
+            border-color: var(--accent-red);
+            animation: tagBlink 1s infinite;
+        }
+
+        @keyframes tagBlink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        /* 角色颜色 */
+        .werewolf .player-avatar-small {
+            background: linear-gradient(135deg, #8b0000, #c0392b);
+            border-color: var(--accent-red);
+            box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+        }
+
+        .seer .player-avatar-small {
+            background: linear-gradient(135deg, #1a5276, #3498db);
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 10px rgba(52, 152, 219, 0.3);
+        }
+
+        .witch .player-avatar-small {
+            background: linear-gradient(135deg, #6c3483, #9b59b6);
+            border-color: var(--accent-purple);
+            box-shadow: 0 0 10px rgba(155, 89, 182, 0.3);
+        }
+
+        .hunter .player-avatar-small {
+            background: linear-gradient(135deg, #a04000, #e67e22);
+            border-color: var(--accent-orange);
+            box-shadow: 0 0 10px rgba(230, 126, 34, 0.3);
+        }
+
+        .villager .player-avatar-small {
+            background: linear-gradient(135deg, #1e8449, #2ecc71);
+            border-color: var(--accent-green);
+            box-shadow: 0 0 10px rgba(46, 204, 113, 0.3);
+        }
+
+        /* ===== 中央舞台 ===== */
+        .center-stage {
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        /* 舞台主区域 */
+        .stage-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 300px;
+            background: radial-gradient(ellipse at center, rgba(201, 168, 76, 0.05) 0%, transparent 70%);
+            border-radius: 20px;
+            border: 1px solid var(--border-gold);
+            position: relative;
+            padding: 30px;
+        }
+
+        .stage-main::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-gold), transparent);
+        }
+
+        .stage-title {
+            font-size: 1.3em;
+            color: var(--accent-gold);
+            margin-bottom: 8px;
+            letter-spacing: 3px;
+        }
+
+        .stage-desc {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 400px;
+            line-height: 1.6;
+        }
+
+        /* 选中目标展示 */
+        .target-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            min-height: 120px;
+        }
+
+        .target-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 3.5em;
+            border: 4px solid var(--accent-gold);
+            box-shadow: 0 0 30px rgba(201, 168, 76, 0.3);
+            background: var(--bg-card);
+            animation: targetFloat 3s ease infinite;
+        }
+
+        @keyframes targetFloat {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .target-info {
+            text-align: center;
+        }
+
+        .target-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: var(--accent-gold-light);
+            margin-bottom: 4px;
+        }
+
+        .target-role {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        /* 操作按钮区 */
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .action-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 20px 15px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--text-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: var(--accent-gold);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+
+        .action-btn:hover::before {
+            transform: scaleX(1);
+        }
+
+        .action-btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--border-gold);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn:active {
+            transform: translateY(-1px);
+        }
+
+        .action-btn .btn-icon {
+            font-size: 2.2em;
+            transition: transform 0.3s;
+        }
+
+        .action-btn:hover .btn-icon {
+            transform: scale(1.2);
+        }
+
+        .action-btn .btn-label {
+            font-weight: bold;
+            font-size: 0.95em;
+        }
+
+        .action-btn .btn-desc {
+            font-size: 0.75em;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .action-btn.primary {
+            border-color: var(--accent-gold);
+            background: rgba(201, 168, 76, 0.05);
+        }
+
+        .action-btn.danger {
+            border-color: var(--accent-red);
+            background: rgba(231, 76, 60, 0.05);
+        }
+
+        .action-btn.danger:hover {
+            box-shadow: 0 10px 30px rgba(231, 76, 60, 0.2);
+        }
+
+        .action-btn.info {
+            border-color: var(--accent-blue);
+            background: rgba(52, 152, 219, 0.05);
+        }
+
+        .action-btn.info:hover {
+            box-shadow: 0 10px 30px rgba(52, 152, 219, 0.2);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .action-btn:disabled:hover::before {
+            transform: scaleX(0);
+        }
+
+        /* 阶段切换按钮 */
+        .phase-switch {
+            margin-top: 20px;
+            padding: 12px 40px;
+            background: linear-gradient(135deg, var(--accent-gold), #b8953f);
+            border: none;
+            border-radius: 30px;
+            color: var(--bg-dark);
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 20px rgba(201, 168, 76, 0.3);
+        }
+
+        .phase-switch:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(201, 168, 76, 0.5);
+        }
+
+        /* 日志面板 */
+        .log-section {
+            background: var(--bg-panel);
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .log-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .log-header-title {
+            font-size: 0.95em;
+            color: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-count {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            background: var(--bg-card);
+            padding: 2px 10px;
+            border-radius: 10px;
+        }
+
+        .log-content {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 10px 15px;
+        }
+
+        .log-entry {
+            display: flex;
+            gap: 10px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(42, 48, 69, 0.5);
+            font-size: 0.88em;
+            line-height: 1.5;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: var(--text-secondary);
+            font-size: 0.8em;
+            white-space: nowrap;
+            min-width: 45px;
+        }
+
+        .log-text {
+            color: var(--text-primary);
+        }
+
+        .log-text.system { color: var(--accent-gold); }
+        .log-text.death { color: var(--accent-red); }
+        .log-text.vote { color: var(--accent-blue); }
+        .log-text.skill { color: var(--accent-purple); }
+
+        /* ===== 设置面板 ===== */
+        .setup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(12, 15, 26, 0.95);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .setup-panel {
+            background: var(--bg-panel);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 600px;
+            width: 90%;
+            border: 1px solid var(--border-gold);
+            box-shadow: 0 0 60px rgba(201, 168, 76, 0.1);
+        }
+
+        .setup-title {
+            text-align: center;
+            font-size: 1.8em;
+            color: var(--accent-gold);
+            margin-bottom: 30px;
+            letter-spacing: 4px;
+        }
+
+        .setup-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .setup-field {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .setup-field label {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .setup-field input,
+        .setup-field select {
+            padding: 12px 15px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1em;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        .setup-field input:focus,
+        .setup-field select:focus {
+            border-color: var(--accent-gold);
+        }
+
+        .role-config-list {
+            margin-bottom: 25px;
+        }
+
+        .role-config-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--bg-card);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            border-left: 3px solid transparent;
+        }
+
+        .role-config-item.werewolf { border-left-color: var(--accent-red); }
+        .role-config-item.seer { border-left-color: var(--accent-blue); }
+        .role-config-item.witch { border-left-color: var(--accent-purple); }
+        .role-config-item.hunter { border-left-color: var(--accent-orange); }
+        .role-config-item.villager { border-left-color: var(--accent-green); }
+
+        .role-config-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .role-config-icon {
+            font-size: 1.8em;
+        }
+
+        .role-config-name {
+            font-weight: bold;
+        }
+
+        .role-config-desc {
+            font-size: 0.75em;
+            color: var(--text-secondary);
+        }
+
+        .counter {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .counter button {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 1px solid var(--border-color);
+            background: var(--bg-panel);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .counter button:hover {
+            background: var(--accent-gold);
+            color: var(--bg-dark);
+            border-color: var(--accent-gold);
+        }
+
+        .counter span {
+            min-width: 30px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+
+        .setup-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .btn-start {
+            padding: 14px 50px;
+            background: linear-gradient(135deg, var(--accent-gold), #b8953f);
+            border: none;
+            border-radius: 30px;
+            color: var(--bg-dark);
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 20px rgba(201, 168, 76, 0.3);
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(201, 168, 76, 0.5);
+        }
+
+        /* ===== 弹窗 ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 500;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-panel);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 450px;
+            width: 90%;
+            border: 1px solid var(--border-gold);
+            box-shadow: 0 0 40px rgba(201, 168, 76, 0.15);
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5em;
+            border: 3px solid var(--accent-gold);
+            background: var(--bg-card);
+        }
+
+        .modal-title {
+            font-size: 1.3em;
+            color: var(--accent-gold);
+            margin-bottom: 4px;
+        }
+
+        .modal-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .skill-box {
+            background: var(--bg-card);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            border-left: 3px solid var(--accent-gold);
+        }
+
+        .skill-box h4 {
+            color: var(--accent-gold);
+            margin-bottom: 8px;
+            font-size: 0.95em;
+        }
+
+        .skill-box p {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .modal-btn {
+            padding: 10px 25px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .modal-btn.primary {
+            background: var(--accent-gold);
+            color: var(--bg-dark);
+        }
+
+        .modal-btn.secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 1100px) {
+            .game-layout {
+                grid-template-columns: 240px 1fr 240px;
+            }
+            .side-panel {
+                padding: 15px 10px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .game-layout {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto 1fr auto;
+            }
+            .side-panel {
+                max-height: 200px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 10px;
+            }
+            .side-panel.left,
+            .side-panel.right {
+                border: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .side-title {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+            .player-slot {
+                width: calc(50% - 4px);
+                margin-bottom: 0;
+            }
+        }
+
+        /* 动画 */
+        .fade-in {
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .shake {
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        /* 技能特效 */
+        .skill-fx {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 6em;
+            z-index: 2000;
+            pointer-events: none;
+            animation: skillFloat 1.5s ease forwards;
+        }
+
+        @keyframes skillFloat {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+            100% { opacity: 0; transform: translate(-50%, -100%) scale(1); }
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-gold);
+        }
+    </style>
+<base target="_blank">
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <!-- 设置面板 -->
+    <div class="setup-overlay" id="setupOverlay">
+        <div class="setup-panel">
+            <div class="setup-title">⚙️ 游戏设置</div>
+            <div class="setup-grid">
+                <div class="setup-field">
+                    <label>玩家总数</label>
+                    <input type="number" id="totalPlayers" value="12" min="6" max="18">
+                </div>
+                <div class="setup-field">
+                    <label>游戏模式</label>
+                    <select id="gameMode">
+                        <option value="standard">标准局</option>
+                        <option value="chaos">混沌局</option>
+                    </select>
+                </div>
+            </div>
+            <div class="role-config-list" id="roleConfigList"></div>
+            <div class="setup-actions">
+                <button class="btn-start" onclick="startGame()">🎮 开始游戏</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 顶部状态栏 -->
+    <div class="top-bar" id="topBar" style="display:none;">
+        <div class="game-title">
+            <span class="wolf-icon">🐺</span>
+            <h1>狼人杀</h1>
+        </div>
+
+        <div class="phase-center">
+            <div class="phase-badge" id="phaseBadge">
+                <span id="phaseIcon">☀️</span>
+                <span id="phaseText">准备阶段</span>
+            </div>
+            <div class="phase-sub" id="phaseSub">等待游戏开始...</div>
+        </div>
+
+        <div class="status-right">
+            <div class="status-item">
+                <span class="status-label">回合</span>
+                <span class="status-value" id="roundDisplay">1</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">存活</span>
+                <span class="status-value" id="aliveDisplay">12/12</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">剩余时间</span>
+                <span class="timer-display" id="timerDisplay">05:00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主游戏区 -->
+    <div class="game-layout" id="gameLayout" style="display:none;">
+        <!-- 左侧玩家 -->
+        <div class="side-panel left" id="leftPanel">
+            <div class="side-title">👤 玩家列表</div>
+            <div id="leftPlayers"></div>
+        </div>
+
+        <!-- 中央舞台 -->
+        <div class="center-stage">
+            <!-- 舞台主区 -->
+            <div class="stage-main" id="stageMain">
+                <div class="stage-title" id="stageTitle">准备阶段</div>
+                <div class="stage-desc" id="stageDesc">请点击「开始游戏」配置对局参数</div>
+
+                <!-- 选中目标 -->
+                <div class="target-display" id="targetDisplay" style="display:none;">
+                    <div class="target-avatar" id="targetAvatar">🎭</div>
+                    <div class="target-info">
+                        <div class="target-name" id="targetName">请选择目标</div>
+                        <div class="target-role" id="targetRole">点击左侧玩家头像选择</div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="action-grid" id="actionGrid">
+                    <div class="action-btn primary" onclick="showSetup()">
+                        <span class="btn-icon">⚙️</span>
+                        <span class="btn-label">游戏设置</span>
+                        <span class="btn-desc">配置玩家和角色</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日志 -->
+            <div class="log-section">
+                <div class="log-header">
+                    <span class="log-header-title">📝 游戏日志</span>
+                    <span class="log-count" id="logCount">0 条记录</span>
+                </div>
+                <div class="log-content" id="logContent"></div>
+            </div>
+        </div>
+
+        <!-- 右侧玩家 -->
+        <div class="side-panel right" id="rightPanel">
+            <div class="side-title">📊 阵营信息</div>
+            <div id="rightInfo"></div>
+        </div>
+    </div>
+
+    <!-- 角色详情弹窗 -->
+    <div class="modal-overlay" id="roleModal">
+        <div class="modal">
+            <div class="modal-header">
+                <div class="modal-avatar" id="modalAvatar">🎭</div>
+                <div class="modal-title" id="modalTitle">角色名称</div>
+                <div class="modal-subtitle" id="modalSubtitle">阵营</div>
+            </div>
+            <div class="modal-body">
+                <div class="info-row">
+                    <span class="info-label">玩家编号</span>
+                    <span class="info-value" id="modalNumber">#1</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">当前状态</span>
+                    <span class="info-value" id="modalStatus">存活</span>
+                </div>
+                <div class="skill-box">
+                    <h4>技能说明</h4>
+                    <p id="modalSkill">技能描述...</p>
+                </div>
+            </div>
+            <div class="modal-actions" id="modalActions"></div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 游戏数据 =====
+        const ROLES = {
+            werewolf: { name: '狼人', icon: '🐺', color: 'werewolf', camp: '狼人阵营', skill: '每晚可以睁眼，共同选择一名玩家杀害。白天需要伪装身份，混淆视听。' },
+            seer: { name: '预言家', icon: '🔮', color: 'seer', camp: '好人阵营', skill: '每晚可以查验一名玩家的身份，得知其是否为狼人。是好人阵营的信息核心。' },
+            witch: { name: '女巫', icon: '🧙‍♀️', color: 'witch', camp: '好人阵营', skill: '拥有一瓶解药和一瓶毒药。解药可救活当晚被狼人杀害的玩家，毒药可毒杀一名玩家。每晚只能使用一瓶药。' },
+            hunter: { name: '猎人', icon: '🏹', color: 'hunter', camp: '好人阵营', skill: '被狼人杀害或被投票放逐时，可以开枪带走一名玩家。被女巫毒死则不能发动技能。' },
+            villager: { name: '平民', icon: '👨‍🌾', color: 'villager', camp: '好人阵营', skill: '没有特殊技能，通过分析其他玩家的发言和投票行为，协助找出狼人。' }
+        };
+
+        let game = {
+            phase: 'setup',
+            round: 1,
+            day: true,
+            players: [],
+            selectedTarget: null,
+            timer: null,
+            timeLeft: 300,
+            roleConfig: { werewolf: 4, seer: 1, witch: 1, hunter: 1, villager: 5 },
+            logs: [],
+            myRole: null
+        };
+
+        // ===== 初始化 =====
+        function initStars() {
+            const container = document.getElementById('stars');
+            for (let i = 0; i < 120; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 3 + 's';
+                star.style.opacity = Math.random() * 0.8 + 0.2;
+                container.appendChild(star);
+            }
+        }
+
+        // 渲染设置面板角色配置
+        function renderSetupRoles() {
+            const container = document.getElementById('roleConfigList');
+            container.innerHTML = '';
+            Object.entries(ROLES).forEach(([key, role]) => {
+                const item = document.createElement('div');
+                item.className = `role-config-item ${role.color}`;
+                item.innerHTML = `
+                    <div class="role-config-left">
+                        <span class="role-config-icon">${role.icon}</span>
+                        <div>
+                            <div class="role-config-name">${role.name}</div>
+                            <div class="role-config-desc">${role.camp}</div>
+                        </div>
+                    </div>
+                    <div class="counter">
+                        <button onclick="changeRoleCount('${key}', -1)">−</button>
+                        <span id="setup-count-${key}">${game.roleConfig[key]}</span>
+                        <button onclick="changeRoleCount('${key}', 1)">+</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function changeRoleCount(role, delta) {
+            const current = game.roleConfig[role];
+            const next = current + delta;
+            if (next >= 0 && next <= 8) {
+                game.roleConfig[role] = next;
+                document.getElementById(`setup-count-${role}`).textContent = next;
+            }
+        }
+
+        function showSetup() {
+            document.getElementById('setupOverlay').style.display = 'flex';
+            renderSetupRoles();
+        }
+
+        // ===== 开始游戏 =====
+        function startGame() {
+            const total = parseInt(document.getElementById('totalPlayers').value);
+            const totalRoles = Object.values(game.roleConfig).reduce((a, b) => a + b, 0);
+
+            if (totalRoles !== total) {
+                alert(`角色总数(${totalRoles})与玩家数量(${total})不匹配！`);
+                return;
+            }
+
+            // 生成角色池
+            let pool = [];
+            Object.entries(game.roleConfig).forEach(([role, count]) => {
+                for (let i = 0; i < count; i++) pool.push(role);
+            });
+            pool = shuffle(pool);
+
+            // 创建玩家
+            game.players = [];
+            for (let i = 0; i < total; i++) {
+                game.players.push({
+                    id: i + 1,
+                    name: `玩家${i + 1}`,
+                    role: pool[i],
+                    alive: true,
+                    sheriff: false,
+                    dying: false,
+                    revealed: false,
+                    poisoned: false,
+                    saved: false,
+                    checked: false
+                });
+            }
+
+            // 模拟当前玩家是1号
+            game.myRole = game.players[0].role;
+
+            document.getElementById('setupOverlay').style.display = 'none';
+            document.getElementById('topBar').style.display = 'flex';
+            document.getElementById('gameLayout').style.display = 'grid';
+
+            renderSidePanels();
+            renderRightInfo();
+            addLog('游戏开始！所有玩家已分配身份。', 'system');
+            addLog(`你的身份是：${ROLES[game.myRole].icon} ${ROLES[game.myRole].name}`, 'system');
+
+            startDay();
+        }
+
+        function shuffle(arr) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        }
+
+        // ===== 渲染侧边玩家 =====
+        function renderSidePanels() {
+            const left = document.getElementById('leftPlayers');
+            const right = document.getElementById('rightInfo');
+            left.innerHTML = '';
+            right.innerHTML = '';
+
+            game.players.forEach((p, idx) => {
+                const role = ROLES[p.role];
+                const isMe = idx === 0;
+                const canSee = p.revealed || !p.alive || (game.myRole === 'werewolf' && p.role === 'werewolf');
+
+                const slot = document.createElement('div');
+                slot.className = `player-slot ${role.color} ${p.alive ? '' : 'dead'} ${p.dying ? 'shake' : ''}`;
+                slot.onclick = () => selectPlayer(p.id);
+                slot.innerHTML = `
+                    <div class="player-avatar-small">
+                        ${p.alive ? role.icon : '💀'}
+                        <div class="number-badge">${p.id}</div>
+                    </div>
+                    <div class="player-info-small">
+                        <div class="player-name-small">${p.name}${isMe ? ' (我)' : ''}</div>
+                        <div class="player-role-small">${canSee ? role.name : '???'}</div>
+                        <div class="player-tags">
+                            ${p.sheriff ? '<span class="tag sheriff">👑警长</span>' : ''}
+                            ${p.dying ? '<span class="tag dying">濒死</span>' : ''}
+                        </div>
+                    </div>
+                `;
+                left.appendChild(slot);
+            });
+        }
+
+        // ===== 渲染右侧信息 =====
+        function renderRightInfo() {
+            const container = document.getElementById('rightInfo');
+            container.innerHTML = '';
+
+            // 阵营统计
+            const goodAlive = game.players.filter(p => p.role !== 'werewolf' && p.alive).length;
+            const wolfAlive = game.players.filter(p => p.role === 'werewolf' && p.alive).length;
+            const totalAlive = goodAlive + wolfAlive;
+
+            const stats = document.createElement('div');
+            stats.style.cssText = 'background: var(--bg-card); padding: 15px; border-radius: 12px; margin-bottom: 15px;';
+            stats.innerHTML = `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span style="color: var(--accent-green);">好人阵营</span>
+                    <span style="font-weight: bold; color: var(--accent-green);">${goodAlive}</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <span style="color: var(--accent-red);">狼人阵营</span>
+                    <span style="font-weight: bold; color: var(--accent-red);">${wolfAlive}</span>
+                </div>
+                <div style="border-top: 1px solid var(--border-color); padding-top: 10px; display: flex; justify-content: space-between;">
+                    <span style="color: var(--text-secondary);">存活总数</span>
+                    <span style="font-weight: bold;">${totalAlive}/${game.players.length}</span>
+                </div>
+            `;
+            container.appendChild(stats);
+
+            // 角色存活情况
+            const roleStats = document.createElement('div');
+            roleStats.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+            Object.entries(ROLES).forEach(([key, role]) => {
+                const alive = game.players.filter(p => p.role === key && p.alive).length;
+                const total = game.players.filter(p => p.role === key).length;
+                const item = document.createElement('div');
+                item.style.cssText = `display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--bg-card); border-radius: 8px; border-left: 3px solid;`;
+                const colors = {
+                    werewolf: 'var(--accent-red)',
+                    seer: 'var(--accent-blue)',
+                    witch: 'var(--accent-purple)',
+                    hunter: 'var(--accent-orange)',
+                    villager: 'var(--accent-green)'
+                };
+                item.style.borderLeftColor = colors[key];
+                item.innerHTML = `
+                    <span style="font-size: 1.4em;">${role.icon}</span>
+                    <span style="flex: 1; font-size: 0.9em;">${role.name}</span>
+                    <span style="font-weight: bold; font-size: 0.9em;">${alive}/${total}</span>
+                `;
+                roleStats.appendChild(item);
+            });
+            container.appendChild(roleStats);
+
+            // 更新顶部存活数
+            document.getElementById('aliveDisplay').textContent = `${totalAlive}/${game.players.length}`;
+        }
+
+        // ===== 选择玩家 =====
+        function selectPlayer(id) {
+            const player = game.players.find(p => p.id === id);
+            if (!player) return;
+
+            game.selectedTarget = player;
+
+            // 更新侧边栏选中状态
+            document.querySelectorAll('.player-slot').forEach((slot, idx) => {
+                slot.classList.toggle('selected', game.players[idx].id === id);
+            });
+
+            // 更新舞台目标显示
+            const role = ROLES[player.role];
+            const canSee = player.revealed || !player.alive || (game.myRole === 'werewolf' && player.role === 'werewolf') || id === 1;
+
+            document.getElementById('targetDisplay').style.display = 'flex';
+            document.getElementById('targetAvatar').textContent = player.alive ? role.icon : '💀';
+            document.getElementById('targetName').textContent = `${player.name} (#${player.id})${id === 1 ? ' [我]' : ''}`;
+            document.getElementById('targetRole').textContent = canSee ? `${role.name} · ${role.camp}` : '身份未知';
+
+            // 根据阶段更新可用操作
+            updateStageActions();
+        }
+
+        // ===== 更新舞台操作按钮 =====
+        function updateStageActions() {
+            const grid = document.getElementById('actionGrid');
+            const target = game.selectedTarget;
+            grid.innerHTML = '';
+
+            if (!target || !target.alive) {
+                // 无目标或目标已死亡
+                grid.innerHTML = `
+                    <div class="action-btn" onclick="deselectTarget()">
+                        <span class="btn-icon">🚫</span>
+                        <span class="btn-label">取消选择</span>
+                        <span class="btn-desc">重新选择目标</span>
+                    </div>
+                `;
+                return;
+            }
+
+            const isMe = target.id === 1;
+            const role = ROLES[game.myRole];
+
+            if (game.phase === 'day') {
+                // 白天操作
+                if (!isMe) {
+                    addActionBtn(grid, '🗣️', '发言', '对该玩家发表看法', () => doSpeak(target));
+                    addActionBtn(grid, '🗳️', '投票', '投票放逐该玩家', () => doVote(target), 'danger');
+                }
+                addActionBtn(grid, '👑', '竞选警长', '参与警长竞选', () => doSheriff());
+                addActionBtn(grid, '🌙', '天黑', '进入黑夜阶段', () => nextPhase(), 'primary');
+            } else if (game.phase === 'night') {
+                // 黑夜操作 - 根据身份显示不同按钮
+                if (game.myRole === 'werewolf' && !isMe) {
+                    addActionBtn(grid, '🗡️', '击杀', '选择杀害该玩家', () => doKill(target), 'danger');
+                }
+                if (game.myRole === 'seer' && !isMe) {
+                    addActionBtn(grid, '🔮', '查验', '查验该玩家身份', () => doCheck(target), 'info');
+                }
+                if (game.myRole === 'witch') {
+                    if (!isMe && !target.saved) {
+                        addActionBtn(grid, '💊', '毒药', '使用毒药毒杀', () => doPoison(target), 'danger');
+                    }
+                    // 解药逻辑简化
+                }
+                if (game.myRole === 'hunter' && !isMe) {
+                    addActionBtn(grid, '🔫', '开枪', '发动技能带走', () => doShoot(target), 'danger');
+                }
+                addActionBtn(grid, '☀️', '天亮', '进入白天阶段', () => nextPhase(), 'primary');
+            }
+        }
+
+        function addActionBtn(container, icon, label, desc, action, type = '') {
+            const btn = document.createElement('div');
+            btn.className = `action-btn ${type}`;
+            btn.innerHTML = `
+                <span class="btn-icon">${icon}</span>
+                <span class="btn-label">${label}</span>
+                <span class="btn-desc">${desc}</span>
+            `;
+            btn.onclick = action;
+            container.appendChild(btn);
+        }
+
+        function deselectTarget() {
+            game.selectedTarget = null;
+            document.getElementById('targetDisplay').style.display = 'none';
+            document.querySelectorAll('.player-slot').forEach(s => s.classList.remove('selected'));
+            updateStageActions();
+        }
+
+        // ===== 各种操作 =====
+        function doSpeak(target) {
+            addLog(`你对玩家${target.id}发表了看法...`, 'system');
+            showSkillFx('🗣️');
+        }
+
+        function doVote(target) {
+            addLog(`你投票放逐了玩家${target.id} (${ROLES[target.role].name})`, 'vote');
+            showSkillFx('🗳️');
+            // 模拟投票结果
+            setTimeout(() => {
+                target.alive = false;
+                target.revealed = true;
+                addLog(`玩家${target.id} (${ROLES[target.role].name}) 被投票放逐！`, 'death');
+                renderSidePanels();
+                renderRightInfo();
+                checkWin();
+                deselectTarget();
+            }, 1000);
+        }
+
+        function doSheriff() {
+            addLog('你参与了警长竞选', 'system');
+            showSkillFx('👑');
+        }
+
+        function doKill(target) {
+            addLog(`狼人阵营选择杀害玩家${target.id}`, 'death');
+            showSkillFx('🗡️');
+            target.dying = true;
+            renderSidePanels();
+            setTimeout(() => {
+                target.dying = false;
+                target.alive = false;
+                target.revealed = true;
+                addLog(`昨晚，玩家${target.id} (${ROLES[target.role].name}) 被狼人杀害！`, 'death');
+                renderSidePanels();
+                renderRightInfo();
+                checkWin();
+                deselectTarget();
+            }, 1500);
+        }
+
+        function doCheck(target) {
+            target.checked = true;
+            const isWolf = target.role === 'werewolf';
+            addLog(`你查验了玩家${target.id}，结果是：${isWolf ? '❌ 狼人！' : '✅ 好人'}`, 'skill');
+            showSkillFx('🔮');
+            // 显示查验结果在目标上
+            document.getElementById('targetRole').textContent = `${ROLES[target.role].name} · ${ROLES[target.role].camp} ${isWolf ? '⚠️狼人！' : '✅好人'}`;
+            target.revealed = true;
+        }
+
+        function doPoison(target) {
+            addLog(`你对玩家${target.id}使用了毒药！`, 'skill');
+            showSkillFx('☠️');
+            target.poisoned = true;
+            setTimeout(() => {
+                target.alive = false;
+                target.revealed = true;
+                addLog(`玩家${target.id} (${ROLES[target.role].name}) 被女巫毒死！`, 'death');
+                renderSidePanels();
+                renderRightInfo();
+                checkWin();
+                deselectTarget();
+            }, 1000);
+        }
+
+        function doShoot(target) {
+            addLog(`你开枪带走了玩家${target.id}！`, 'skill');
+            showSkillFx('🔫');
+            target.alive = false;
+            target.revealed = true;
+            setTimeout(() => {
+                addLog(`玩家${target.id} (${ROLES[target.role].name}) 被猎人带走！`, 'death');
+                renderSidePanels();
+                renderRightInfo();
+                checkWin();
+                deselectTarget();
+            }, 500);
+        }
+
+        function showSkillFx(emoji) {
+            const fx = document.createElement('div');
+            fx.className = 'skill-fx';
+            fx.textContent = emoji;
+            document.body.appendChild(fx);
+            setTimeout(() => fx.remove(), 1500);
+        }
+
+        // ===== 阶段切换 =====
+        function startDay() {
+            game.phase = 'day';
+            game.day = true;
+            game.timeLeft = 300;
+            game.selectedTarget = null;
+
+            document.getElementById('phaseIcon').textContent = '☀️';
+            document.getElementById('phaseText').textContent = `第${game.round}天 · 白天`;
+            document.getElementById('phaseSub').textContent = '自由讨论，分析局势，找出狼人';
+            document.getElementById('stageTitle').textContent = '白天讨论阶段';
+            document.getElementById('stageDesc').textContent = '请选择一名玩家进行互动，或点击「天黑」进入夜晚阶段';
+            document.getElementById('targetDisplay').style.display = 'none';
+
+            updateStageActions();
+            startTimer();
+            addLog(`☀️ 天亮了，第${game.round}天开始`, 'system');
+        }
+
+        function startNight() {
+            game.phase = 'night';
+            game.day = false;
+            game.timeLeft = 180;
+            game.selectedTarget = null;
+
+            document.getElementById('phaseIcon').textContent = '🌙';
+            document.getElementById('phaseText').textContent = `第${game.round}夜 · 黑夜`;
+            document.getElementById('phaseSub').textContent = '狼人睁眼，神职发动技能';
+            document.getElementById('stageTitle').textContent = '黑夜行动阶段';
+            document.getElementById('stageDesc').textContent = `你的身份是 ${ROLES[game.myRole].icon} ${ROLES[game.myRole].name}，请选择目标执行技能`;
+            document.getElementById('targetDisplay').style.display = 'none';
+
+            updateStageActions();
+            startTimer();
+            addLog(`🌙 天黑了，第${game.round}夜开始`, 'system');
+        }
+
+        function nextPhase() {
+            stopTimer();
+            if (game.day) {
+                startNight();
+            } else {
+                game.round++;
+                document.getElementById('roundDisplay').textContent = game.round;
+                startDay();
+            }
+        }
+
+        // ===== 计时器 =====
+        function startTimer() {
+            stopTimer();
+            updateTimer();
+            game.timer = setInterval(() => {
+                game.timeLeft--;
+                updateTimer();
+                if (game.timeLeft <= 0) {
+                    stopTimer();
+                    addLog('⏰ 时间到！', 'system');
+                    nextPhase();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (game.timer) {
+                clearInterval(game.timer);
+                game.timer = null;
+            }
+        }
+
+        function updateTimer() {
+            const m = Math.floor(game.timeLeft / 60);
+            const s = game.timeLeft % 60;
+            document.getElementById('timerDisplay').textContent = 
+                `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        // ===== 日志 =====
+        function addLog(text, type = '') {
+            const time = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            game.logs.unshift({ time, text, type });
+            if (game.logs.length > 50) game.logs.pop();
+
+            const container = document.getElementById('logContent');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry fade-in';
+            entry.innerHTML = `
+                <span class="log-time">${time}</span>
+                <span class="log-text ${type}">${text}</span>
+            `;
+            container.insertBefore(entry, container.firstChild);
+            document.getElementById('logCount').textContent = `${game.logs.length} 条记录`;
+        }
+
+        // ===== 胜负判定 =====
+        function checkWin() {
+            const wolves = game.players.filter(p => p.role === 'werewolf' && p.alive).length;
+            const good = game.players.filter(p => p.role !== 'werewolf' && p.alive).length;
+
+            if (wolves === 0) {
+                endGame('好人阵营');
+            } else if (wolves >= good) {
+                endGame('狼人阵营');
+            }
+        }
+
+        function endGame(winner) {
+            game.phase = 'end';
+            stopTimer();
+
+            document.getElementById('phaseText').textContent = '游戏结束';
+            document.getElementById('phaseSub').textContent = `${winner}获得胜利！`;
+            document.getElementById('stageTitle').textContent = '🎉 游戏结束';
+            document.getElementById('stageDesc').textContent = `${winner}获得胜利！所有玩家身份已公开`;
+            document.getElementById('actionGrid').innerHTML = `
+                <div class="action-btn primary" onclick="location.reload()">
+                    <span class="btn-icon">🔄</span>
+                    <span class="btn-label">重新开始</span>
+                    <span class="btn-desc">开启新的一局</span>
+                </div>
+            `;
+
+            // 公开所有身份
+            game.players.forEach(p => p.revealed = true);
+            renderSidePanels();
+            addLog(`🏆 ${winner}获得胜利！`, 'system');
+        }
+
+        // ===== 弹窗 =====
+        function showRoleModal(player) {
+            const role = ROLES[player.role];
+            document.getElementById('modalAvatar').textContent = player.alive ? role.icon : '💀';
+            document.getElementById('modalTitle').textContent = role.name;
+            document.getElementById('modalSubtitle').textContent = role.camp;
+            document.getElementById('modalNumber').textContent = `#${player.id} ${player.name}`;
+            document.getElementById('modalStatus').textContent = player.alive ? '存活' : '已出局';
+            document.getElementById('modalSkill').textContent = role.skill;
+
+            const actions = document.getElementById('modalActions');
+            actions.innerHTML = `
+                <button class="modal-btn primary" onclick="closeModal()">关闭</button>
+            `;
+
+            document.getElementById('roleModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('roleModal').classList.remove('active');
+        }
+
+        // 点击弹窗外部关闭
+        document.getElementById('roleModal').onclick = (e) => {
+            if (e.target === document.getElementById('roleModal')) closeModal();
+        };
+
+        // ===== 启动 =====
+        initStars();
+        renderSetupRoles();
+    </script>
+</body>
+</html>

@@ -14,7 +14,6 @@ async function createStartedGame(app: ReturnType<typeof createApp>) {
       title: "Runtime Tick",
       targetPlayerCount: 6,
       timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      allowedSourceMatrixRoomIds: [],
     }),
   });
   const { gameRoomId } = (await create.json()) as { gameRoomId: string };

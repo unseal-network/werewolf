@@ -47,4 +47,43 @@ describe("validatePlayerAction", () => {
     expect(event.type).toBe("vote_submitted");
     expect(event.payload.targetPlayerId).toBe("p2");
   });
+
+  it("rejects night actions that do not match the actor role", () => {
+    expect(() =>
+      validatePlayerAction({
+        ...base,
+        phase: "night_seer",
+        actorPlayerId: "p1",
+        currentSpeakerPlayerId: null,
+        privateStates: [
+          { playerId: "p1", role: "witch", team: "good", alive: true, knownTeammatePlayerIds: [] },
+          { playerId: "p2", role: "werewolf", team: "wolf", alive: true, knownTeammatePlayerIds: [] },
+          { playerId: "p3", role: "seer", team: "good", alive: true, knownTeammatePlayerIds: [] },
+        ],
+        action: { kind: "seerInspect", targetPlayerId: "p2" },
+        now: new Date("2026-05-09T10:00:00.000Z"),
+      })
+    ).toThrow("You do not have the role for this action");
+  });
+
+  it("rejects repeated night actions in the same phase", () => {
+    expect(() =>
+      validatePlayerAction({
+        ...base,
+        phase: "night_guard",
+        actorPlayerId: "p1",
+        currentSpeakerPlayerId: null,
+        privateStates: [
+          { playerId: "p1", role: "guard", team: "good", alive: true, knownTeammatePlayerIds: [] },
+          { playerId: "p2", role: "werewolf", team: "wolf", alive: true, knownTeammatePlayerIds: [] },
+          { playerId: "p3", role: "seer", team: "good", alive: true, knownTeammatePlayerIds: [] },
+        ],
+        submittedNightActions: [
+          { actorPlayerId: "p1", kind: "guardProtect", targetPlayerId: "p3", day: 1, phase: "night_guard" },
+        ],
+        action: { kind: "guardProtect", targetPlayerId: "p2" },
+        now: new Date("2026-05-09T10:00:00.000Z"),
+      })
+    ).toThrow("You have already acted this phase");
+  });
 });

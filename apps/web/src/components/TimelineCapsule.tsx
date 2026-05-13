@@ -90,6 +90,15 @@ function formatEventWith(
         }),
       };
     }
+    if (event.type === "speech_transcript_delta") {
+      return {
+        typeKey: "speech",
+        text: t("timeline.evt.transcript", {
+          actor: playerLabel(event.actorId),
+          text: String(event.payload.text ?? ""),
+        }),
+      };
+    }
     if (event.type === "vote_submitted") {
       return {
         typeKey: "vote",
@@ -204,6 +213,15 @@ function formatEventWith(
         }),
       };
     }
+    if (event.type === "player_removed") {
+      return {
+        typeKey: "system",
+        text: t("timeline.evt.playerRemoved", {
+          name: String(event.payload?.displayName ?? playerLabel(event.actorId)),
+          seat: String(event.payload?.seatNo ?? "?"),
+        }),
+      };
+    }
     if (event.type === "game_ended") {
       return { typeKey: "system", text: t("timeline.evt.gameEnded") };
     }
@@ -249,6 +267,7 @@ export function TimelineCapsule({
     height: number;
     pointerId: number;
   } | null>(null);
+  const suppressClickRef = useRef(false);
   const peekRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleEvents = useMemo(
@@ -311,8 +330,11 @@ export function TimelineCapsule({
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
     setDragging(false);
+    suppressClickRef.current = drag.moved;
     if (!drag.moved) {
       setOpen(true);
     }
@@ -358,10 +380,18 @@ export function TimelineCapsule({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onClick={() => {
+          if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+          }
+          setOpen(true);
+        }}
         aria-label={t("timeline.capsule")}
       >
-        <span className="grip" aria-hidden />
-        <strong>{t("timeline.capsule")}</strong>
+        <span className="log-peek-icon" aria-hidden>
+          📝
+        </span>
       </button>
 
       <div

@@ -1,11 +1,17 @@
 import { Hono } from "hono";
+import { Buffer } from "node:buffer";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { AppError } from "@werewolf/shared";
-import { authenticateRequest, type MatrixAuthClient } from "../context/auth";
+import {
+  authenticateRequest,
+  type MatrixAuthClient,
+  type MatrixProfileCache,
+} from "../context/auth";
 import type { InMemoryGameService } from "../services/game-service";
 
 export interface LivekitRouteDeps {
   matrix: MatrixAuthClient;
+  profileCache?: MatrixProfileCache | undefined;
   games: InMemoryGameService;
 }
 
@@ -34,27 +40,28 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
   // Generate LiveKit access token for a player to join the voice room
   app.post("/:gameRoomId/livekit-token", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const gameRoomId = c.req.param("gameRoomId");
       const room = deps.games.snapshot(gameRoomId);
       const player = room.players.find(
         (p) => p.userId === user.id && !p.leftAt
       );
-      if (!player) {
-        throw new AppError("not_found", "You are not in this room", 404);
-      }
+      const isPlayer = Boolean(player);
+      const identity =
+        player?.id ??
+        `spectator_${Buffer.from(user.id).toString("base64url")}`;
 
       const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
-        identity: player.id,
-        name: player.displayName,
+        identity,
+        name: player?.displayName ?? user.displayName,
         ttl: "24h",
       });
       at.addGrant({
         room: gameRoomId,
         roomJoin: true,
-        canPublish: true,
+        canPublish: isPlayer,
         canSubscribe: true,
-        canPublishData: true,
+        canPublishData: isPlayer,
       });
 
       const token = await at.toJwt();
@@ -77,7 +84,8 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         token,
         serverUrl: LIVEKIT_URL,
         room: gameRoomId,
-        identity: player.id,
+        identity,
+        canPublish: isPlayer,
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
@@ -91,7 +99,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
   // Ensure a LiveKit room exists (creator endpoint, idempotent)
   app.post("/:gameRoomId/livekit-room", async (c) => {
     try {
-      await authenticateRequest(c.req.raw, deps.matrix);
+      await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const gameRoomId = c.req.param("gameRoomId");
       deps.games.snapshot(gameRoomId);
       try {

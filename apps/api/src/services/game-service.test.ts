@@ -9,6 +9,7 @@ const players = [
   ["@dan:example.com", "Dan"],
   ["@erin:example.com", "Erin"],
   ["@finn:example.com", "Finn"],
+  ["@gina:example.com", "Gina"],
 ] as const;
 
 function createStartedServiceGame() {
@@ -19,11 +20,28 @@ function createStartedServiceGame() {
       title: "Rules",
       targetPlayerCount: 6,
       timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      allowedSourceMatrixRoomIds: [],
     },
     players[0][0]
   );
-  for (const [userId, name] of players) {
+  for (const [userId, name] of players.slice(0, 6)) {
+    games.join(room.id, userId, name);
+  }
+  games.start(room.id, players[0][0]);
+  return { games, gameRoomId: room.id };
+}
+
+function createStartedServiceGameWithPlayers(playerCount: number) {
+  const games = new InMemoryGameService();
+  const { room } = games.createGame(
+    {
+      sourceMatrixRoomId: "!source:example.com",
+      title: "Rules",
+      targetPlayerCount: playerCount,
+      timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+    },
+    players[0][0]
+  );
+  for (const [userId, name] of players.slice(0, playerCount)) {
     games.join(room.id, userId, name);
   }
   games.start(room.id, players[0][0]);
@@ -47,7 +65,6 @@ describe("InMemoryGameService rules", () => {
         title: "Seats",
         targetPlayerCount: 6,
         timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-        allowedSourceMatrixRoomIds: [],
       },
       players[0][0]
     );
@@ -69,7 +86,6 @@ describe("InMemoryGameService rules", () => {
         title: "Seats",
         targetPlayerCount: 6,
         timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-        allowedSourceMatrixRoomIds: [],
       },
       players[0][0]
     );
@@ -83,6 +99,80 @@ describe("InMemoryGameService rules", () => {
     expect(room.players.find((player) => player.seatNo === 1)?.agentId).toBe("@bot:example.com");
   });
 
+  it("lets the creator remove any waiting-room player and users remove their invited agents", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    const human = games.join(room.id, players[1][0], players[1][1]);
+    const invited = games.addAgentPlayer(
+      room.id,
+      players[1][0],
+      "@bot:example.com",
+      "Bot"
+    );
+
+    expect(() =>
+      games.removePlayer(room.id, players[2][0], invited.id)
+    ).toThrow("Only creator can remove players");
+
+    const removedAgent = games.removePlayer(room.id, players[1][0], invited.id);
+    expect(removedAgent.leftAt).not.toBeNull();
+
+    const removedHuman = games.removePlayer(room.id, players[0][0], human.id);
+    expect(removedHuman.leftAt).not.toBeNull();
+    expect(room.events.map((event) => event.type)).toContain("player_removed");
+  });
+
+  it("joins a human directly into the clicked empty seat", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+
+    const joined = games.join(room.id, players[1][0], players[1][1], undefined, 4);
+
+    expect(joined.seatNo).toBe(4);
+    expect(joined.id).toBe("player_4");
+  });
+
+  it("rejoins a previously-left human into the clicked empty seat instead of the old seat", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    games.join(room.id, players[0][0], players[0][1], undefined, 4);
+    games.leave(room.id, players[0][0]);
+    games.join(room.id, players[1][0], players[1][1], undefined, 1);
+    games.join(room.id, players[2][0], players[2][1], undefined, 2);
+    const bot = games.addAgentPlayer(room.id, players[1][0], "@bot:example.com", "Bot");
+    games.removePlayer(room.id, players[1][0], bot.id);
+
+    const rejoined = games.join(room.id, players[0][0], players[0][1], undefined, bot.seatNo);
+
+    expect(rejoined.seatNo).toBe(bot.seatNo);
+    expect(rejoined.id).toBe(`player_${bot.seatNo}`);
+    expect(room.players.find((player) => player.id === "player_4")).toBeUndefined();
+  });
+
   it("reveals the wolf kill target to the witch before the heal phase action", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
@@ -93,7 +183,10 @@ describe("InMemoryGameService rules", () => {
     expect(wolf).toBeDefined();
     expect(witch).toBeDefined();
 
-    await games.submitAction(gameRoomId, guard!.playerId, { kind: "pass" });
+    await games.submitAction(gameRoomId, guard!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: wolf!.playerId,
+    });
     await games.advanceGame(gameRoomId, passAgentTurn);
 
     const target = room.privateStates.find(
@@ -157,6 +250,611 @@ describe("InMemoryGameService rules", () => {
         subjectId: nextSpeaker.id,
       })
     );
+  });
+
+  it("uses flushed STT transcript when a human speaker times out", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    const nextSpeaker = room.players[1]!;
+
+    games.setVoiceAgents({
+      get: () => ({
+        flushPlayerTranscript: async () => "I heard enough to accuse seat 3.",
+        resetPlayerTranscript: () => undefined,
+      }),
+      setTranscriptHandler: () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    room.speechQueue = [speaker.id, nextSpeaker.id];
+
+    await games.advanceGame(gameRoomId, passAgentTurn);
+
+    expect(room.projection.currentSpeakerPlayerId).toBe(nextSpeaker.id);
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "speech_submitted",
+        actorId: speaker.id,
+        payload: expect.objectContaining({
+          speech: "I heard enough to accuse seat 3.",
+        }),
+      })
+    );
+  });
+
+  it("allows pass to affect only the phase version it was submitted for", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const seer = room.privateStates.find((state) => state.role === "seer");
+    expect(seer).toBeDefined();
+    const staleVersion = 24;
+    room.projection = {
+      ...room.projection!,
+      phase: "night_seer",
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+      version: 25,
+    };
+    room.pendingNightActions = [];
+
+    await expect(
+      games.submitAction(gameRoomId, seer!.playerId, {
+        kind: "pass",
+        expectedPhase: "night_witch_poison",
+        expectedDay: room.projection.day,
+        expectedVersion: staleVersion,
+      })
+    ).rejects.toThrow("Action phase has changed");
+
+    expect(room.projection.phase).toBe("night_seer");
+    expect(
+      room.pendingNightActions.some((action) => action.actorPlayerId === seer!.playerId)
+    ).toBe(false);
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "night_action_submitted" &&
+          event.actorId === seer!.playerId
+      )
+    ).toBe(false);
+
+    const event = await games.submitAction(gameRoomId, seer!.playerId, {
+      kind: "pass",
+      expectedPhase: "night_seer",
+      expectedDay: room.projection.day,
+      expectedVersion: room.projection.version,
+    });
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: seer!.playerId,
+        payload: expect.objectContaining({
+          action: expect.objectContaining({ kind: "passAction" }),
+        }),
+      })
+    );
+  });
+
+  it("keeps witch heal and poison passes scoped to separate night phases", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const witch = room.privateStates.find((state) => state.role === "witch");
+    expect(witch).toBeDefined();
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_witch_heal",
+      day: 1,
+      version: 30,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+    await games.submitAction(gameRoomId, witch!.playerId, {
+      kind: "pass",
+      expectedPhase: "night_witch_heal",
+      expectedDay: 1,
+      expectedVersion: 30,
+    });
+
+    room.projection = {
+      ...room.projection,
+      phase: "night_witch_poison",
+      version: 31,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+    const poisonPass = await games.submitAction(gameRoomId, witch!.playerId, {
+      kind: "pass",
+      expectedPhase: "night_witch_poison",
+      expectedDay: 1,
+      expectedVersion: 31,
+    });
+
+    expect(poisonPass).toEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: witch!.playerId,
+      })
+    );
+    expect(
+      room.pendingNightActions.filter(
+        (action) => action.actorPlayerId === witch!.playerId
+      )
+    ).toHaveLength(2);
+  });
+
+  it("consumes the witch heal item after a successful heal", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const witch = room.privateStates.find((state) => state.role === "witch");
+    const victim = room.privateStates.find(
+      (state) => state.role !== "witch" && state.role !== "werewolf" && state.alive
+    );
+    expect(witch).toBeDefined();
+    expect(victim).toBeDefined();
+    witch!.witchItems = { healAvailable: true, poisonAvailable: true };
+    room.pendingNightActions = [
+      {
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: victim!.playerId,
+        day: 1,
+        phase: "night_wolf",
+      },
+    ];
+    room.projection = {
+      ...room.projection!,
+      phase: "night_witch_heal",
+      day: 1,
+      version: 32,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    await games.submitAction(gameRoomId, witch!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: victim!.playerId,
+      expectedPhase: "night_witch_heal",
+      expectedDay: 1,
+      expectedVersion: 32,
+    });
+
+    expect(witch!.witchItems).toEqual({
+      healAvailable: false,
+      poisonAvailable: true,
+    });
+
+    room.pendingNightActions = [
+      {
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: victim!.playerId,
+        day: 2,
+        phase: "night_wolf",
+      },
+    ];
+    room.projection = {
+      ...room.projection,
+      phase: "night_witch_heal",
+      day: 2,
+      version: 33,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+
+    await expect(
+      games.submitAction(gameRoomId, witch!.playerId, {
+        kind: "nightAction",
+        targetPlayerId: victim!.playerId,
+        expectedPhase: "night_witch_heal",
+        expectedDay: 2,
+        expectedVersion: 33,
+      })
+    ).rejects.toThrow("Heal item is not available");
+  });
+
+  it("consumes the witch poison item after a successful poison", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const witch = room.privateStates.find((state) => state.role === "witch");
+    const target = room.privateStates.find(
+      (state) => state.playerId !== witch?.playerId && state.alive
+    );
+    expect(witch).toBeDefined();
+    expect(target).toBeDefined();
+    witch!.witchItems = { healAvailable: true, poisonAvailable: true };
+    room.pendingNightActions = [];
+    room.projection = {
+      ...room.projection!,
+      phase: "night_witch_poison",
+      day: 1,
+      version: 34,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    await games.submitAction(gameRoomId, witch!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: target!.playerId,
+      expectedPhase: "night_witch_poison",
+      expectedDay: 1,
+      expectedVersion: 34,
+    });
+
+    expect(witch!.witchItems).toEqual({
+      healAvailable: true,
+      poisonAvailable: false,
+    });
+
+    room.pendingNightActions = [];
+    room.projection = {
+      ...room.projection,
+      phase: "night_witch_poison",
+      day: 2,
+      version: 35,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+
+    await expect(
+      games.submitAction(gameRoomId, witch!.playerId, {
+        kind: "nightAction",
+        targetPlayerId: target!.playerId,
+        expectedPhase: "night_witch_poison",
+        expectedDay: 2,
+        expectedVersion: 35,
+      })
+    ).rejects.toThrow("Poison item is not available");
+  });
+
+  it("does not complete a stale speech turn after STT flush yields", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    const nextSpeaker = room.players[1]!;
+
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      day: 1,
+      version: 40,
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [speaker.id, nextSpeaker.id];
+    games.setVoiceAgents({
+      get: () => ({
+        flushPlayerTranscript: async () => {
+          room.projection = {
+            ...room.projection!,
+            version: 41,
+            currentSpeakerPlayerId: nextSpeaker.id,
+          };
+          return "late transcript";
+        },
+        resetPlayerTranscript: () => undefined,
+      }),
+      setTranscriptHandler: () => undefined,
+    } as unknown as VoiceAgentRegistry);
+
+    await expect(
+      games.submitAction(gameRoomId, speaker.id, {
+        kind: "speechComplete",
+        expectedPhase: "day_speak",
+        expectedDay: 1,
+        expectedVersion: 40,
+      })
+    ).rejects.toThrow("Action turn has changed");
+
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "speech_submitted" &&
+          event.actorId === speaker.id &&
+          String(event.payload?.speech) === "late transcript"
+      )
+    ).toBe(false);
+  });
+
+  it("rejects night actions from players without the current phase role", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const witch = room.privateStates.find((state) => state.role === "witch");
+    const wolf = room.privateStates.find((state) => state.role === "werewolf");
+    const seer = room.privateStates.find((state) => state.role === "seer");
+    expect(witch).toBeDefined();
+    expect(wolf).toBeDefined();
+    expect(seer).toBeDefined();
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_seer",
+      day: 1,
+      version: 50,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    await expect(
+      games.submitAction(gameRoomId, witch!.playerId, {
+        kind: "nightAction",
+        targetPlayerId: wolf!.playerId,
+        expectedPhase: "night_seer",
+        expectedDay: 1,
+        expectedVersion: 50,
+      })
+    ).rejects.toThrow("You do not have the role for this action");
+
+    room.pendingNightActions = [
+      {
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: seer!.playerId,
+        day: 1,
+        phase: "night_wolf",
+      },
+    ];
+    room.projection = {
+      ...room.projection,
+      phase: "night_witch_heal",
+      version: 51,
+    };
+    await expect(
+      games.submitAction(gameRoomId, wolf!.playerId, {
+        kind: "nightAction",
+        targetPlayerId: seer!.playerId,
+        expectedPhase: "night_witch_heal",
+        expectedDay: 1,
+        expectedVersion: 51,
+      })
+    ).rejects.toThrow("You do not have the role for this action");
+  });
+
+  it("allows human wolf kills targeting wolf teammates", async () => {
+    const { games, gameRoomId } = createStartedServiceGameWithPlayers(7);
+    const room = games.snapshot(gameRoomId);
+    const wolves = room.privateStates.filter(
+      (state) => state.role === "werewolf"
+    );
+    expect(wolves).toHaveLength(2);
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 55,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    const event = await games.submitAction(gameRoomId, wolves[0]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: wolves[1]!.playerId,
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 55,
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: wolves[0]!.playerId,
+        subjectId: wolves[1]!.playerId,
+      })
+    );
+  });
+
+  it("allows the guard to protect themself", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const guard = room.privateStates.find((state) => state.role === "guard");
+    expect(guard).toBeDefined();
+    room.projection = {
+      ...room.projection!,
+      phase: "night_guard",
+      day: 1,
+      version: 56,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    const event = await games.submitAction(gameRoomId, guard!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: guard!.playerId,
+      expectedPhase: "night_guard",
+      expectedDay: 1,
+      expectedVersion: 56,
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: guard!.playerId,
+        subjectId: guard!.playerId,
+      })
+    );
+  });
+
+  it("allows a wolf to target themself at night", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf");
+    expect(wolf).toBeDefined();
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 57,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    const event = await games.submitAction(gameRoomId, wolf!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: wolf!.playerId,
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 57,
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: wolf!.playerId,
+        subjectId: wolf!.playerId,
+      })
+    );
+  });
+
+  it("allows the witch to heal themself when they are the wolf target", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const witch = room.privateStates.find((state) => state.role === "witch");
+    expect(witch).toBeDefined();
+    witch!.witchItems = { healAvailable: true, poisonAvailable: true };
+    room.pendingNightActions = [
+      {
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: witch!.playerId,
+        day: 1,
+        phase: "night_wolf",
+      },
+    ];
+    room.projection = {
+      ...room.projection!,
+      phase: "night_witch_heal",
+      day: 1,
+      version: 58,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    const event = await games.submitAction(gameRoomId, witch!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: witch!.playerId,
+      expectedPhase: "night_witch_heal",
+      expectedDay: 1,
+      expectedVersion: 58,
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: witch!.playerId,
+        subjectId: witch!.playerId,
+      })
+    );
+    expect(witch!.witchItems?.healAvailable).toBe(false);
+  });
+
+  it("rejects ending another player's speech turn", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    const other = room.players[1]!;
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      day: 1,
+      version: 60,
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [speaker.id, other.id];
+
+    await expect(
+      games.submitAction(gameRoomId, other.id, {
+        kind: "speechComplete",
+        expectedPhase: "day_speak",
+        expectedDay: 1,
+        expectedVersion: 60,
+      })
+    ).rejects.toThrow("Not your turn to speak");
+
+    expect(room.projection.currentSpeakerPlayerId).toBe(speaker.id);
+  });
+
+  it("rejects wolf-team night speech from non-wolves", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const villager = room.privateStates.find((state) => state.role === "villager");
+    expect(villager).toBeDefined();
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 70,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+
+    await expect(
+      games.submitAction(gameRoomId, villager!.playerId, {
+        kind: "speech",
+        speech: "I should not be in wolf chat.",
+        expectedPhase: "night_wolf",
+        expectedDay: 1,
+        expectedVersion: 70,
+      })
+    ).rejects.toThrow("Speech not allowed in this phase");
+  });
+
+  it("records live STT transcript deltas as stream events", () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: speaker.id,
+    };
+
+    games.recordSpeechTranscript(gameRoomId, {
+      playerId: speaker.id,
+      text: "I think seat 2 is suspicious",
+      final: false,
+    });
+
+    expect(room.events.at(-1)).toEqual(
+      expect.objectContaining({
+        type: "speech_transcript_delta",
+        visibility: "public",
+        actorId: speaker.id,
+        payload: expect.objectContaining({
+          stream: true,
+          final: false,
+          text: "I think seat 2 is suspicious",
+        }),
+      })
+    );
+  });
+
+  it("ignores stale STT transcript deltas after the speaker turn ends", () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    const before = room.events.length;
+
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+    };
+
+    const event = games.recordSpeechTranscript(gameRoomId, {
+      playerId: speaker.id,
+      text: "late transcript chunk",
+      final: false,
+    });
+
+    expect(event).toBeNull();
+    expect(room.events).toHaveLength(before);
   });
 
   it("resets the speech deadline for each next speaker", async () => {
@@ -228,7 +926,36 @@ describe("InMemoryGameService rules", () => {
     expect(turnEvent!.seq).toBeGreaterThan(speechEvent!.seq);
   });
 
-  it("waits for agent TTS playout before completing the speech turn", async () => {
+  it("scheduleAdvance advances an agent speaker immediately before the speech deadline", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+
+    games.setRunAgentTurn(async (input) => ({
+      text: `${input.displayName} has a short claim.`,
+      toolName: "saySpeech",
+      input: { speech: `${input.displayName} has a short claim.` },
+    }));
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.scheduleAdvance(gameRoomId);
+
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(new Date(room.projection.deadlineAt!).getTime()).toBeGreaterThan(
+      Date.now() + 55_000
+    );
+  });
+
+  it("waits for agent TTS completion before completing the speech turn", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const agentSpeaker = room.players[0]!;
@@ -270,11 +997,26 @@ describe("InMemoryGameService rules", () => {
 
     expect(room.projection.currentSpeakerPlayerId).toBe(agentSpeaker.id);
     expect(room.events.some((event) => event.type === "turn_started")).toBe(false);
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      )
+    ).toBe(false);
 
     resolveSpeak();
     await advance;
 
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    const speechEventIndex = room.events.findIndex(
+      (event) =>
+        event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+    );
+    const turnEventIndex = room.events.findIndex(
+      (event) => event.type === "turn_started" && event.subjectId === humanSpeaker.id
+    );
+    expect(speechEventIndex).toBeGreaterThan(-1);
+    expect(turnEventIndex).toBe(speechEventIndex + 1);
     expect(room.events).toContainEqual(
       expect.objectContaining({
         type: "turn_started",
@@ -283,7 +1025,7 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
-  it("starts the next human speaker deadline after agent TTS finishes", async () => {
+  it("starts the next human speaker deadline after agent TTS completes", async () => {
     vi.useFakeTimers();
     try {
       const { games, gameRoomId } = createStartedServiceGame();
@@ -470,6 +1212,144 @@ describe("InMemoryGameService rules", () => {
     expect(event.id).not.toBe("pending");
     expect(event.seq).toBeGreaterThan(0);
     expect(event.type).toBe("speech_submitted");
+  });
+
+  it("does not advance a speech turn while the player's STT finalization is pending", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    const nextSpeaker = room.players[1]!;
+    let flushCalls = 0;
+    let resolveFlush: (value: string) => void = () => undefined;
+    const flushDone = new Promise<string>((resolve) => {
+      resolveFlush = resolve;
+    });
+
+    games.setRunAgentTurn(passAgentTurn);
+    games.setVoiceAgents({
+      get: () => ({
+        flushPlayerTranscript: () => {
+          flushCalls += 1;
+          return flushDone;
+        },
+        resetPlayerTranscript: () => undefined,
+      }),
+      setTranscriptHandler: () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      day: 1,
+      version: 80,
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    room.speechQueue = [speaker.id, nextSpeaker.id];
+
+    const complete = games.submitAction(gameRoomId, speaker.id, {
+      kind: "speechComplete",
+      expectedPhase: "day_speak",
+      expectedDay: 1,
+      expectedVersion: 80,
+    });
+    await vi.waitFor(() => expect(flushCalls).toBe(1));
+
+    const advance = games.scheduleAdvance(gameRoomId);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(flushCalls).toBe(1);
+    expect(room.projection.currentSpeakerPlayerId).toBe(speaker.id);
+    expect(
+      room.events.some(
+        (event) => event.type === "speech_submitted" && event.actorId === speaker.id
+      )
+    ).toBe(false);
+
+    resolveFlush("final player transcript");
+    const event = await complete;
+    await advance;
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "speech_submitted",
+        actorId: speaker.id,
+        payload: expect.objectContaining({ speech: "final player transcript" }),
+      })
+    );
+    expect(room.projection.currentSpeakerPlayerId).toBe(nextSpeaker.id);
+    expect(
+      room.events.filter(
+        (candidate) =>
+          candidate.type === "speech_submitted" && candidate.actorId === speaker.id
+      )
+    ).toHaveLength(1);
+  });
+
+  it("does not enter voting before the final speaker's STT speech event is written", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    let flushCalls = 0;
+    let resolveFlush: (value: string) => void = () => undefined;
+    const flushDone = new Promise<string>((resolve) => {
+      resolveFlush = resolve;
+    });
+
+    games.setRunAgentTurn(passAgentTurn);
+    games.setVoiceAgents({
+      get: () => ({
+        flushPlayerTranscript: () => {
+          flushCalls += 1;
+          return flushDone;
+        },
+        resetPlayerTranscript: () => undefined,
+      }),
+      setTranscriptHandler: () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      day: 1,
+      version: 90,
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    room.speechQueue = [speaker.id];
+
+    const complete = games.submitAction(gameRoomId, speaker.id, {
+      kind: "speechComplete",
+      expectedPhase: "day_speak",
+      expectedDay: 1,
+      expectedVersion: 90,
+    });
+    await vi.waitFor(() => expect(flushCalls).toBe(1));
+
+    const advance = games.scheduleAdvance(gameRoomId);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(room.projection.phase).toBe("day_speak");
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "phase_started" &&
+          event.payload.phase === "day_vote"
+      )
+    ).toBe(false);
+
+    resolveFlush("final claim before voting");
+    await complete;
+    await advance;
+
+    const speechEventIndex = room.events.findIndex(
+      (event) => event.type === "speech_submitted" && event.actorId === speaker.id
+    );
+    const votePhaseIndex = room.events.findIndex(
+      (event) =>
+        event.type === "phase_started" && event.payload.phase === "day_vote"
+    );
+    expect(room.projection.phase).toBe("day_vote");
+    expect(speechEventIndex).toBeGreaterThan(-1);
+    expect(votePhaseIndex).toBeGreaterThan(speechEventIndex);
   });
 
   it("leaves day vote immediately after the final human vote", async () => {

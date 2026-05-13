@@ -4,7 +4,10 @@ import { RootLayout } from "./routes/__root";
 import { CreateGamePage } from "./routes/create";
 import { GameRoomPage } from "./routes/game.$gameRoomId";
 import { AnimationDemoPage } from "./routes/animation-demo";
+import { UiDemoPage } from "./routes/ui-demo";
+import { UserSelectPage } from "./routes/user-select";
 import { I18nProvider } from "./i18n/I18nProvider";
+import { hasStoredMatrixSession } from "./matrix/session";
 import "./styles/game-room.css";
 
 function App() {
@@ -20,7 +23,15 @@ function App() {
   if (params.get("animationDemo") === "1") {
     return <AnimationDemoPage />;
   }
+  if (params.get("uiDemo") === "1") {
+    return <UiDemoPage />;
+  }
   const gameRoomId = params.get("gameRoomId");
+  const forceChooseUser = params.get("chooseUser") === "1";
+
+  if (forceChooseUser || !hasStoredMatrixSession()) {
+    return <UserSelectPage />;
+  }
 
   if (gameRoomId) {
     return <GameRoomPage gameRoomId={gameRoomId} />;

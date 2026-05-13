@@ -64,7 +64,6 @@ function wolfRoom(phase: "night_wolf" | "day_speak"): {
         agentSpeechRate: 1.5,
       },
       createdFromMatrixRoomId: "!source:example.com",
-      allowedSourceMatrixRoomIds: [],
       agentSourceMatrixRoomId: "!source:example.com",
       players: [
         {

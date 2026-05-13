@@ -14,7 +14,6 @@ async function createGame(app: ReturnType<typeof createApp>) {
       title: "Start Engine",
       targetPlayerCount: 6,
       timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      allowedSourceMatrixRoomIds: [],
     }),
   });
   const body = (await response.json()) as { gameRoomId: string };

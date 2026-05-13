@@ -26,7 +26,9 @@ export interface StoredPlayer {
   kind: "user" | "agent";
   userId?: string;
   agentId?: string;
+  invitedByUserId?: string;
   displayName: string;
+  avatarUrl?: string;
   seatNo: number;
   ready: boolean;
   onlineState: "online" | "offline";
@@ -43,7 +45,6 @@ export interface StoredGameRoom {
   language: CreateGameRequest["language"];
   timing: CreateGameRequest["timing"];
   createdFromMatrixRoomId: string;
-  allowedSourceMatrixRoomIds: string[];
   agentSourceMatrixRoomId: string;
   players: StoredPlayer[];
   projection: RoomProjection | null;
@@ -101,20 +102,32 @@ export interface DeadlineGuard {
   deadlineAt: string;
 }
 
+type RuntimeNightActionScope = {
+  actorPlayerId: string;
+  day?: number;
+  phase?: GamePhase;
+};
+
 type RuntimeNightAction =
-  | { actorPlayerId: string; kind: "wolfKill"; targetPlayerId: string }
-  | { actorPlayerId: string; kind: "guardProtect"; targetPlayerId: string }
-  | { actorPlayerId: string; kind: "witchHeal"; targetPlayerId: string }
-  | { actorPlayerId: string; kind: "witchPoison"; targetPlayerId: string }
-  | { actorPlayerId: string; kind: "seerInspect"; targetPlayerId: string }
-  | { actorPlayerId: string; kind: "passAction" };
+  | (RuntimeNightActionScope & { kind: "wolfKill"; targetPlayerId: string })
+  | (RuntimeNightActionScope & { kind: "guardProtect"; targetPlayerId: string })
+  | (RuntimeNightActionScope & { kind: "witchHeal"; targetPlayerId: string })
+  | (RuntimeNightActionScope & { kind: "witchPoison"; targetPlayerId: string })
+  | (RuntimeNightActionScope & { kind: "seerInspect"; targetPlayerId: string })
+  | (RuntimeNightActionScope & { kind: "passAction" });
 
 export type PlayerSubmittedAction =
-  | { kind: "speech"; speech: string }
-  | { kind: "speechComplete" }
-  | { kind: "vote"; targetPlayerId: string }
-  | { kind: "nightAction"; targetPlayerId: string }
-  | { kind: "pass" };
+  (
+    | { kind: "speech"; speech: string }
+    | { kind: "speechComplete" }
+    | { kind: "vote"; targetPlayerId: string }
+    | { kind: "nightAction"; targetPlayerId: string }
+    | { kind: "pass" }
+  ) & {
+    expectedPhase?: GamePhase | undefined;
+    expectedDay?: number | undefined;
+    expectedVersion?: number | undefined;
+  };
 
 const absentNightActorAutoAdvanceMs = 15_000;
 
@@ -127,6 +140,7 @@ export class InMemoryGameService {
   private broker: SseBroker | null = null;
   private voiceAgents: VoiceAgentRegistry | null = null;
   private store: GameStore | null = null;
+  private speechFinalizations = new Map<string, Promise<GameEvent | null>>();
 
   setBroker(broker: SseBroker) {
     this.broker = broker;
@@ -134,6 +148,13 @@ export class InMemoryGameService {
 
   setVoiceAgents(registry: VoiceAgentRegistry) {
     this.voiceAgents = registry;
+    registry.setTranscriptHandler?.((update) => {
+      this.recordSpeechTranscript(update.gameRoomId, {
+        playerId: update.playerId,
+        text: update.text,
+        final: update.final,
+      });
+    });
   }
 
   /**
@@ -201,7 +222,6 @@ export class InMemoryGameService {
       language: parsed.language,
       timing: parsed.timing,
       createdFromMatrixRoomId: parsed.sourceMatrixRoomId,
-      allowedSourceMatrixRoomIds: parsed.allowedSourceMatrixRoomIds,
       agentSourceMatrixRoomId:
         parsed.agentSourceMatrixRoomId ?? parsed.sourceMatrixRoomId,
       players: [],
@@ -251,14 +271,43 @@ export class InMemoryGameService {
     throw new AppError("conflict", "Room is full", 409);
   }
 
-  join(gameRoomId: string, userId: string, displayName: string): StoredPlayer {
+  join(
+    gameRoomId: string,
+    userId: string,
+    displayName: string,
+    avatarUrl?: string,
+    preferredSeatNo?: number
+  ): StoredPlayer {
     const room = this.requireWaitingRoom(gameRoomId);
     const activeCount = room.players.filter((player) => !player.leftAt).length;
-    if (activeCount >= 12) {
-      throw new AppError("conflict", "Room is full (max 12 players)", 409);
+    if (activeCount >= room.targetPlayerCount) {
+      throw new AppError("conflict", "Room is full", 409);
     }
     const existing = room.players.find((player) => player.userId === userId);
     if (existing) {
+      if (existing.leftAt && preferredSeatNo !== undefined) {
+        const seatNo = this.resolveJoinSeatNo(room, preferredSeatNo);
+        room.players = room.players.filter(
+          (player) =>
+            player.id !== existing.id &&
+            !(player.leftAt && player.seatNo === seatNo)
+        );
+        const player: StoredPlayer = {
+          id: `player_${seatNo}`,
+          kind: "user",
+          userId,
+          displayName,
+          ...(avatarUrl ? { avatarUrl } : {}),
+          seatNo,
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+          joinedAt: new Date().toISOString(),
+        };
+        room.players.push(player);
+        this.persistRoom(room);
+        return player;
+      }
       const activeAtOldSeat = room.players.some(
         (player) =>
           player.id !== existing.id &&
@@ -268,12 +317,14 @@ export class InMemoryGameService {
       if (!activeAtOldSeat) {
         existing.leftAt = null;
         existing.onlineState = "online";
+        existing.displayName = displayName;
+        if (avatarUrl) existing.avatarUrl = avatarUrl;
         this.persistRoom(room);
         return existing;
       }
       room.players = room.players.filter((player) => player.id !== existing.id);
     }
-    const seatNo = this.nextAvailableSeatNo(room);
+    const seatNo = this.resolveJoinSeatNo(room, preferredSeatNo);
     room.players = room.players.filter(
       (player) => !(player.leftAt && player.seatNo === seatNo)
     );
@@ -282,6 +333,7 @@ export class InMemoryGameService {
       kind: "user",
       userId,
       displayName,
+      ...(avatarUrl ? { avatarUrl } : {}),
       seatNo,
       ready: true,
       onlineState: "online",
@@ -291,6 +343,30 @@ export class InMemoryGameService {
     room.players.push(player);
     this.persistRoom(room);
     return player;
+  }
+
+  private resolveJoinSeatNo(
+    room: StoredGameRoom,
+    preferredSeatNo: number | undefined
+  ): number {
+    if (preferredSeatNo === undefined) return this.nextAvailableSeatNo(room);
+    if (!Number.isInteger(preferredSeatNo) || preferredSeatNo < 1) {
+      throw new AppError("invalid_action", "Invalid seat number", 400);
+    }
+    if (preferredSeatNo > room.targetPlayerCount) {
+      throw new AppError(
+        "invalid_action",
+        `Seat ${preferredSeatNo} is outside the room limit (1-${room.targetPlayerCount})`,
+        400
+      );
+    }
+    const occupied = room.players.some(
+      (player) => !player.leftAt && player.seatNo === preferredSeatNo
+    );
+    if (occupied) {
+      throw new AppError("conflict", "Seat is occupied", 409);
+    }
+    return preferredSeatNo;
   }
 
   leave(gameRoomId: string, userId: string): StoredPlayer {
@@ -311,12 +387,10 @@ export class InMemoryGameService {
     gameRoomId: string,
     callerUserId: string,
     agentUserId: string,
-    displayName: string
+    displayName: string,
+    avatarUrl?: string
   ): StoredPlayer {
     const room = this.requireWaitingRoom(gameRoomId);
-    if (room.creatorUserId !== callerUserId) {
-      throw new AppError("forbidden", "Only creator can add agent players", 403);
-    }
     const existing = room.players.find(
       (candidate) => candidate.agentId === agentUserId
     );
@@ -330,6 +404,9 @@ export class InMemoryGameService {
       if (!existing.leftAt || !activeAtOldSeat) {
         existing.leftAt = null;
         existing.onlineState = "online";
+        existing.displayName = displayName || agentUserId;
+        existing.invitedByUserId = callerUserId;
+        if (avatarUrl) existing.avatarUrl = avatarUrl;
         this.persistRoom(room);
         return existing;
       }
@@ -347,7 +424,9 @@ export class InMemoryGameService {
       id: `player_${seatNo}`,
       kind: "agent",
       agentId: agentUserId,
+      invitedByUserId: callerUserId,
       displayName: displayName || agentUserId,
+      ...(avatarUrl ? { avatarUrl } : {}),
       seatNo,
       ready: true,
       onlineState: "online",
@@ -365,17 +444,25 @@ export class InMemoryGameService {
     playerId: string
   ): StoredPlayer {
     const room = this.requireWaitingRoom(gameRoomId);
-    if (room.creatorUserId !== callerUserId) {
-      throw new AppError("forbidden", "Only creator can remove players", 403);
-    }
     const player = room.players.find(
       (candidate) => candidate.id === playerId && !candidate.leftAt
     );
     if (!player) {
       throw new AppError("not_found", "Player not found in room", 404);
     }
+    const canRemove =
+      room.creatorUserId === callerUserId ||
+      (player.kind === "agent" && player.invitedByUserId === callerUserId);
+    if (!canRemove) {
+      throw new AppError(
+        "forbidden",
+        "Only creator can remove players; users can remove their invited agents",
+        403
+      );
+    }
     player.leftAt = new Date().toISOString();
     player.onlineState = "offline";
+    this.emitPlayerRemovedEvent(room, player, callerUserId);
     this.persistRoom(room);
     return player;
   }
@@ -442,20 +529,30 @@ export class InMemoryGameService {
         kind: caller.kind,
         userId: caller.userId,
         agentId: caller.agentId,
+        invitedByUserId: caller.invitedByUserId,
         displayName: caller.displayName,
+        avatarUrl: caller.avatarUrl,
       };
       caller.kind = occupant.kind;
       caller.displayName = occupant.displayName;
+      if (occupant.avatarUrl !== undefined) caller.avatarUrl = occupant.avatarUrl;
+      else delete caller.avatarUrl;
       if (occupant.userId !== undefined) caller.userId = occupant.userId;
       else delete caller.userId;
       if (occupant.agentId !== undefined) caller.agentId = occupant.agentId;
       else delete caller.agentId;
+      if (occupant.invitedByUserId !== undefined) caller.invitedByUserId = occupant.invitedByUserId;
+      else delete caller.invitedByUserId;
       occupant.kind = callerSnapshot.kind;
       occupant.displayName = callerSnapshot.displayName;
+      if (callerSnapshot.avatarUrl !== undefined) occupant.avatarUrl = callerSnapshot.avatarUrl;
+      else delete occupant.avatarUrl;
       if (callerSnapshot.userId !== undefined) occupant.userId = callerSnapshot.userId;
       else delete occupant.userId;
       if (callerSnapshot.agentId !== undefined) occupant.agentId = callerSnapshot.agentId;
       else delete occupant.agentId;
+      if (callerSnapshot.invitedByUserId !== undefined) occupant.invitedByUserId = callerSnapshot.invitedByUserId;
+      else delete occupant.invitedByUserId;
       // The "caller record" is now at the target seat; "occupant record" is
       // back at the original seat. Return the post-swap views.
       this.emitSeatChangedEvent(room, {
@@ -480,12 +577,14 @@ export class InMemoryGameService {
       id: `player_${targetSeatNo}`,
       kind: caller.kind,
       displayName: caller.displayName,
+      ...(caller.avatarUrl !== undefined ? { avatarUrl: caller.avatarUrl } : {}),
       seatNo: targetSeatNo,
       ready: caller.ready,
       onlineState: caller.onlineState,
       leftAt: null,
       ...(caller.userId !== undefined ? { userId: caller.userId } : {}),
       ...(caller.agentId !== undefined ? { agentId: caller.agentId } : {}),
+      ...(caller.invitedByUserId !== undefined ? { invitedByUserId: caller.invitedByUserId } : {}),
       ...(caller.joinedAt !== undefined ? { joinedAt: caller.joinedAt } : {}),
     };
     room.players = room.players.filter(
@@ -539,6 +638,31 @@ export class InMemoryGameService {
                 displacedDisplayName: move.displacedDisplayName,
               }
             : {}),
+        },
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+  }
+
+  private emitPlayerRemovedEvent(
+    room: StoredGameRoom,
+    player: StoredPlayer,
+    removedByUserId: string
+  ): void {
+    this.assignAndAppendEvents(room, [
+      {
+        id: "pending",
+        gameRoomId: room.id,
+        seq: 1,
+        type: "player_removed",
+        visibility: "public",
+        actorId: player.id,
+        payload: {
+          playerId: player.id,
+          seatNo: player.seatNo,
+          displayName: player.displayName,
+          kind: player.kind,
+          removedByUserId,
         },
         createdAt: new Date().toISOString(),
       },
@@ -642,6 +766,7 @@ export class InMemoryGameService {
 
     const phase = room.projection.phase;
     const now = new Date();
+    this.assertActionExpectation(room, action);
 
     if (action.kind === "speech") {
       const privateState = this.requirePrivateState(room, playerId);
@@ -693,33 +818,17 @@ export class InMemoryGameService {
       if (room.projection.currentSpeakerPlayerId !== playerId) {
         throw new AppError("invalid_action", "Not your turn to speak", 400);
       }
-      // Flush the player's STT transcript buffer and write it as a speech event
-      let transcript = "";
-      if (this.voiceAgents) {
-        const agent = this.voiceAgents.get(gameRoomId);
-        if (agent) {
-          transcript = await agent.flushPlayerTranscript(playerId);
-        }
-      }
-      const speechText = transcript.trim() || `${player.displayName} fell silent.`;
-      const event = validatePlayerAction({
-        gameRoomId,
-        day: room.projection.day,
-        phase,
-        actorPlayerId: playerId,
-        currentSpeakerPlayerId: room.projection.currentSpeakerPlayerId,
-        alivePlayerIds: room.projection.alivePlayerIds,
-        eliminatedPlayerIds: room.privateStates
-          .filter((s) => !s.alive)
-          .map((s) => s.playerId),
-        action: { kind: "saySpeech", speech: speechText },
+      const assigned = await this.finalizeHumanSpeechTurn(
+        room,
+        playerId,
         now,
-      });
-      const [assigned] = this.assignAndAppendEvents(room, [event]);
-      this.advanceSpeechSpeaker(room, playerId, now);
-      this.emitSpeechTurnStarted(room, playerId, now);
+        `${player.displayName} fell silent.`
+      );
+      if (!assigned) {
+        throw new AppError("conflict", "Action turn has changed", 409);
+      }
       void this.scheduleAdvance(gameRoomId);
-      return assigned!;
+      return assigned;
     }
 
     if (action.kind === "vote") {
@@ -779,10 +888,8 @@ export class InMemoryGameService {
       if (!room.projection.alivePlayerIds.includes(action.targetPlayerId)) {
         throw new AppError("invalid_action", "Target is not alive", 400);
       }
-      if (action.targetPlayerId === playerId) {
-        throw new AppError("invalid_action", "Cannot target yourself", 400);
-      }
       const privateState = this.requirePrivateState(room, playerId);
+      this.requirePrivateState(room, action.targetPlayerId);
       const phaseToRole: Partial<Record<GamePhase, Role>> = {
         night_guard: "guard",
         night_wolf: "werewolf",
@@ -793,14 +900,19 @@ export class InMemoryGameService {
       if (privateState.role !== phaseToRole[phase]) {
         throw new AppError("forbidden", "You do not have the role for this action", 403);
       }
+      if (
+        action.targetPlayerId === playerId &&
+        phase !== "night_guard" &&
+        phase !== "night_wolf" &&
+        phase !== "night_witch_heal"
+      ) {
+        throw new AppError("invalid_action", "Cannot target yourself", 400);
+      }
       if (phase === "night_witch_heal" && !privateState.witchItems?.healAvailable) {
         throw new AppError("invalid_action", "Heal item is not available", 400);
       }
       if (phase === "night_witch_heal") {
-        const wolfKill = room.pendingNightActions.find(
-          (nightAction): nightAction is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
-            nightAction.kind === "wolfKill"
-        );
+        const wolfKill = this.findWolfKillForCurrentDay(room);
         if (!wolfKill) {
           throw new AppError("invalid_action", "No wolf kill target to heal", 400);
         }
@@ -811,9 +923,7 @@ export class InMemoryGameService {
       if (phase === "night_witch_poison" && !privateState.witchItems?.poisonAvailable) {
         throw new AppError("invalid_action", "Poison item is not available", 400);
       }
-      const alreadyActed = room.pendingNightActions.some(
-        (a) => a.actorPlayerId === playerId
-      );
+      const alreadyActed = this.hasNightActionForCurrentPhase(room, playerId);
       if (alreadyActed) {
         throw new AppError("conflict", "You have already acted this phase", 409);
       }
@@ -881,9 +991,22 @@ export class InMemoryGameService {
         "night_seer",
       ];
       if (nightPhases.includes(phase)) {
-        const alreadyActed = room.pendingNightActions.some(
-          (a) => a.actorPlayerId === playerId
-        );
+        const privateState = this.requirePrivateState(room, playerId);
+        const phaseToRole: Partial<Record<GamePhase, Role>> = {
+          night_guard: "guard",
+          night_wolf: "werewolf",
+          night_witch_heal: "witch",
+          night_witch_poison: "witch",
+          night_seer: "seer",
+        };
+        if (privateState.role !== phaseToRole[phase]) {
+          throw new AppError(
+            "forbidden",
+            "You do not have the role for this action",
+            403
+          );
+        }
+        const alreadyActed = this.hasNightActionForCurrentPhase(room, playerId);
         if (alreadyActed) {
           throw new AppError("conflict", "You have already acted this phase", 409);
         }
@@ -895,6 +1018,31 @@ export class InMemoryGameService {
     }
 
     throw new AppError("invalid_action", "Unknown action kind", 400);
+  }
+
+  private assertActionExpectation(
+    room: StoredGameRoom,
+    action: PlayerSubmittedAction
+  ): void {
+    if (!room.projection) return;
+    if (
+      action.expectedPhase !== undefined &&
+      action.expectedPhase !== room.projection.phase
+    ) {
+      throw new AppError("conflict", "Action phase has changed", 409);
+    }
+    if (
+      action.expectedDay !== undefined &&
+      action.expectedDay !== room.projection.day
+    ) {
+      throw new AppError("conflict", "Action day has changed", 409);
+    }
+    if (
+      action.expectedVersion !== undefined &&
+      action.expectedVersion !== room.projection.version
+    ) {
+      throw new AppError("conflict", "Action turn has changed", 409);
+    }
   }
 
   async scheduleAdvance(gameRoomId: string): Promise<void> {
@@ -1025,9 +1173,7 @@ export class InMemoryGameService {
       if (guard) {
         const player = this.requirePlayer(room, guard.playerId);
         if (player.kind === "user") {
-          const pending = room.pendingNightActions.find(
-            (a) => a.actorPlayerId === guard.playerId
-          );
+          const pending = this.findNightActionForCurrentPhase(room, guard.playerId);
           if (!pending) {
             if (!this.deadlinePassed(room, now)) {
               return this.tickResult(room, before);
@@ -1063,11 +1209,10 @@ export class InMemoryGameService {
       const pendingHumanWolves = wolves.filter((id) => {
         const player = room.players.find((p) => p.id === id);
         if (player?.kind !== "user") return false;
-        const acted = room.pendingNightActions.some(
-          (a) =>
-            a.actorPlayerId === id &&
-            (a.kind === "wolfKill" || a.kind === "passAction")
-        );
+        const acted = this.hasNightActionForCurrentPhase(room, id, [
+          "wolfKill",
+          "passAction",
+        ]);
         return !acted;
       });
       if (pendingHumanWolves.length > 0) {
@@ -1127,9 +1272,7 @@ export class InMemoryGameService {
       if (witch) {
         const player = this.requirePlayer(room, witch.playerId);
         if (player.kind === "user") {
-          const pending = room.pendingNightActions.find(
-            (a) => a.actorPlayerId === witch.playerId
-          );
+          const pending = this.findNightActionForCurrentPhase(room, witch.playerId);
           if (!pending) {
             if (!this.deadlinePassed(room, now)) {
               return this.tickResult(room, before);
@@ -1159,9 +1302,7 @@ export class InMemoryGameService {
       if (witch) {
         const player = this.requirePlayer(room, witch.playerId);
         if (player.kind === "user") {
-          const pending = room.pendingNightActions.find(
-            (a) => a.actorPlayerId === witch.playerId
-          );
+          const pending = this.findNightActionForCurrentPhase(room, witch.playerId);
           if (!pending) {
             if (!this.deadlinePassed(room, now)) {
               return this.tickResult(room, before);
@@ -1189,9 +1330,7 @@ export class InMemoryGameService {
       if (seer) {
         const player = this.requirePlayer(room, seer.playerId);
         if (player.kind === "user") {
-          const pending = room.pendingNightActions.find(
-            (a) => a.actorPlayerId === seer.playerId
-          );
+          const pending = this.findNightActionForCurrentPhase(room, seer.playerId);
           if (!pending) {
             if (!this.deadlinePassed(room, now)) {
               return this.tickResult(room, before);
@@ -1225,6 +1364,7 @@ export class InMemoryGameService {
         gameRoomId: room.id,
         day: room.projection.day,
         alivePlayerIds: room.projection.alivePlayerIds,
+        privateStates: room.privateStates,
         actions: room.pendingNightActions,
         now,
       });
@@ -1356,6 +1496,44 @@ export class InMemoryGameService {
     }
 
     return this.tickResult(room, before);
+  }
+
+  recordSpeechTranscript(
+    gameRoomId: string,
+    input: { playerId: string; text: string; final: boolean }
+  ): GameEvent | null {
+    const room = this.rooms.get(gameRoomId);
+    if (!room || room.status !== "active" || !room.projection) return null;
+    const text = input.text.trim();
+    if (!text) return null;
+    const player = room.players.find((candidate) => candidate.id === input.playerId);
+    if (!player || player.leftAt) return null;
+    if (
+      room.projection.phase !== "day_speak" &&
+      room.projection.phase !== "tie_speech"
+    ) {
+      return null;
+    }
+    if (room.projection.currentSpeakerPlayerId !== input.playerId) {
+      return null;
+    }
+    const [event] = this.assignAndAppendEvents(room, [
+      {
+        ...this.baseEvent(room, input.playerId, "public"),
+        type: "speech_transcript_delta",
+        payload: {
+          day: room.projection.day,
+          phase: room.projection.phase,
+          text,
+          final: input.final,
+          stream: true,
+        },
+      },
+    ]);
+    console.log(
+      `[STT] ${room.id} ${event!.id} ${player.displayName}: ${text}`
+    );
+    return event ?? null;
   }
 
   private tickResult(room: StoredGameRoom, before: number): RuntimeTickResult {
@@ -1547,41 +1725,116 @@ export class InMemoryGameService {
     action: RuntimeNightAction
   ): void {
     if (!room.projection) throw new Error("projection is required");
-    room.pendingNightActions.push(action);
+    const scopedAction = {
+      ...action,
+      day: action.day ?? room.projection.day,
+      phase: action.phase ?? room.projection.phase,
+    } as RuntimeNightAction;
+    room.pendingNightActions.push(scopedAction);
+    this.consumeWitchItemForAction(room, scopedAction);
     this.assignAndAppendEvents(room, [
       {
         id: "pending",
         gameRoomId: room.id,
         seq: 1,
         type: "night_action_submitted",
-        visibility: `private:user:${action.actorPlayerId}`,
-        actorId: action.actorPlayerId,
-        subjectId: "targetPlayerId" in action ? action.targetPlayerId : undefined,
-        payload: { day: room.projection.day, phase: room.projection.phase, action },
+        visibility: `private:user:${scopedAction.actorPlayerId}`,
+        actorId: scopedAction.actorPlayerId,
+        subjectId:
+          "targetPlayerId" in scopedAction ? scopedAction.targetPlayerId : undefined,
+        payload: {
+          day: room.projection.day,
+          phase: room.projection.phase,
+          action: scopedAction,
+        },
         createdAt: new Date().toISOString(),
       },
     ]);
-    if (action.kind === "seerInspect") {
-      const inspected = this.requirePrivateState(room, action.targetPlayerId);
+    if (scopedAction.kind === "seerInspect") {
+      const inspected = this.requirePrivateState(room, scopedAction.targetPlayerId);
       this.assignAndAppendEvents(room, [
         {
           id: "pending",
           gameRoomId: room.id,
           seq: 1,
           type: "seer_result_revealed",
-          visibility: `private:user:${action.actorPlayerId}`,
+          visibility: `private:user:${scopedAction.actorPlayerId}`,
           actorId: "runtime",
-          subjectId: action.targetPlayerId,
+          subjectId: scopedAction.targetPlayerId,
           payload: {
             day: room.projection.day,
-            seerPlayerId: action.actorPlayerId,
-            inspectedPlayerId: action.targetPlayerId,
+            seerPlayerId: scopedAction.actorPlayerId,
+            inspectedPlayerId: scopedAction.targetPlayerId,
             alignment: inspected.team === "wolf" ? "wolf" : "good",
           },
           createdAt: new Date().toISOString(),
         },
       ]);
     }
+  }
+
+  private consumeWitchItemForAction(
+    room: StoredGameRoom,
+    action: RuntimeNightAction
+  ): void {
+    if (action.kind !== "witchHeal" && action.kind !== "witchPoison") {
+      return;
+    }
+    const state = this.requirePrivateState(room, action.actorPlayerId);
+    if (!state.witchItems) {
+      return;
+    }
+    state.witchItems = {
+      ...state.witchItems,
+      healAvailable:
+        action.kind === "witchHeal" ? false : state.witchItems.healAvailable,
+      poisonAvailable:
+        action.kind === "witchPoison" ? false : state.witchItems.poisonAvailable,
+    };
+  }
+
+  private isNightActionForCurrentPhase(
+    room: StoredGameRoom,
+    action: RuntimeNightAction
+  ): boolean {
+    if (!room.projection) return false;
+    return (
+      action.day === room.projection.day &&
+      action.phase === room.projection.phase
+    );
+  }
+
+  private findNightActionForCurrentPhase(
+    room: StoredGameRoom,
+    actorPlayerId: string,
+    kinds?: RuntimeNightAction["kind"][]
+  ): RuntimeNightAction | undefined {
+    return room.pendingNightActions.find(
+      (action) =>
+        action.actorPlayerId === actorPlayerId &&
+        this.isNightActionForCurrentPhase(room, action) &&
+        (!kinds || kinds.includes(action.kind))
+    );
+  }
+
+  private hasNightActionForCurrentPhase(
+    room: StoredGameRoom,
+    actorPlayerId: string,
+    kinds?: RuntimeNightAction["kind"][]
+  ): boolean {
+    return Boolean(this.findNightActionForCurrentPhase(room, actorPlayerId, kinds));
+  }
+
+  private findWolfKillForCurrentDay(
+    room: StoredGameRoom
+  ): Extract<RuntimeNightAction, { kind: "wolfKill" }> | undefined {
+    if (!room.projection) return undefined;
+    return room.pendingNightActions.find(
+      (
+        action
+      ): action is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
+        action.kind === "wolfKill" && action.day === room.projection?.day
+    );
   }
 
   private async runWolfDiscussion(
@@ -1592,11 +1845,10 @@ export class InMemoryGameService {
   ): Promise<void> {
     for (const playerId of wolfPlayerIds) {
       // Skip wolves that already acted (human wolves who submitted their vote)
-      const alreadyActed = room.pendingNightActions.some(
-        (a) =>
-          a.actorPlayerId === playerId &&
-          (a.kind === "wolfKill" || a.kind === "passAction")
-      );
+      const alreadyActed = this.hasNightActionForCurrentPhase(room, playerId, [
+        "wolfKill",
+        "passAction",
+      ]);
       if (alreadyActed) continue;
 
       const player = this.requirePlayer(room, playerId);
@@ -1643,6 +1895,7 @@ export class InMemoryGameService {
       .filter(
         (a): a is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
           a.kind === "wolfKill" &&
+          this.isNightActionForCurrentPhase(room, a) &&
           a.actorPlayerId !== "wolf_team" &&
           wolfPlayerIds.includes(a.actorPlayerId)
       )
@@ -1667,9 +1920,9 @@ export class InMemoryGameService {
       // Skip human wolves who were auto-passed after deadline
       const player = this.requirePlayer(room, playerId);
       if (player.kind === "user") {
-        const passed = room.pendingNightActions.some(
-          (a) => a.actorPlayerId === playerId && a.kind === "passAction"
-        );
+        const passed = this.hasNightActionForCurrentPhase(room, playerId, [
+          "passAction",
+        ]);
         if (passed) continue;
       }
 
@@ -1744,7 +1997,12 @@ export class InMemoryGameService {
 
     // Remove individual wolfKill entries before adding the resolved team kill
     room.pendingNightActions = room.pendingNightActions.filter(
-      (a) => !(a.kind === "wolfKill" && a.actorPlayerId !== "wolf_team")
+      (a) =>
+        !(
+          a.kind === "wolfKill" &&
+          this.isNightActionForCurrentPhase(room, a) &&
+          a.actorPlayerId !== "wolf_team"
+        )
     );
 
     if (targetPlayerId) {
@@ -1752,6 +2010,8 @@ export class InMemoryGameService {
         actorPlayerId: "wolf_team",
         kind: "wolfKill",
         targetPlayerId,
+        day: room.projection.day,
+        phase: room.projection.phase,
       });
       this.assignAndAppendEvents(room, [
         {
@@ -1765,7 +2025,13 @@ export class InMemoryGameService {
           payload: {
             day: room.projection.day,
             phase: room.projection.phase,
-            action: { actorPlayerId: "wolf_team", kind: "wolfKill", targetPlayerId },
+            action: {
+              actorPlayerId: "wolf_team",
+              kind: "wolfKill",
+              targetPlayerId,
+              day: room.projection.day,
+              phase: room.projection.phase,
+            },
           },
           createdAt: now.toISOString(),
         },
@@ -1805,17 +2071,19 @@ export class InMemoryGameService {
     if (!room.projection.alivePlayerIds.includes(action.targetPlayerId)) {
       return { actorPlayerId, kind: "passAction" };
     }
-    if (action.targetPlayerId === actorPlayerId) {
+    if (
+      action.targetPlayerId === actorPlayerId &&
+      action.kind !== "guardProtect" &&
+      action.kind !== "wolfKill" &&
+      action.kind !== "witchHeal"
+    ) {
       return { actorPlayerId, kind: "passAction" };
     }
 
     const state = this.requirePrivateState(room, actorPlayerId);
     if (action.kind === "witchHeal") {
       if (!state.witchItems?.healAvailable) return { actorPlayerId, kind: "passAction" };
-      const wolfKill = room.pendingNightActions.find(
-        (nightAction): nightAction is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
-          nightAction.kind === "wolfKill"
-      );
+      const wolfKill = this.findWolfKillForCurrentDay(room);
       if (!wolfKill || action.targetPlayerId !== wolfKill.targetPlayerId) {
         return { actorPlayerId, kind: "passAction" };
       }
@@ -1823,7 +2091,7 @@ export class InMemoryGameService {
     if (action.kind === "witchPoison" && !state.witchItems?.poisonAvailable) {
       return { actorPlayerId, kind: "passAction" };
     }
-    if (room.pendingNightActions.some((pending) => pending.actorPlayerId === actorPlayerId)) {
+    if (this.hasNightActionForCurrentPhase(room, actorPlayerId)) {
       return { actorPlayerId, kind: "passAction" };
     }
     return action;
@@ -2052,19 +2320,12 @@ export class InMemoryGameService {
       if (!this.deadlinePassed(room, now)) {
         return; // 等待人类玩家通过 submitAction 发言
       }
-      this.assignAndAppendEvents(room, [
-        {
-          ...this.baseEvent(room, playerId, "public"),
-          type: "speech_submitted",
-          payload: {
-            day: room.projection.day,
-            speech: `${player.displayName} chose to remain silent.`,
-          },
-        },
-      ]);
-      this.resetPlayerTranscript(room.id, playerId);
-      this.advanceSpeechSpeaker(room, playerId, now);
-      this.emitSpeechTurnStarted(room, playerId, now);
+      await this.finalizeHumanSpeechTurn(
+        room,
+        playerId,
+        now,
+        `${player.displayName} chose to remain silent.`
+      );
       return;
     }
 
@@ -2072,21 +2333,9 @@ export class InMemoryGameService {
       prompt: `${this.languageInstruction(room)} You are ${player.displayName} in a Werewolf game. Speak briefly for ${room.projection.phase}. Your role is ${state.role}.`,
     });
     const speech = stringValue(result.input?.speech) ?? result.text;
-    this.assignAndAppendEvents(room, [
-      {
-        id: "pending",
-        gameRoomId: room.id,
-        seq: 1,
-        type: "speech_submitted",
-        visibility: "public",
-        actorId: playerId,
-        payload: { day: room.projection.day, speech },
-        createdAt: now.toISOString(),
-      },
-    ]);
-    // Synthesize agent speech via TTS and wait for the audio to fully play
-    // out before rotating to the next speaker, so the shared voice track
-    // doesn't get interrupted mid-utterance by the next turn.
+    // Synthesize agent speech via TTS and wait for the TTS WebSocket to finish
+    // and for the generated PCM frames to be handed to LiveKit before rotating
+    // to the next speaker.
     //
     // Skip TTS when the LLM call fell back to a placeholder speech: that
     // means the agent_id isn't provisioned on Unseal, and TTS for the same
@@ -2100,11 +2349,16 @@ export class InMemoryGameService {
       const voiceAgent = this.voiceAgents.get(room.id);
       if (voiceAgent) {
         try {
-          await voiceAgent.speak(
+          const captured = await voiceAgent.speak(
             speech,
             playerId,
             room.timing.agentSpeechRate ?? 1.5
           );
+          if (!captured) {
+            console.error(
+              `[VoiceAgent] no TTS audio captured for ${room.id}/${playerId}`
+            );
+          }
         } catch (err) {
           console.error("[VoiceAgent] speak failed:", err);
         }
@@ -2112,8 +2366,86 @@ export class InMemoryGameService {
     }
 
     const completedAt = new Date();
+    this.assignAndAppendEvents(room, [
+      {
+        id: "pending",
+        gameRoomId: room.id,
+        seq: 1,
+        type: "speech_submitted",
+        visibility: "public",
+        actorId: playerId,
+        payload: { day: room.projection.day, speech },
+        createdAt: completedAt.toISOString(),
+      },
+    ]);
     this.advanceSpeechSpeaker(room, playerId, completedAt);
     this.emitSpeechTurnStarted(room, playerId, completedAt);
+  }
+
+  private finalizeHumanSpeechTurn(
+    room: StoredGameRoom,
+    playerId: string,
+    now: Date,
+    fallbackSpeech: string
+  ): Promise<GameEvent | null> {
+    const existing = this.speechFinalizations.get(room.id);
+    if (existing) return existing;
+
+    const finalization = this.finalizeHumanSpeechTurnInner(
+      room,
+      playerId,
+      now,
+      fallbackSpeech
+    ).finally(() => {
+      if (this.speechFinalizations.get(room.id) === finalization) {
+        this.speechFinalizations.delete(room.id);
+      }
+    });
+    this.speechFinalizations.set(room.id, finalization);
+    return finalization;
+  }
+
+  private async finalizeHumanSpeechTurnInner(
+    room: StoredGameRoom,
+    playerId: string,
+    now: Date,
+    fallbackSpeech: string
+  ): Promise<GameEvent | null> {
+    if (!room.projection) return null;
+    const expectedSpeechTurn = {
+      phase: room.projection.phase,
+      day: room.projection.day,
+      version: room.projection.version,
+      currentSpeakerPlayerId: room.projection.currentSpeakerPlayerId,
+    };
+    const transcript = await this.flushPlayerTranscript(room.id, playerId);
+    if (
+      !room.projection ||
+      room.projection.phase !== expectedSpeechTurn.phase ||
+      room.projection.day !== expectedSpeechTurn.day ||
+      room.projection.version !== expectedSpeechTurn.version ||
+      room.projection.currentSpeakerPlayerId !== expectedSpeechTurn.currentSpeakerPlayerId
+    ) {
+      return null;
+    }
+    const speechText = transcript.trim() || fallbackSpeech;
+    const event = validatePlayerAction({
+      gameRoomId: room.id,
+      day: room.projection.day,
+      phase: room.projection.phase,
+      actorPlayerId: playerId,
+      currentSpeakerPlayerId: room.projection.currentSpeakerPlayerId,
+      alivePlayerIds: room.projection.alivePlayerIds,
+      eliminatedPlayerIds: room.privateStates
+        .filter((s) => !s.alive)
+        .map((s) => s.playerId),
+      action: { kind: "saySpeech", speech: speechText },
+      now,
+    });
+    const [assigned] = this.assignAndAppendEvents(room, [event]);
+    this.advanceSpeechSpeaker(room, playerId, now);
+    this.emitSpeechTurnStarted(room, playerId, now);
+    return assigned ?? null;
   }
 
   private advanceSpeechSpeaker(
@@ -2176,10 +2508,7 @@ export class InMemoryGameService {
 
   private revealWolfKillToWitch(room: StoredGameRoom, now: Date): void {
     if (!room.projection) throw new Error("projection is required");
-    const wolfKill = room.pendingNightActions.find(
-      (action): action is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
-        action.kind === "wolfKill"
-    );
+    const wolfKill = this.findWolfKillForCurrentDay(room);
     if (!wolfKill) return;
     const witch = room.privateStates.find((state) => state.role === "witch" && state.alive);
     if (!witch) return;
@@ -2211,6 +2540,15 @@ export class InMemoryGameService {
   private resetPlayerTranscript(gameRoomId: string, playerId: string): void {
     const agent = this.voiceAgents?.get(gameRoomId);
     agent?.resetPlayerTranscript(playerId);
+  }
+
+  private async flushPlayerTranscript(
+    gameRoomId: string,
+    playerId: string
+  ): Promise<string> {
+    const agent = this.voiceAgents?.get(gameRoomId);
+    if (!agent) return "";
+    return agent.flushPlayerTranscript(playerId);
   }
 
   private requireRolePlayer(room: StoredGameRoom, role: Role): PlayerPrivateState {

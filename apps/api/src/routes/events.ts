@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { AppError, type GameEvent } from "@werewolf/shared";
-import { authenticateRequest, type MatrixAuthClient } from "../context/auth";
+import {
+  authenticateRequest,
+  type MatrixAuthClient,
+  type MatrixProfileCache,
+} from "../context/auth";
 import type { SseBroker } from "../services/sse-broker";
 import type { GameStore } from "../services/game-store";
 import type { InMemoryGameService } from "../services/game-service";
@@ -11,6 +15,7 @@ export interface EventsRouteDeps {
   store?: GameStore | null;
   games: InMemoryGameService;
   matrix: MatrixAuthClient;
+  profileCache?: MatrixProfileCache | undefined;
 }
 
 export function createEventsRoutes(deps: EventsRouteDeps): Hono {
@@ -31,41 +36,46 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
   app.get("/:gameRoomId/subscribe", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, matrix);
+      const user = await authenticateRequest(c.req.raw, matrix, deps.profileCache);
       const gameRoomId = c.req.param("gameRoomId");
-      const room = games.snapshot(gameRoomId);
-      const myPlayer = room.players.find(
-        (player) => player.userId === user.id && !player.leftAt
-      );
-      const myPrivateState = myPlayer
-        ? room.privateStates.find((state) => state.playerId === myPlayer.id)
-        : undefined;
-      const isWolf = myPrivateState?.team === "wolf";
+      games.snapshot(gameRoomId);
       const lastEventId = c.req.header("last-event-id");
       const lastSeq = lastEventId ? Number(lastEventId) : 0;
 
       const stream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
+          const perspective = () => buildPerspective(games, gameRoomId, user.id);
           const pushVisible = (payload: string) => {
             const event = eventFromSsePayload(payload);
             if (!event) return;
-            const latestRoom = games.snapshot(gameRoomId);
-            const revealAll =
-              latestRoom.status === "ended" ||
-              latestRoom.projection?.status === "ended";
+            const view = perspective();
             if (
               !filterEventsForUser(
                 [event],
-                myPlayer?.id,
-                Boolean(isWolf),
-                revealAll
+                view.myPlayerId,
+                view.isWolf,
+                view.revealAll
               ).length
             ) {
               return;
             }
             controller.enqueue(encoder.encode(payload));
           };
+
+          const initial = perspective();
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                snapshot: {
+                  room: initial.room,
+                  projection: initial.room.projection,
+                  privateStates: initial.privateStates,
+                  events: initial.events,
+                },
+              })}\n\n`
+            )
+          );
 
           const { replay, unsubscribe } = broker.subscribe(
             gameRoomId,
@@ -87,11 +97,12 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
           if (needsDbReplay) {
             try {
+              const view = perspective();
               const dbEvents = filterEventsForUser(
                 await store.loadEventsSince(gameRoomId, lastSeq),
-                myPlayer?.id,
-                Boolean(isWolf),
-                room.status === "ended" || room.projection?.status === "ended"
+                view.myPlayerId,
+                view.isWolf,
+                view.revealAll
               );
               const minBrokerSeq = replayStart;
               for (const event of dbEvents) {
@@ -130,6 +141,37 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
   });
 
   return app;
+}
+
+function buildPerspective(
+  games: InMemoryGameService,
+  gameRoomId: string,
+  userId: string
+) {
+  const room = games.snapshot(gameRoomId);
+  const myPlayer = room.players.find(
+    (player) => player.userId === userId && !player.leftAt
+  );
+  const myPrivateState = myPlayer
+    ? room.privateStates.find((state) => state.playerId === myPlayer.id)
+    : undefined;
+  const revealAll = room.status === "ended" || room.projection?.status === "ended";
+  const isWolf = Boolean(myPrivateState?.team === "wolf" && myPrivateState.alive);
+  const events = filterEventsForUser(
+    room.events,
+    myPlayer?.id,
+    isWolf,
+    revealAll
+  );
+  const privateStates = myPrivateState ? [myPrivateState] : [];
+  return {
+    room: { ...room, events, privateStates },
+    events,
+    privateStates,
+    myPlayerId: myPlayer?.id,
+    isWolf,
+    revealAll,
+  };
 }
 
 function eventFromSsePayload(payload: string): GameEvent | null {

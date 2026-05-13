@@ -119,7 +119,7 @@
 |---|---|
 | `main.tsx` | 入口。`?gameRoomId=` 决定渲染 CreateGamePage 还是 GameRoomPage |
 | `routes/create.tsx` | 创建房间表单。POST /games 然后 `window.location.href = ${path}?gameRoomId=...` |
-| `routes/game.$gameRoomId.tsx` | **主页面，~1500 行**。组合 GameRoomShell + CenterStage + TimelineCapsule + VoiceRoomProvider。事件处理：SSE 直接 append，对 `PROJECTION_REFRESH_EVENT_TYPES` 触发一次 refreshGame |
+| `routes/game.$gameRoomId.tsx` | **主页面**。组合 GameRoomShell + CenterStage + TimelineCapsule + VoiceRoomProvider。进入页面只建立一次 `/subscribe`，维护本地 timeline，并从 subscribe snapshot + 新事件派生渲染状态 |
 | `components/VoiceRoom.tsx` | LiveKit Room 生命周期。`useEffect([serverUrl, token])` 一次性 connect，token 只在 player.id 变时才换 |
 | `components/VoicePanel.tsx` | 麦克风开关 UI |
 | `components/TimelineCapsule.tsx` | 时间线渲染。新增 `player_seat_changed` / `seer_result_revealed` / `witch_kill_revealed` 等 event 的本地化渲染 |
@@ -177,17 +177,21 @@ GET /:roomId/subscribe (Last-Event-ID: <lastSeq>)
 客户端（`game.$gameRoomId.tsx`）：
 ```ts
 source.onmessage = (event) => {
-  const parsed = parseSseEvent(event.data);
-  if (sseEventVisibleToMe(parsed, myPrivateStateRef.current)) {
-    setEvents(prev => [...prev, parsed]);          // 直接 append
+  const parsed = parseSubscribeMessage(event.data);
+  if (parsed.kind === "snapshot") {
+    setRoomSnapshot(parsed.snapshot.room);
+    setProjectionSnapshot(parsed.snapshot.projection);
+    setTimeline(parsed.snapshot.events);
+    setTimelineBaseSeq(computeTimelineBaseSeq(parsed.snapshot.events));
+    return;
   }
-  if (PROJECTION_REFRESH_EVENT_TYPES.has(parsed.type)) {
-    void refreshGame();                            // 只在改 projection 形状的事件 refresh
+  if (sseEventVisibleToMe(parsed.event, myPrivateStateRef.current)) {
+    setTimeline(prev => appendDedupe(prev, parsed.event));
   }
 };
 ```
 
-`PROJECTION_REFRESH_EVENT_TYPES = { game_started, phase_started, phase_closed, night_resolved, player_eliminated, player_seat_changed, game_ended, speech_submitted, vote_submitted, wolf_vote_resolved }`。其他事件（agent_turn_*、night_action_submitted、seer_result_revealed 等）纯 append，不再 trigger 整页 refetch。
+客户端不能知道也不能调用 `GET /games/:gameRoomId`。`/subscribe` 是房间读模型唯一来源，UI 操作不能触发重订阅或刷新。snapshot 里的历史 event 只用于日志，渲染状态只应用 `seq > timelineBaseSeq` 的新事件。
 
 `sseEventVisibleToMe` 镜像服务端 `filterEventsForUser`：public → 收，runtime → 丢，`private:user:<id>` → 匹配自己，`private:team:wolf` → 看 myPrivateState.team === wolf。
 

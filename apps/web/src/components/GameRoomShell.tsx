@@ -14,8 +14,8 @@ interface GameRoomShellProps {
   playerCount: number;
   targetPlayerCount: number;
   phaseLabel: string;
-  rawPhase?: string | null | undefined;
   day?: number | undefined;
+  rawPhase?: string | null | undefined;
   deadlineAt?: string | null | undefined;
   aliveCount?: number | undefined;
   scene: SceneId;
@@ -100,8 +100,8 @@ export function GameRoomShell({
   playerCount,
   targetPlayerCount,
   phaseLabel,
-  rawPhase,
   day,
+  rawPhase,
   deadlineAt,
   aliveCount,
   scene,
@@ -119,7 +119,7 @@ export function GameRoomShell({
   isLoading,
   errorMessage,
 }: GameRoomShellProps) {
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
   const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
   const countdown = useCountdown(deadlineAt);
   const danger = countdown > 0 && countdown <= 10;
@@ -174,13 +174,13 @@ export function GameRoomShell({
             {phaseIcon(scene)}
           </div>
           <div className="visual-room-meta">
-            <div className="visual-room-title">{title}</div>
-            <div className="visual-room-subtitle">
+            <div className="visual-room-phase">
               {phaseLabel}
               {day ? ` · 第 ${day} 天` : ""}
               {" · "}
               {living}/{targetPlayerCount || playerCount} 存活
             </div>
+            <div className="visual-room-title">{title}</div>
             {sourceMatrixRoomId ? (
               <div className="visual-room-source">{roomCode}</div>
             ) : null}
@@ -188,24 +188,6 @@ export function GameRoomShell({
           <div className="visual-top-actions">
             <div className={`visual-countdown ${danger ? "danger" : ""}`}>
               {deadlineAt ? (countdown > 0 ? countdown : "✓") : "—"}
-            </div>
-            <div className="locale-switcher visual-locale" role="group" aria-label={t("common.languageLabel")}>
-              <button
-                type="button"
-                className={locale === "zh-CN" ? "active" : ""}
-                onClick={() => setLocale("zh-CN")}
-                aria-pressed={locale === "zh-CN"}
-              >
-                中
-              </button>
-              <button
-                type="button"
-                className={locale === "en" ? "active" : ""}
-                onClick={() => setLocale("en")}
-                aria-pressed={locale === "en"}
-              >
-                EN
-              </button>
             </div>
           </div>
         </header>
