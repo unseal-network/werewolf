@@ -683,6 +683,14 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     };
   }, [voiceIdentityMode, matrixUserId, client, gameRoomId, roomIdForVoice]);
 
+  useEffect(() => {
+    return () => {
+      if (seerResultTimeoutRef.current !== null) {
+        window.clearTimeout(seerResultTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Drive a 1Hz tick so the countdown re-renders even when no SSE event
   // arrives. Only active when a deadline exists, to avoid useless renders
   // in the lobby / end states.
@@ -1014,27 +1022,54 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     myPrivateState?.role,
   ]);
 
+  const latestSeerResult = useMemo(() => {
+    if (!myPlayer || !myPrivateState || !projection) return null;
+    if (myPrivateState.role !== "seer") return null;
+
+    const seerResult = timelineDisplayState.facts.latestSeerResultBySeerDay.get(
+      seerDayKey(myPlayer.id, projection.day)
+    );
+    if (!seerResult) return null;
+
+    const seatNo =
+      room?.players.find((player) => player.id === seerResult.inspectedPlayerId)
+        ?.seatNo ?? 0;
+    const alignment = seerResult.alignment === "wolf" ? "wolf" : "good";
+
+    return {
+      key: `${seerResult.seerPlayerId}:${seerResult.day}:${seerResult.inspectedPlayerId}:${alignment}`,
+      seatNo,
+      alignment,
+    } as const;
+  }, [myPlayer, myPrivateState, projection, room?.players, timelineDisplayState.facts]);
+
+  useEffect(() => {
+    if (!latestSeerResult) return;
+    if (lastShownSeerResultKeyRef.current === latestSeerResult.key) return;
+
+    lastShownSeerResultKeyRef.current = latestSeerResult.key;
+    setSeerResultOpen(true);
+    if (seerResultTimeoutRef.current !== null) {
+      window.clearTimeout(seerResultTimeoutRef.current);
+    }
+    seerResultTimeoutRef.current = window.setTimeout(() => {
+      setSeerResultOpen(false);
+      seerResultTimeoutRef.current = null;
+    }, 4200);
+  }, [latestSeerResult]);
+
+  const closeSeerResult = useCallback(() => {
+    setSeerResultOpen(false);
+    if (seerResultTimeoutRef.current !== null) {
+      window.clearTimeout(seerResultTimeoutRef.current);
+      seerResultTimeoutRef.current = null;
+    }
+  }, []);
+
   const privateResultCopy = useMemo(() => {
     if (!myPlayer || !myPrivateState || !projection) return "";
     const phase = projection.phase ?? "";
     const currentDay = projection.day;
-
-    // Find the most recent seer_result_revealed for this player. Keep this
-    // visible for the rest of the day because the server may auto-advance
-    // immediately after the inspect action lands.
-    if (myPrivateState.role === "seer") {
-      const seerResult = timelineDisplayState.facts.latestSeerResultBySeerDay.get(
-        seerDayKey(myPlayer.id, currentDay)
-      );
-      if (!seerResult) return "";
-      const inspectedSeat =
-        room?.players.find((p) => p.id === seerResult.inspectedPlayerId)
-          ?.seatNo ?? 0;
-      return t("stage.privateResult.seer", {
-        seat: inspectedSeat,
-        alignment: t(`alignment.${seerResult.alignment}`),
-      });
-    }
 
     // Find witch_kill_revealed for witch
     if (phase === "night_witch_heal" && myPrivateState.role === "witch") {
@@ -1562,6 +1597,12 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
               onRefresh={refreshAgentCandidates}
               onStartNow={onAgentPickerStartNow}
               onClose={onAgentPickerClose}
+            />
+            <SeerResultDialog
+              open={seerResultOpen && Boolean(latestSeerResult)}
+              seatNo={latestSeerResult?.seatNo ?? 0}
+              alignment={latestSeerResult?.alignment ?? "good"}
+              onClose={closeSeerResult}
             />
           </>
         }
