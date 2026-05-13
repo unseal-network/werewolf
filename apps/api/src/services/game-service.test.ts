@@ -1449,4 +1449,75 @@ describe("InMemoryGameService rules", () => {
       })
     );
   });
+
+  it("records agent votes to the timeline before waiting for human voters", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const [agentVoter, humanVoter, target] = room.players;
+    expect(agentVoter).toBeDefined();
+    expect(humanVoter).toBeDefined();
+    expect(target).toBeDefined();
+    agentVoter!.kind = "agent";
+    agentVoter!.agentId = "@agent-voter:example.com";
+    let agentVoteCalls = 0;
+
+    room.privateStates = room.privateStates.map((state) => ({
+      ...state,
+      alive:
+        state.playerId === agentVoter!.id ||
+        state.playerId === humanVoter!.id ||
+        state.playerId === target!.id,
+    }));
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      alivePlayerIds: [agentVoter!.id, humanVoter!.id, target!.id],
+    };
+    room.pendingVotes = [];
+
+    await games.advanceGame(gameRoomId, async () => {
+      agentVoteCalls += 1;
+      return {
+        text: "vote",
+        toolName: "submitVote",
+        input: { targetPlayerId: target!.id },
+      };
+    });
+
+    expect(room.projection.phase).toBe("day_vote");
+    expect(room.pendingVotes).toEqual([
+      { actorPlayerId: agentVoter!.id, targetPlayerId: target!.id },
+    ]);
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "vote_submitted",
+        visibility: "public",
+        actorId: agentVoter!.id,
+        subjectId: target!.id,
+        payload: expect.objectContaining({
+          phase: "day_vote",
+          targetPlayerId: target!.id,
+        }),
+      })
+    );
+
+    await games.advanceGame(gameRoomId, async () => {
+      agentVoteCalls += 1;
+      return {
+        text: "duplicate vote",
+        toolName: "submitVote",
+        input: { targetPlayerId: target!.id },
+      };
+    });
+
+    expect(agentVoteCalls).toBe(1);
+    expect(
+      room.events.filter(
+        (event) =>
+          event.type === "vote_submitted" && event.actorId === agentVoter!.id
+      )
+    ).toHaveLength(1);
+  });
 });

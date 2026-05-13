@@ -1431,44 +1431,14 @@ export class InMemoryGameService {
       if (voteResult === null) {
         return this.tickResult(room, before);
       }
-      room.pendingVotes = voteResult;
       const resolved = resolveDayVote({
         gameRoomId: room.id,
         day: room.projection.day,
         alivePlayerIds: room.projection.alivePlayerIds,
         ...(tiedOnly ? { allowedTargetPlayerIds: tiedOnly } : {}),
-        votes: room.pendingVotes,
+        votes: voteResult,
         now,
       });
-      this.assignAndAppendEvents(
-        room,
-        room.pendingVotes
-          .filter(
-            (vote) =>
-              !room.events.some(
-                (event) =>
-                  event.type === "vote_submitted" &&
-                  event.actorId === vote.actorPlayerId &&
-                  Number(event.payload?.day) === room.projection?.day &&
-                  String(event.payload?.phase ?? "day_vote") === room.projection?.phase
-              )
-          )
-          .map((vote) => ({
-            id: "pending",
-            gameRoomId: room.id,
-            seq: 1,
-            type: "vote_submitted" as const,
-            visibility: "public" as const,
-            actorId: vote.actorPlayerId,
-            subjectId: vote.targetPlayerId || undefined,
-            payload: {
-              day: room.projection?.day ?? 1,
-              phase: room.projection?.phase,
-              targetPlayerId: vote.targetPlayerId,
-            },
-            createdAt: now.toISOString(),
-          }))
-      );
       this.assignAndAppendEvents(room, resolved.events);
       room.pendingVotes = [];
       if (resolved.exiledPlayerId) {
@@ -2158,14 +2128,13 @@ export class InMemoryGameService {
     allowedTargetPlayerIds?: string[]
   ): Promise<Array<{ actorPlayerId: string; targetPlayerId: string }> | null> {
     if (!room.projection) throw new Error("projection is required");
-    const votes: Array<{ actorPlayerId: string; targetPlayerId: string }> = [...room.pendingVotes];
     const allowedTargets = allowedTargetPlayerIds ?? room.projection.alivePlayerIds;
     const wolf = room.privateStates.find(
       (state) => state.role === "werewolf" && state.alive
     );
 
     for (const playerId of room.projection.alivePlayerIds) {
-      const alreadyVoted = votes.some((v) => v.actorPlayerId === playerId);
+      const alreadyVoted = room.pendingVotes.some((v) => v.actorPlayerId === playerId);
       if (alreadyVoted) continue;
 
       const player = this.requirePlayer(room, playerId);
@@ -2211,10 +2180,35 @@ export class InMemoryGameService {
         targetPlayerId !== playerId &&
         allowedTargets.includes(targetPlayerId)
       ) {
-        votes.push({ actorPlayerId: playerId, targetPlayerId });
+        this.recordPublicVote(room, playerId, targetPlayerId, now);
       }
     }
-    return votes;
+    return room.pendingVotes;
+  }
+
+  private recordPublicVote(
+    room: StoredGameRoom,
+    actorPlayerId: string,
+    targetPlayerId: string,
+    now: Date
+  ): GameEvent {
+    if (!room.projection) throw new Error("projection is required");
+    room.pendingVotes.push({ actorPlayerId, targetPlayerId });
+    const [event] = this.assignAndAppendEvents(room, [
+      {
+        ...this.baseEvent(room, actorPlayerId, "public"),
+        type: "vote_submitted",
+        subjectId: targetPlayerId || undefined,
+        payload: {
+          day: room.projection.day,
+          phase: room.projection.phase,
+          targetPlayerId,
+        },
+        createdAt: now.toISOString(),
+      },
+    ]);
+    if (!event) throw new Error("vote event was not appended");
+    return event;
   }
 
   private async runAgentToolTurn(
