@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useMemo } from 'react'
 import { useIFrameMessage } from '@unseal-network/game-sdk'
 import { createIframeMessageMock, isInIframe } from '../mocks/iframeMessageMock'
-
+import { co } from '@unseal-network/mobile-sdk'
 export interface GameInfo {
   roomId: string
   userId: string
@@ -18,7 +18,7 @@ export function useIframeAuth() {
   // 非 iframe 环境（本地开发）自动使用 mock
   const realMessage = useIFrameMessage()
   const mockMessage = useMemo(() => createIframeMessageMock(), [])
-  const iframeMessage = isInIframe() ? realMessage : mockMessage
+  const iframeMessage = isInIframe() || co.isMobile ? realMessage : mockMessage
 
   const [info, setInfo] = useState<GameInfo | null>(null)
   const tokenRef = useRef<string>('')

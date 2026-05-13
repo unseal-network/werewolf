@@ -10,6 +10,8 @@ import { LobbyPage } from './pages/LobbyPage'
 import { GamePage } from './pages/GamePage'
 import { AdminModal } from './components/AdminModal'
 import type { AgentCandidate } from './api/client'
+import { un } from '@unseal-network/mobile-log'
+import { co } from '@unseal-network/mobile-sdk'
 
 type AppStage = 'init' | 'lobby' | 'playing'
 
@@ -108,7 +110,7 @@ export function App() {
   const handleInit = useCallback(async () => {
     setInitError(null)
     pollAbortRef.current = true // 中止可能正在进行的轮询
-
+    un.log('初始化宿主房间信息')
     try {
       // 1. 先用 URL 中已有的 gameRoomId 快速恢复（刷新场景）
       const urlId = getUrlGameRoomId()
@@ -121,10 +123,11 @@ export function App() {
 
       // 2. 获取 Matrix token
       const unsealToken = await getToken()
+      un.log('初始化宿主房间信息unsealToken', unsealToken)
       const gameInfo = await init()
 
       // 3. 非 iframe（本地开发）：跳过 Unseal 服务，直接进大厅
-      if (!isInIframe()) {
+      if (!isInIframe() && !co.isMobile) {
         const adminFromPowerLevel = (gameInfo?.powerLevel ?? 0) >= 100
         if (adminFromPowerLevel) {
           setStage('lobby')
@@ -151,14 +154,18 @@ export function App() {
         setStage('lobby')
         return
       }
+      un.log('gameInfo 宿主房间信息', gameInfo)
       const adminFromPowerLevel = (gameInfo?.powerLevel ?? 0) >= 100
 
       // 5a. 查询宿主房间（ROOM_002 = 房间不存在，视为尚无 linkRoomId）
       let linkRoomId: string | null = null
       try {
+        un.log('get 宿主房间信息', { roomId })
         const roomData = await unsealClientRef.current.getRoom(roomId, jwt)
         linkRoomId = roomData.linkRoomId
+        un.log('宿主房间信息', { roomId, linkRoomId })
       } catch (e) {
+        un.log('查询宿主房间信息失败', { roomId, error: e instanceof Error ? e.message : e })
         if (e instanceof UnsealApiError && e.code === 'ROOM_002') {
           setInitError('房间不存在')
           return
@@ -218,7 +225,7 @@ export function App() {
     await client.joinGame(newRoomId)
 
     // 绑定到宿主房间（供非 admin 玩家发现，仅 iframe 模式生效）
-    if (isInIframe() && info?.gameRoomId && unsealClientRef.current && unsealJwtRef.current) {
+    if ((isInIframe() || co.isMobile) && info?.gameRoomId && unsealClientRef.current && unsealJwtRef.current) {
       await unsealClientRef.current.linkRoom(info.gameRoomId, newRoomId, unsealJwtRef.current)
     }
 
@@ -258,7 +265,7 @@ export function App() {
     try {
       await getToken()
       const client = getClient()
-      if (isInIframe()) {
+      if (isInIframe() || co.isMobile) {
         const members = await iframeMessage.getMembers()
         setAgents(members.filter((r: any) => !!r.isAgent).map((r: any) => ({
           userId: r.userId,
