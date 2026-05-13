@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 import type { EngineRoleCardState } from "../engine/GameEngine";
+import {
+  getRoleRevealTiltFromOrientation,
+  getRoleRevealTiltFromPointer,
+} from "./roleRevealTilt";
 
 interface RoleRevealEngineProps {
   roleCard?: EngineRoleCardState | undefined;
   onClose?: (() => void) | undefined;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
 }
 
 export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
@@ -39,8 +39,12 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
       if (event.beta == null || event.gamma == null) return;
       originBeta ??= event.beta;
       originGamma ??= event.gamma;
-      const tiltX = clamp((event.beta - originBeta) * -0.42, -18, 18);
-      const tiltY = clamp((event.gamma - originGamma) * 0.58, -18, 18);
+      const { tiltX, tiltY } = getRoleRevealTiltFromOrientation({
+        beta: event.beta,
+        gamma: event.gamma,
+        originBeta,
+        originGamma,
+      });
       applyTilt(tiltX, tiltY);
     };
 
@@ -49,10 +53,8 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
       const rect = card.getBoundingClientRect();
       const relX = (event.clientX - (rect.left + rect.width / 2)) / rect.width;
       const relY = (event.clientY - (rect.top + rect.height / 2)) / rect.height;
-      applyTilt(
-        clamp(relY * -22, -18, 18),
-        clamp(relX * 22, -18, 18)
-      );
+      const { tiltX, tiltY } = getRoleRevealTiltFromPointer(relX, relY);
+      applyTilt(tiltX, tiltY);
     };
 
     const onPointerLeave = () => applyTilt(0, 0);
