@@ -37,6 +37,7 @@ export interface JoinedPlayer {
 
 export interface GameEventDto {
   id: string;
+  gameRoomId?: string;
   seq: number;
   type: string;
   actorId?: string;

@@ -10,6 +10,22 @@ export function applyRoomEvent(
   event: GameEventDto
 ): GameRoom | null {
   if (!room) return room;
+  if (
+    event.type === "game_started" ||
+    event.type === "phase_started" ||
+    event.type === "turn_started"
+  ) {
+    return {
+      ...room,
+      status: "active",
+    };
+  }
+  if (event.type === "game_ended") {
+    return {
+      ...room,
+      status: "ended",
+    };
+  }
   if (event.type === "player_joined") {
     const player = roomPlayerPayload(event.payload?.player);
     return player ? upsertRoomPlayers(room, [player]) : room;
@@ -120,12 +136,26 @@ export function applyProjectionEvent(
   projection: RoomProjection | null,
   event: GameEventDto
 ): RoomProjection | null {
-  if (!projection) return projection;
-  if (event.type === "phase_started") {
+  if (event.type === "game_started") {
+    const playerIds = Array.isArray(event.payload?.playerIds)
+      ? event.payload.playerIds.filter(
+          (playerId): playerId is string => typeof playerId === "string"
+        )
+      : [];
     return {
-      ...projection,
-      phase: String(event.payload.phase ?? projection.phase),
-      day: Number(event.payload.day ?? projection.day),
+      ...projectionBaseForEvent(projection, event),
+      status: "active",
+      alivePlayerIds: playerIds,
+      version: event.seq,
+    };
+  }
+  if (event.type === "phase_started") {
+    const baseProjection = projectionBaseForEvent(projection, event);
+    return {
+      ...baseProjection,
+      status: "active",
+      phase: String(event.payload.phase ?? baseProjection.phase),
+      day: Number(event.payload.day ?? baseProjection.day),
       deadlineAt:
         typeof event.payload.deadlineAt === "string"
           ? event.payload.deadlineAt
@@ -135,18 +165,44 @@ export function applyProjectionEvent(
     };
   }
   if (event.type === "turn_started") {
+    const baseProjection = projectionBaseForEvent(projection, event);
     return {
-      ...projection,
-      phase: String(event.payload.phase ?? projection.phase),
-      day: Number(event.payload.day ?? projection.day),
+      ...baseProjection,
+      status: "active",
+      phase: String(event.payload.phase ?? baseProjection.phase),
+      day: Number(event.payload.day ?? baseProjection.day),
       deadlineAt:
         typeof event.payload.deadlineAt === "string"
           ? event.payload.deadlineAt
-          : projection.deadlineAt,
+          : baseProjection.deadlineAt,
       currentSpeakerPlayerId:
         typeof event.payload.currentSpeakerPlayerId === "string"
           ? event.payload.currentSpeakerPlayerId
-          : event.subjectId ?? projection.currentSpeakerPlayerId,
+          : event.subjectId ?? baseProjection.currentSpeakerPlayerId,
+      version: event.seq,
+    };
+  }
+  if (!projection) return projection;
+  if (event.type === "speech_submitted") {
+    return {
+      ...projection,
+      currentSpeakerPlayerId:
+        event.actorId && event.actorId === projection.currentSpeakerPlayerId
+          ? null
+          : projection.currentSpeakerPlayerId,
+      version: event.seq,
+    };
+  }
+  if (event.type === "phase_closed") {
+    const nextPhase =
+      typeof event.payload.nextPhase === "string"
+        ? event.payload.nextPhase
+        : projection.phase;
+    return {
+      ...projection,
+      phase: nextPhase,
+      deadlineAt: null,
+      currentSpeakerPlayerId: null,
       version: event.seq,
     };
   }
@@ -174,6 +230,29 @@ export function applyProjectionEvent(
     };
   }
   return projection;
+}
+
+function projectionBaseForEvent(
+  projection: RoomProjection | null,
+  event: GameEventDto
+): RoomProjection {
+  if (projection) return projection;
+  const eventWithRoom = event as GameEventDto & { gameRoomId?: unknown };
+  const gameRoomId =
+    typeof eventWithRoom.gameRoomId === "string"
+      ? eventWithRoom.gameRoomId
+      : stringPayload(event.payload?.gameRoomId);
+  return {
+    gameRoomId,
+    status: "active",
+    phase: null,
+    day: 1,
+    deadlineAt: null,
+    currentSpeakerPlayerId: null,
+    winner: null,
+    alivePlayerIds: [],
+    version: event.seq,
+  };
 }
 
 function roomPlayerPayload(value: unknown): RoomPlayer | null {
@@ -244,10 +323,17 @@ export interface TimelineDisplayFacts {
   nightActionSubmittedByActorPhaseDay: Set<string>;
 }
 
+export interface TimelineViewerPerspective {
+  userId: string | null;
+  playerId: string | null;
+  seatNo: number | null;
+}
+
 export interface TimelineDisplayState {
   room: GameRoom | null;
   projection: RoomProjection | null;
   facts: TimelineDisplayFacts;
+  perspective: TimelineViewerPerspective;
 }
 
 export function actorDayKey(actorId: string, day: number): string {
@@ -379,11 +465,85 @@ export function deriveTimelineDisplayFacts(
     .reduce(applyTimelineFactEvent, createTimelineDisplayFacts());
 }
 
+function deriveTimelineViewerPerspective(
+  roomSnapshot: GameRoom | null,
+  room: GameRoom | null,
+  liveEvents: GameEventDto[],
+  viewerUserId?: string
+): TimelineViewerPerspective {
+  if (!viewerUserId) {
+    return {
+      userId: null,
+      playerId: null,
+      seatNo: null,
+    };
+  }
+
+  const initialPlayer = roomSnapshot?.players.find(
+    (player) => player.userId === viewerUserId && !player.leftAt
+  );
+  let playerId = initialPlayer?.id ?? null;
+  let seatNo = initialPlayer?.seatNo ?? null;
+
+  for (const event of liveEvents) {
+    if (event.type === "player_joined") {
+      const joined = roomPlayerPayload(event.payload?.player);
+      if (joined?.userId === viewerUserId && !joined.leftAt) {
+        playerId = joined.id;
+        seatNo = joined.seatNo;
+      }
+      continue;
+    }
+
+    if (event.type === "player_removed") {
+      const removedPlayerId = stringPayload(event.payload?.playerId || event.actorId);
+      if (removedPlayerId && removedPlayerId === playerId) {
+        playerId = null;
+        seatNo = null;
+      }
+      continue;
+    }
+
+    if (event.type !== "player_seat_changed") {
+      continue;
+    }
+
+    const movedUserId = stringPayload(event.payload?.movedUserId);
+    if (movedUserId !== viewerUserId) {
+      continue;
+    }
+
+    const movedSeatNo = numberPayload(event.payload?.toSeatNo);
+    playerId =
+      typeof event.actorId === "string" && event.actorId
+        ? event.actorId
+        : movedSeatNo !== null
+          ? `player_${movedSeatNo}`
+          : playerId;
+    if (movedSeatNo !== null) {
+      seatNo = movedSeatNo;
+    }
+  }
+
+  const resolvedPlayer =
+    (playerId
+      ? room?.players.find((player) => player.id === playerId && !player.leftAt)
+      : undefined) ??
+    room?.players.find((player) => player.userId === viewerUserId && !player.leftAt);
+
+  return {
+    userId: viewerUserId,
+    playerId: resolvedPlayer?.id ?? playerId,
+    seatNo: resolvedPlayer?.seatNo ?? seatNo,
+  };
+}
+
 export function deriveTimelineDisplayState(
   roomSnapshot: GameRoom | null,
   projectionSnapshot: RoomProjection | null,
   timeline: GameEventDto[],
-  baseSeq: number
+  baseSeq: number,
+  viewerUserId?: string
 ): TimelineDisplayState {
   const orderedTimeline = [...timeline].sort((a, b) => a.seq - b.seq);
   const liveEvents = orderedTimeline.filter((event) => event.seq > baseSeq);
@@ -404,6 +564,12 @@ export function deriveTimelineDisplayState(
       : null,
     projection,
     facts: deriveTimelineDisplayFacts(orderedTimeline),
+    perspective: deriveTimelineViewerPerspective(
+      roomSnapshot,
+      room,
+      liveEvents,
+      viewerUserId
+    ),
   };
 }
 

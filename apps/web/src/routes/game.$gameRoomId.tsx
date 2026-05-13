@@ -486,9 +486,10 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         roomSnapshot,
         projectionSnapshot,
         timeline,
-        timelineBaseSeq
+        timelineBaseSeq,
+        matrixUserId
       ),
-    [roomSnapshot, projectionSnapshot, timeline, timelineBaseSeq]
+    [roomSnapshot, projectionSnapshot, timeline, timelineBaseSeq, matrixUserId]
   );
   const room = timelineDisplayState.room;
   const projection = timelineDisplayState.projection;
@@ -622,9 +623,21 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     Math.max(6, activeSeatCount),
     room?.targetPlayerCount ?? 12
   );
+  const currentViewerPlayerId =
+    timelineDisplayState.perspective.playerId ?? undefined;
+  const currentViewerSeatNo =
+    timelineDisplayState.perspective.seatNo ?? undefined;
   const myPlayer = useMemo(
-    () => room?.players.find((player) => player.userId === matrixUserId && !player.leftAt),
-    [room, matrixUserId]
+    () =>
+      room?.players.find(
+        (player) =>
+          !player.leftAt &&
+          ((currentViewerPlayerId && player.id === currentViewerPlayerId) ||
+            (currentViewerSeatNo !== undefined &&
+              player.seatNo === currentViewerSeatNo) ||
+            player.userId === matrixUserId)
+      ),
+    [currentViewerPlayerId, currentViewerSeatNo, room, matrixUserId]
   );
   const myPrivateState = useMemo(
     () => privateStates.find((state) => state.playerId === myPlayer?.id),

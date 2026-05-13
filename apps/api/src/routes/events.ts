@@ -46,36 +46,39 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
         async start(controller) {
           const encoder = new TextEncoder();
           const perspective = () => buildPerspective(games, gameRoomId, user.id);
+          const serializeSnapshot = (seq?: number) => {
+            const view = perspective();
+            const data = `data: ${JSON.stringify({
+              snapshot: {
+                room: view.room,
+                projection: view.room.projection,
+                privateStates: view.privateStates,
+                events: view.events,
+              },
+            })}\n\n`;
+            return seq ? `id: ${seq}\n${data}` : data;
+          };
           const pushVisible = (payload: string) => {
             const event = eventFromSsePayload(payload);
             if (!event) return;
             const view = perspective();
-            if (
-              !filterEventsForUser(
+            const visible = Boolean(
+              filterEventsForUser(
                 [event],
                 view.myPlayerId,
                 view.isWolf,
                 view.revealAll
               ).length
-            ) {
+            );
+            if (eventRefreshesPerspectiveSnapshot(event, visible)) {
+              controller.enqueue(encoder.encode(serializeSnapshot(event.seq)));
               return;
             }
+            if (!visible) return;
             controller.enqueue(encoder.encode(payload));
           };
 
-          const initial = perspective();
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                snapshot: {
-                  room: initial.room,
-                  projection: initial.room.projection,
-                  privateStates: initial.privateStates,
-                  events: initial.events,
-                },
-              })}\n\n`
-            )
-          );
+          controller.enqueue(encoder.encode(serializeSnapshot()));
 
           const { replay, unsubscribe } = broker.subscribe(
             gameRoomId,
@@ -172,6 +175,19 @@ function buildPerspective(
     isWolf,
     revealAll,
   };
+}
+
+function eventRefreshesPerspectiveSnapshot(
+  event: GameEvent,
+  visible: boolean
+): boolean {
+  if (event.type === "roles_assigned") {
+    return true;
+  }
+  if (!visible) {
+    return false;
+  }
+  return event.type === "night_action_submitted" || event.type === "phase_started";
 }
 
 function eventFromSsePayload(payload: string): GameEvent | null {

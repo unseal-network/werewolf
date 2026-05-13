@@ -128,6 +128,144 @@ describe("timeline state derivation", () => {
     expect(next.projection?.version).toBe(160);
   });
 
+  it("clears the current speaker as soon as their speech event is received", () => {
+    const next = deriveTimelineDisplayState(
+      room(),
+      projection({ currentSpeakerPlayerId: "player_6", version: 159 }),
+      [
+        event(
+          160,
+          "speech_submitted",
+          { day: 2, speech: "done" },
+          { actorId: "player_6" }
+        ),
+      ],
+      159
+    );
+
+    expect(next.projection?.currentSpeakerPlayerId).toBeNull();
+    expect(next.projection?.version).toBe(160);
+  });
+
+  it("uses the next turn_started event to move the active speaker forward", () => {
+    const next = deriveTimelineDisplayState(
+      room(),
+      projection({ currentSpeakerPlayerId: "player_6", version: 159 }),
+      [
+        event(
+          160,
+          "speech_submitted",
+          { day: 2, speech: "done" },
+          { actorId: "player_6" }
+        ),
+        event(161, "turn_started", {
+          phase: "day_speak",
+          day: 2,
+          currentSpeakerPlayerId: "player_5",
+          deadlineAt: "2026-05-12T13:01:00.000Z",
+        }),
+      ],
+      159
+    );
+
+    expect(next.projection?.currentSpeakerPlayerId).toBe("player_5");
+    expect(next.projection?.version).toBe(161);
+  });
+
+  it("closes a phase from the phase_closed event without waiting for the next phase_started", () => {
+    const next = deriveTimelineDisplayState(
+      room(),
+      projection({ phase: "day_vote", currentSpeakerPlayerId: null, version: 159 }),
+      [
+        event(160, "phase_closed", {
+          phase: "day_vote",
+          day: 2,
+          nextPhase: "day_resolution",
+        }),
+      ],
+      159
+    );
+
+    expect(next.projection).toMatchObject({
+      phase: "day_resolution",
+      currentSpeakerPlayerId: null,
+      deadlineAt: null,
+      version: 160,
+    });
+  });
+
+  it("creates a live projection when a waiting-room client receives the first phase event", () => {
+    const waitingRoom = {
+      ...room(),
+      status: "waiting" as const,
+      projection: null,
+    };
+    const next = deriveTimelineDisplayState(
+      waitingRoom,
+      null,
+      [
+        event(160, "phase_started", {
+          phase: "night_guard",
+          day: 1,
+          deadlineAt: "2026-05-12T13:01:00.000Z",
+        }),
+      ],
+      159
+    );
+
+    expect(next.projection).toMatchObject({
+      status: "active",
+      phase: "night_guard",
+      day: 1,
+      deadlineAt: "2026-05-12T13:01:00.000Z",
+      version: 160,
+    });
+    expect(next.room?.status).toBe("active");
+    expect(next.room?.projection?.phase).toBe("night_guard");
+  });
+
+  it("derives start state for clients that only receive start events through SSE", () => {
+    const waitingRoom = {
+      ...room(),
+      status: "waiting" as const,
+      projection: null,
+    };
+    const next = deriveTimelineDisplayState(
+      waitingRoom,
+      null,
+      [
+        event(
+          160,
+          "game_started",
+          { targetPlayerCount: 6, playerIds: ["player_5", "player_6"] },
+          { actorId: "runtime", gameRoomId: "game_1" }
+        ),
+        event(
+          161,
+          "phase_started",
+          {
+            phase: "night_guard",
+            day: 1,
+            deadlineAt: "2026-05-12T13:01:00.000Z",
+          },
+          { actorId: "runtime", gameRoomId: "game_1" }
+        ),
+      ],
+      159
+    );
+
+    expect(next.room?.status).toBe("active");
+    expect(next.projection).toMatchObject({
+      gameRoomId: "game_1",
+      status: "active",
+      phase: "night_guard",
+      day: 1,
+      alivePlayerIds: ["player_5", "player_6"],
+      version: 161,
+    });
+    expect(next.room?.projection).toBe(next.projection);
+  });
+
   it("returns one synchronized display state for live projection events", () => {
     const baseRoom = room();
     const baseProjection = projection({
@@ -198,6 +336,136 @@ describe("timeline state derivation", () => {
       displayName: "Bot 3",
       seatNo: 3,
       kind: "agent",
+    });
+  });
+
+  it("derives the viewer seat from seat-change timeline events instead of stale snapshot ids", () => {
+    const baseRoom: GameRoom = {
+      ...room(),
+      players: [
+        {
+          id: "player_4",
+          agentId: "@agent4:matrix",
+          displayName: "Bot 4",
+          seatNo: 4,
+          kind: "agent",
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+        },
+        {
+          id: "player_6",
+          userId: "@user6:matrix",
+          displayName: "6",
+          seatNo: 6,
+          kind: "user",
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+        },
+      ],
+    };
+
+    const derived = deriveTimelineDisplayState(
+      baseRoom,
+      projection(),
+      [
+        event(
+          160,
+          "player_seat_changed",
+          {
+            fromSeatNo: 6,
+            toSeatNo: 4,
+            movedUserId: "@user6:matrix",
+            movedDisplayName: "6",
+            displacedSeatNo: 6,
+            displacedPlayerId: "player_6",
+            displacedDisplayName: "Bot 4",
+          },
+          { actorId: "player_4" }
+        ),
+      ],
+      159,
+      "@user6:matrix"
+    );
+
+    expect(derived.perspective).toMatchObject({
+      userId: "@user6:matrix",
+      playerId: "player_4",
+      seatNo: 4,
+    });
+    expect(
+      derived.room?.players.find((player) => player.id === "player_4")
+    ).toMatchObject({
+      userId: "@user6:matrix",
+      seatNo: 4,
+    });
+  });
+
+  it("does not mistake another user's seat change for the viewer", () => {
+    const baseRoom: GameRoom = {
+      ...room(),
+      players: [
+        {
+          id: "player_2",
+          userId: "@user2:matrix",
+          displayName: "2",
+          seatNo: 2,
+          kind: "user",
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+        },
+        {
+          id: "player_3",
+          agentId: "@agent3:matrix",
+          displayName: "Bot 3",
+          seatNo: 3,
+          kind: "agent",
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+        },
+        {
+          id: "player_6",
+          userId: "@user6:matrix",
+          displayName: "6",
+          seatNo: 6,
+          kind: "user",
+          ready: true,
+          onlineState: "online",
+          leftAt: null,
+        },
+      ],
+    };
+
+    const derived = deriveTimelineDisplayState(
+      baseRoom,
+      projection(),
+      [
+        event(
+          160,
+          "player_seat_changed",
+          {
+            fromSeatNo: 2,
+            toSeatNo: 3,
+            movedUserId: "@user2:matrix",
+            movedDisplayName: "2",
+            displacedSeatNo: 2,
+            displacedPlayerId: "player_2",
+            displacedDisplayName: "Bot 3",
+          },
+          { actorId: "player_3" }
+        ),
+      ],
+      159,
+      "@user6:matrix"
+    );
+
+    expect(derived.perspective).toMatchObject({
+      userId: "@user6:matrix",
+      playerId: "player_6",
+      seatNo: 6,
     });
   });
 

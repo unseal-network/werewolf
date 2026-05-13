@@ -59,6 +59,57 @@ describe("games API", () => {
     expect(Array.isArray(message.snapshot?.privateStates)).toBe(true);
   });
 
+  it("pushes a fresh perspective snapshot to subscribed players when roles are assigned", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+    deps.games.join(room.id, "@bob:example.com", "Bob", undefined, 2);
+    for (let seatNo = 3; seatNo <= 6; seatNo += 1) {
+      deps.games.addAgentPlayer(
+        room.id,
+        "@alice:example.com",
+        `@agent${seatNo}:example.com`,
+        `Agent ${seatNo}`
+      );
+    }
+
+    const response = await app.request(`/games/${room.id}/subscribe`, {
+      headers: { authorization: "Bearer matrix-token-bob" },
+    });
+    expect(response.status).toBe(200);
+    const reader = response.body?.getReader();
+    expect(reader).toBeTruthy();
+    await readNextSseJson(reader!);
+
+    deps.games.start(room.id, "@alice:example.com");
+
+    const roleSnapshot = await readSseUntil(
+      reader!,
+      (message) =>
+        Array.isArray(message.snapshot?.privateStates) &&
+        message.snapshot.privateStates.length === 1
+    );
+    await reader!.cancel();
+
+    expect(roleSnapshot.snapshot?.privateStates?.[0]).toMatchObject({
+      playerId: "player_2",
+      alive: true,
+    });
+    expect(roleSnapshot.snapshot?.projection).toMatchObject({
+      status: "active",
+      phase: "night_guard",
+    });
+  });
+
   it("creates a game and defaults agent source room to source room", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", {
@@ -104,7 +155,15 @@ describe("games API", () => {
       deps.games.join(room.id, token, name);
     }
     deps.games.start(room.id, "@alice:example.com");
-    const speaker = deps.games.snapshot(room.id).players[0]!;
+    const startedRoom = deps.games.snapshot(room.id);
+    const speaker = startedRoom.players[0]!;
+    startedRoom.projection = startedRoom.projection
+      ? {
+          ...startedRoom.projection,
+          phase: "day_speak",
+          currentSpeakerPlayerId: speaker.id,
+        }
+      : null;
     const event = deps.games.recordSpeechTranscript(room.id, {
       playerId: speaker.id,
       text: "live subtitle text",
@@ -213,3 +272,29 @@ describe("games API", () => {
     );
   });
 });
+
+async function readNextSseJson(
+  reader: ReadableStreamDefaultReader<Uint8Array>
+): Promise<Record<string, any>> {
+  const chunk = await Promise.race([
+    reader.read(),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("subscribe message timeout")), 1000)
+    ),
+  ]);
+  const text = new TextDecoder().decode(chunk.value);
+  const json = text.match(/data: (.*)\n\n/)?.[1];
+  if (!json) throw new Error(`Missing SSE json in: ${text}`);
+  return JSON.parse(json) as Record<string, any>;
+}
+
+async function readSseUntil(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+  predicate: (message: Record<string, any>) => boolean
+): Promise<Record<string, any>> {
+  for (let index = 0; index < 10; index += 1) {
+    const message = await readNextSseJson(reader);
+    if (predicate(message)) return message;
+  }
+  throw new Error("Expected SSE message was not received");
+}
