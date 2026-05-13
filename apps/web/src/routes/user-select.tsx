@@ -6,6 +6,28 @@ interface TestUserConfig {
   users: MatrixSessionProfile[];
 }
 
+const TEST_USER_CONFIG_FILES = ["test-users.local.json", "test-users.example.json"];
+
+function normalizeAssetPrefix(prefix: string | undefined): string {
+  const raw = prefix?.trim() || "/";
+  if (raw === "/") return "/";
+  const leading = raw.startsWith("/") ? raw : `/${raw}`;
+  return leading.endsWith("/") ? leading : `${leading}/`;
+}
+
+export function testUserConfigPaths(prefix: string | undefined): string[] {
+  const basePath = normalizeAssetPrefix(prefix);
+  return TEST_USER_CONFIG_FILES.map((file) => `${basePath}${file}`);
+}
+
+function testUserConfigPrefix(): string {
+  return (
+    import.meta.env.VITE_TEST_USERS_BASE_PATH ??
+    import.meta.env.BASE_URL ??
+    "/"
+  );
+}
+
 function hashHue(input: string): number {
   let hash = 0;
   for (let index = 0; index < input.length; index += 1) {
@@ -30,7 +52,7 @@ function avatarStyle(userId: string) {
 }
 
 async function loadTestUsers(): Promise<MatrixSessionProfile[]> {
-  const candidates = ["/test-users.local.json", "/test-users.example.json"];
+  const candidates = testUserConfigPaths(testUserConfigPrefix());
   for (const path of candidates) {
     try {
       const response = await fetch(path, { cache: "no-store" });
