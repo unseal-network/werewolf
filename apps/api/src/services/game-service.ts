@@ -70,6 +70,7 @@ export interface RuntimeAgentTurnInput {
   role: Role;
   phase: GamePhase;
   prompt: string;
+  messages?: Array<{ role: "system" | "user"; content: string }>;
   tools: Record<string, unknown>;
 }
 
