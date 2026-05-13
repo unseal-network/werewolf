@@ -9,6 +9,7 @@ interface ActionBarProps {
   submitting: boolean
   isEnded: boolean
   canAct: boolean
+  isAdmin?: boolean | undefined
   speakerName?: string | undefined
   winner?: 'wolf' | 'good' | null | undefined
   privateState?: PlayerPrivateState | undefined
@@ -19,6 +20,7 @@ interface ActionBarProps {
   onPass: () => void
   onCancel: () => void
   onBackToLobby?: (() => void) | undefined
+  onPlayAgain?: (() => void) | undefined
 }
 
 const spinnerEl = (
@@ -31,8 +33,8 @@ const spinnerEl = (
 
 export function ActionBar({
   actionKind, actionSubmitted, selectedPlayer, submitting,
-  isEnded, canAct, speakerName, winner, privateState, currentPhase,
-  onSpeechComplete, onVote, onNightAction, onPass, onCancel, onBackToLobby,
+  isEnded, canAct, isAdmin, speakerName, winner, privateState, currentPhase,
+  onSpeechComplete, onVote, onNightAction, onPass, onCancel, onBackToLobby, onPlayAgain,
 }: ActionBarProps) {
   const baseStyle: React.CSSProperties = {
     flexShrink: 0, padding: '12px 16px calc(env(safe-area-inset-bottom) + 16px)',
@@ -57,19 +59,37 @@ export function ActionBar({
             <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>游戏已结束</div>
           </div>
         </div>
-        {onBackToLobby && (
-          <button
-            onClick={onBackToLobby}
-            style={{
-              width: '100%', padding: '13px', borderRadius: 16,
-              background: 'linear-gradient(135deg, #5b21b6, #7c3aed)',
-              border: '1px solid rgba(255,209,102,0.35)',
-              color: '#ffd166', fontSize: 14, fontWeight: 800,
-              letterSpacing: '0.08em', cursor: 'pointer',
-            }}>
-            ← 返回大厅
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {onBackToLobby && (
+            <button
+              onClick={onBackToLobby}
+              style={{
+                flex: 1, padding: '13px', borderRadius: 16,
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                color: '#94a3b8', fontSize: 14, fontWeight: 800,
+                letterSpacing: '0.04em', cursor: 'pointer',
+              }}>
+              🏠 返回大厅
+            </button>
+          )}
+          {isAdmin && onPlayAgain && (
+            <button
+              onClick={onPlayAgain}
+              disabled={submitting}
+              style={{
+                flex: 1, padding: '13px', borderRadius: 16,
+                background: 'linear-gradient(135deg, #5b21b6, #7c3aed)',
+                border: '1px solid rgba(255,209,102,0.35)',
+                color: '#ffd166', fontSize: 14, fontWeight: 800,
+                letterSpacing: '0.04em', cursor: submitting ? 'not-allowed' : 'pointer',
+                opacity: submitting ? 0.6 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}>
+              {submitting ? spinnerEl : '🔄 再来一局'}
+            </button>
+          )}
+        </div>
       </div>
     )
   }

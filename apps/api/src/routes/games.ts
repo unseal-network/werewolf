@@ -31,6 +31,62 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     );
   }
 
+  // POST /games/room — create an empty room, no body required
+  app.post("/room", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const room = deps.games.createRoom(user.id);
+      return c.json({ gameRoomId: room.id }, 201);
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
+  // PUT /games/:gameRoomId/settings — configure room before start (creator only)
+  app.put("/:gameRoomId/settings", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix);
+      const body = await readOptionalJson(c.req.raw);
+      // Build settings object omitting undefined values (exactOptionalPropertyTypes)
+      const settings: Parameters<typeof deps.games.updateSettings>[2] = {};
+      const srcRoom = stringValue(body.sourceMatrixRoomId);
+      if (srcRoom !== undefined) settings.sourceMatrixRoomId = srcRoom;
+      const title = stringValue(body.title);
+      if (title !== undefined) settings.title = title;
+      const tpc = numberValue(body.targetPlayerCount);
+      if (tpc !== undefined) settings.targetPlayerCount = tpc;
+      if (body.language === "zh-CN" || body.language === "en") settings.language = body.language;
+      if (body.timing && typeof body.timing === "object" && !Array.isArray(body.timing)) {
+        settings.timing = buildTiming(body.timing as Record<string, unknown>);
+      }
+      if (Array.isArray(body.allowedSourceMatrixRoomIds)) {
+        settings.allowedSourceMatrixRoomIds = (body.allowedSourceMatrixRoomIds as unknown[]).filter(
+          (x): x is string => typeof x === "string"
+        );
+      }
+      const room = deps.games.updateSettings(
+        c.req.param("gameRoomId"),
+        user.id,
+        settings
+      );
+      return c.json({
+        gameRoomId: room.id,
+        targetPlayerCount: room.targetPlayerCount,
+        language: room.language,
+      });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
   app.post("/", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix);
@@ -350,6 +406,21 @@ async function readOptionalJson(request: Request): Promise<Record<string, unknow
   return parsed && typeof parsed === "object" && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)
     : {};
+}
+
+function buildTiming(raw: Record<string, unknown>): {
+  nightActionSeconds?: number;
+  speechSeconds?: number;
+  voteSeconds?: number;
+} {
+  const result: { nightActionSeconds?: number; speechSeconds?: number; voteSeconds?: number } = {};
+  const nas = numberValue(raw.nightActionSeconds);
+  const ss = numberValue(raw.speechSeconds);
+  const vs = numberValue(raw.voteSeconds);
+  if (nas !== undefined) result.nightActionSeconds = nas;
+  if (ss !== undefined) result.speechSeconds = ss;
+  if (vs !== undefined) result.voteSeconds = vs;
+  return result;
 }
 
 function stringValue(value: unknown): string | undefined {

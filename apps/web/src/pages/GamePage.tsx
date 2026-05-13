@@ -291,6 +291,7 @@ export function GamePage({
           submitting={submitting}
           isEnded={isEnded}
           canAct={canAct}
+          isAdmin={isAdmin}
           speakerName={speakerName}
           winner={projection?.winner}
           privateState={myPrivateState}
@@ -301,6 +302,7 @@ export function GamePage({
           onPass={() => void handleSubmit('pass')}
           onCancel={() => setSelectedPlayerId(null)}
           onBackToLobby={onBackToLobby}
+          onPlayAgain={isAdmin ? onStart : undefined}
         />
 
         {/* 角色标记气泡 */}

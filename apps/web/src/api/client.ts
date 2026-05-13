@@ -173,6 +173,31 @@ export function createApiClient(options: ApiClientOptions) {
   }
 
   return {
+    /** Create an empty room, returns { gameRoomId } */
+    createRoom() {
+      return request<{ gameRoomId: string }>("/games/room", { method: "POST" });
+    },
+    /** Update room settings before the game starts (creator only) */
+    updateRoomSettings(
+      gameRoomId: string,
+      settings: {
+        sourceMatrixRoomId?: string;
+        title?: string;
+        targetPlayerCount?: number;
+        language?: "zh-CN" | "en";
+        timing?: {
+          nightActionSeconds?: number;
+          speechSeconds?: number;
+          voteSeconds?: number;
+        };
+        allowedSourceMatrixRoomIds?: string[];
+      }
+    ) {
+      return request<{ gameRoomId: string; targetPlayerCount: number; language: string }>(
+        `/games/${gameRoomId}/settings`,
+        { method: "PUT", body: JSON.stringify(settings) }
+      );
+    },
     createGame(body: unknown) {
       return request<CreatedGame>("/games", {
         method: "POST",

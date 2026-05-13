@@ -112,18 +112,30 @@ export function App() {
   const handleCreateAndJoin = useCallback(async (config: { targetPlayerCount: number; language: string; meetingRequired: boolean }) => {
     await getToken()
     const client = getClient()
-    const result = await client.createGame({
+
+    // 若宿主 App 预绑定了房间 ID，直接使用；否则创建新空房间
+    const linkRoomId = info?.linkRoomId ?? info?.gameRoomId
+    let roomId: string
+    if (linkRoomId) {
+      roomId = linkRoomId
+    } else {
+      const res = await client.createRoom()
+      roomId = res.gameRoomId
+    }
+
+    // 配置房间参数
+    await client.updateRoomSettings(roomId, {
       sourceMatrixRoomId: info?.roomId ?? '',
       title: '狼人杀',
       targetPlayerCount: config.targetPlayerCount,
-      language: config.language,
+      language: config.language as 'zh-CN' | 'en',
       timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      allowedSourceMatrixRoomIds: [],
     })
-    setGameRoomId(result.gameRoomId)
-    setUrlGameRoomId(result.gameRoomId)       // 写入 URL
-    await client.joinGame(result.gameRoomId)
-    await refreshGame(result.gameRoomId)
+
+    setGameRoomId(roomId)
+    setUrlGameRoomId(roomId)                   // 写入 URL
+    await client.joinGame(roomId)
+    await refreshGame(roomId)
     setStage('playing')
   }, [getToken, getClient, info, refreshGame])
 

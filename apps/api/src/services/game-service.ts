@@ -176,6 +176,91 @@ export class InMemoryGameService {
     this.runAgentTurnImpl = impl;
   }
 
+  /**
+   * Create an empty room (no title/config required). The caller can then
+   * configure it via `updateSettings()` before starting.
+   */
+  createRoom(creatorUserId: string): StoredGameRoom {
+    const id = `game_${Date.now().toString(36)}_${Math.random()
+      .toString(36)
+      .slice(2, 6)}`;
+    const room: StoredGameRoom = {
+      id,
+      creatorUserId,
+      title: "",
+      status: "waiting",
+      targetPlayerCount: 8,
+      language: "zh-CN",
+      timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      createdFromMatrixRoomId: "",
+      allowedSourceMatrixRoomIds: [],
+      agentSourceMatrixRoomId: "",
+      players: [],
+      projection: null,
+      privateStates: [],
+      events: [],
+      pendingNightActions: [],
+      pendingVotes: [],
+      speechQueue: [],
+      tiePlayerIds: [],
+    };
+    this.rooms.set(id, room);
+    this.persistRoom(room);
+    return room;
+  }
+
+  /**
+   * Update room settings. Only the room creator can call this, and only
+   * before the game has started (status === 'waiting').
+   */
+  updateSettings(
+    gameRoomId: string,
+    callerUserId: string,
+    settings: {
+      sourceMatrixRoomId?: string;
+      title?: string;
+      targetPlayerCount?: number;
+      language?: "zh-CN" | "en";
+      timing?: Partial<{ nightActionSeconds: number; speechSeconds: number; voteSeconds: number }>;
+      allowedSourceMatrixRoomIds?: string[];
+    }
+  ): StoredGameRoom {
+    const room = this.requireWaitingRoom(gameRoomId);
+    if (room.creatorUserId !== callerUserId) {
+      throw new AppError("forbidden", "Only the room creator can update settings", 403);
+    }
+    if (settings.sourceMatrixRoomId !== undefined) {
+      room.createdFromMatrixRoomId = settings.sourceMatrixRoomId;
+      if (!room.agentSourceMatrixRoomId) {
+        room.agentSourceMatrixRoomId = settings.sourceMatrixRoomId;
+      }
+    }
+    if (settings.title !== undefined) {
+      room.title = settings.title.slice(0, 80);
+    }
+    if (settings.targetPlayerCount !== undefined) {
+      if (![6, 8, 12].includes(settings.targetPlayerCount)) {
+        throw new AppError("invalid_action", "targetPlayerCount must be 6, 8, or 12", 400);
+      }
+      room.targetPlayerCount = settings.targetPlayerCount;
+    }
+    if (settings.language !== undefined) {
+      room.language = settings.language;
+    }
+    if (settings.timing !== undefined) {
+      room.timing = {
+        nightActionSeconds: settings.timing.nightActionSeconds ?? room.timing?.nightActionSeconds ?? 45,
+        speechSeconds: settings.timing.speechSeconds ?? room.timing?.speechSeconds ?? 60,
+        voteSeconds: settings.timing.voteSeconds ?? room.timing?.voteSeconds ?? 30,
+      };
+    }
+    if (settings.allowedSourceMatrixRoomIds !== undefined) {
+      room.allowedSourceMatrixRoomIds = settings.allowedSourceMatrixRoomIds;
+    }
+    this.persistRoom(room);
+    return room;
+  }
+
   createGame(
     input: unknown,
     creatorUserId: string
@@ -534,10 +619,36 @@ export class InMemoryGameService {
   }
 
   start(gameRoomId: string, userId: string): StartedGame {
-    const room = this.requireWaitingRoom(gameRoomId);
+    // Accept both 'waiting' and 'ended' rooms. For ended rooms, reset state
+    // so players can play again without leaving/rejoining.
+    const room = this.rooms.get(gameRoomId);
+    if (!room) {
+      throw new AppError("not_found", "Game room not found", 404);
+    }
+    if (room.status !== "waiting" && room.status !== "ended") {
+      throw new AppError("conflict", "Game room is not in a startable state (waiting or ended)", 409);
+    }
     if (room.creatorUserId !== userId) {
       throw new AppError("forbidden", "Only creator can start the game", 403);
     }
+
+    // Reset ended room state so it can be restarted
+    if (room.status === "ended") {
+      for (const player of room.players) {
+        if (!player.leftAt) {
+          player.ready = false;
+        }
+      }
+      room.projection = null;
+      room.privateStates = [];
+      room.events = [];
+      room.pendingNightActions = [];
+      room.pendingVotes = [];
+      room.speechQueue = [];
+      room.tiePlayerIds = [];
+      room.status = "waiting";
+    }
+
     const activePlayers = room.players.filter((player) => !player.leftAt);
     if (activePlayers.length < 6) {
       throw new AppError(

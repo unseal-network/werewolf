@@ -6,7 +6,6 @@
 import type { IFrameMessageType } from '@unseal-network/game-sdk'
 
 const env = import.meta.env
-console.log(env)
 export function createIframeMessageMock(): IFrameMessageType {
   const mockInfo = {
     roomId: env.VITE_MOCK_ROOM_ID ?? '!dev_room:local',

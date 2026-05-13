@@ -9,6 +9,8 @@ export interface GameInfo {
   powerLevel: number
   config: { streamURL: string }
   gameRoomId?: string
+  /** 宿主 App 预绑定的游戏房间 ID，存在时跳过创建房间直接使用 */
+  linkRoomId?: string
   [key: string]: unknown
 }
 
