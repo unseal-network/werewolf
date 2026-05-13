@@ -336,7 +336,7 @@ export function CreateGamePage({
           </div>
         </header>
         <form onSubmit={submit} className="create-form">
-          <label>
+          <label className="create-field create-field-token">
             {t("create.matrixToken")}
             <textarea
               value={matrixToken}
@@ -355,11 +355,11 @@ export function CreateGamePage({
               {roomsLoading ? "..." : t("create.refreshRooms")}
             </button>
           </div>
-          <label>
+          <label className="create-field">
             {t("create.gameTitle")}
             <input value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
-          <label>
+          <label className="create-field">
             {t("create.sourceRoom")}
             <FormSelect
               value={roomOptions.includes(roomSelectValue) ? roomSelectValue : "__custom__"}
@@ -368,7 +368,7 @@ export function CreateGamePage({
             />
           </label>
           {roomSelectValue === "__custom__" ? (
-            <label>
+            <label className="create-field">
               {t("create.customRoom")}
               <input
                 value={sourceMatrixRoomId}
@@ -377,22 +377,24 @@ export function CreateGamePage({
               />
             </label>
           ) : null}
-          <label>
-            {t("create.language")}
-            <FormSelect
-              value={language}
-              options={languageOptions}
-              onChange={(value) => setLanguage(value as "zh-CN" | "en")}
-            />
-          </label>
-          <label>
-            {t("create.agentSpeechRate")}
-            <FormSelect
-              value={String(agentSpeechRate)}
-              options={speechRateOptions}
-              onChange={(value) => setAgentSpeechRate(Number(value))}
-            />
-          </label>
+          <div className="create-form-grid">
+            <label className="create-field">
+              {t("create.language")}
+              <FormSelect
+                value={language}
+                options={languageOptions}
+                onChange={(value) => setLanguage(value as "zh-CN" | "en")}
+              />
+            </label>
+            <label className="create-field">
+              {t("create.agentSpeechRate")}
+              <FormSelect
+                value={String(agentSpeechRate)}
+                options={speechRateOptions}
+                onChange={(value) => setAgentSpeechRate(Number(value))}
+              />
+            </label>
+          </div>
           <button type="submit" className="action-primary">
             {t("create.submit")}
           </button>
