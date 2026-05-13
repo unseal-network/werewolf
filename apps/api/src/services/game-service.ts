@@ -1643,12 +1643,21 @@ export class InMemoryGameService {
     room.projection = {
       ...room.projection,
       currentSpeakerPlayerId,
-      deadlineAt: currentSpeakerPlayerId
-        ? new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString()
-        : null,
+      deadlineAt: this.deadlineForSpeechSpeaker(room, currentSpeakerPlayerId, now),
       version: room.events.length + 1,
     };
     this.emitSpeechTurnStarted(room, previousSpeakerPlayerId, now);
+  }
+
+  private deadlineForSpeechSpeaker(
+    room: StoredGameRoom,
+    playerId: string | null,
+    now: Date
+  ): string | null {
+    if (!playerId) return null;
+    const player = this.requirePlayer(room, playerId);
+    if (player.kind !== "user") return null;
+    return new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString();
   }
 
   private deadlineForPhase(
@@ -2465,9 +2474,11 @@ export class InMemoryGameService {
       (candidate) => candidate !== completedPlayerId
     );
     const nextSpeakerPlayerId = room.speechQueue[0] ?? null;
-    const nextDeadlineAt = nextSpeakerPlayerId
-      ? new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString()
-      : room.projection.deadlineAt;
+    const nextDeadlineAt = this.deadlineForSpeechSpeaker(
+      room,
+      nextSpeakerPlayerId,
+      now
+    );
     room.projection = {
       ...room.projection,
       currentSpeakerPlayerId: nextSpeakerPlayerId,

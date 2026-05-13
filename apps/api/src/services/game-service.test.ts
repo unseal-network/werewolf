@@ -1189,6 +1189,38 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("does not assign a deadline to an agent speech turn", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const humanSpeaker = room.players[0]!;
+    const agentSpeaker = room.players[1]!;
+
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: humanSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [humanSpeaker.id, agentSpeaker.id];
+
+    await games.submitAction(gameRoomId, humanSpeaker.id, {
+      kind: "speech",
+      speech: "我先说完，交给下一位。",
+    });
+
+    const turnEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "turn_started" && event.subjectId === agentSpeaker.id
+      );
+    expect(room.projection.currentSpeakerPlayerId).toBe(agentSpeaker.id);
+    expect(room.projection.deadlineAt).toBeNull();
+    expect(turnEvent?.payload.deadlineAt).toBeNull();
+  });
+
   it("starts the next human speaker deadline after agent TTS completes", async () => {
     vi.useFakeTimers();
     try {
