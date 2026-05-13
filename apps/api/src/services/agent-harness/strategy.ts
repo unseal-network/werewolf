@@ -110,15 +110,12 @@ export function buildFocusAngle(room: StoredGameRoom, playerId: string): string 
 }
 
 export function buildSpeechRules(language: CreateGameRequest["language"]): string {
-  const languageLine = language === "zh-CN" ? "使用简体中文自然口语。" : "Use natural English table talk.";
+  const languageLine = language === "zh-CN" ? "使用简体中文。" : "Use English.";
   return [
     "<speech_rules>",
     languageLine,
     "必须调用 saySpeech 工具提交发言。",
-    "语音版优先一句话说完，最多两句；一句话内部用逗号、顿号或分号做自然停顿分段。",
-    "必须给出至少一个具体怀疑、信任判断或归票方向。",
-    "只基于当前局势发言，不要编造没有发生的发言、查验、投票或死亡。",
-    "不要说自己是 AI，不要输出舞台动作。",
+    "把要播报的内容放在 saySpeech 的 speech 字段里。",
     "</speech_rules>",
   ].join("\n");
 }
