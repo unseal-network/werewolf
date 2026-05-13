@@ -12,7 +12,9 @@ export function createIframeMessageMock(): IFrameMessageType {
     userId: env.VITE_MOCK_USER_ID ?? '@dev_user:local',
     displayName: env.VITE_MOCK_DISPLAY_NAME ?? 'Dev Player',
     powerLevel: Number(env.VITE_MOCK_POWER_LEVEL ?? 100),
-    config: { streamURL: '' },
+    config: { 
+      streamURL: import.meta.env.VITE_UNSEAL_API_BASE_URL ?? 'http://localhost:12018' 
+    },
     gameRoomId: '',   // 游戏房间 ID，初始为空，创建/加入后由 App 管理
   }
 

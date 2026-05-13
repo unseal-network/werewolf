@@ -13,7 +13,7 @@ interface WaitingRoomViewProps {
   onSelectSeat: (seatNo: number) => Promise<void>
   onReady: () => Promise<void>
   onLoadAgents: () => Promise<void>
-  onAddAgent: (agentUserId: string, displayName: string) => Promise<void>
+  onAddAgents: (agents: Array<{ userId: string; displayName: string }>) => Promise<void>
   onLeave: () => void
 }
 
@@ -24,7 +24,7 @@ function getInitial(name: string) {
 
 export function WaitingRoomView({
   userId, isAdmin, room, agents, agentsLoading,
-  onStart, onSelectSeat, onReady, onLoadAgents, onAddAgent, onLeave,
+  onStart, onSelectSeat, onReady, onLoadAgents, onAddAgents, onLeave,
 }: WaitingRoomViewProps) {
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
@@ -33,6 +33,10 @@ export function WaitingRoomView({
   const [showSeatSheet, setShowSeatSheet] = useState(false)
   const [showAgentSheet, setShowAgentSheet] = useState(false)
   const [agentsLoaded, setAgentsLoaded] = useState(false)
+  // AI 多选
+  const [selectedAgentIds, setSelectedAgentIds] = useState<Set<string>>(new Set())
+  const [addingAgents, setAddingAgents] = useState(false)
+  const [addAgentError, setAddAgentError] = useState<string | null>(null)
 
   const total = room.targetPlayerCount ?? 8
   const seatedPlayers = room.players.filter(p => p.seatNo > 0 && !p.leftAt)
@@ -77,9 +81,36 @@ export function WaitingRoomView({
   }
 
   const handleLoadAgents = async () => {
+    setSelectedAgentIds(new Set())
+    setAddAgentError(null)
     await onLoadAgents()
     setAgentsLoaded(true)
     setShowAgentSheet(true)
+  }
+
+  const toggleAgent = (uid: string) => {
+    setSelectedAgentIds(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) next.delete(uid)
+      else next.add(uid)
+      return next
+    })
+  }
+
+  const handleConfirmAddAgents = async () => {
+    const toAdd = agents.filter(a => selectedAgentIds.has(a.userId) && !a.alreadyJoined)
+    if (toAdd.length === 0) return
+    setAddingAgents(true)
+    setAddAgentError(null)
+    try {
+      await onAddAgents(toAdd.map(a => ({ userId: a.userId, displayName: a.displayName })))
+      setSelectedAgentIds(new Set())
+      setShowAgentSheet(false)
+    } catch (e) {
+      setAddAgentError(e instanceof Error ? e.message : '添加失败，请重试')
+    } finally {
+      setAddingAgents(false)
+    }
   }
 
   // Grid columns
@@ -231,23 +262,156 @@ export function WaitingRoomView({
         </div>
       </BottomSheet>
 
-      {/* Agent picker sheet */}
-      <BottomSheet open={showAgentSheet} onClose={() => setShowAgentSheet(false)} title="添加 AI 玩家">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {!agentsLoaded || agentsLoading ? (
-            <div style={{ textAlign: 'center', color: '#475569', padding: '20px 0' }}>加载中...</div>
-          ) : agents.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#475569', fontSize: 13, padding: '20px 0' }}>暂无可用 AI</div>
-          ) : agents.map(agent => (
-            <button key={agent.userId} onClick={() => { if (!agent.alreadyJoined) { void onAddAgent(agent.userId, agent.displayName); setShowAgentSheet(false) } }} disabled={agent.alreadyJoined} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: agent.alreadyJoined ? 'rgba(255,255,255,0.02)' : 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', cursor: agent.alreadyJoined ? 'default' : 'pointer', opacity: agent.alreadyJoined ? 0.5 : 1, width: '100%', textAlign: 'left' }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{getInitial(agent.displayName)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{agent.displayName}</div>
+      {/* Agent picker sheet — 多选 */}
+      <BottomSheet
+        open={showAgentSheet}
+        onClose={() => { setShowAgentSheet(false); setSelectedAgentIds(new Set()); setAddAgentError(null) }}
+        title="添加 AI 玩家"
+      >
+        {(() => {
+          const availableSlots = total - seatedPlayers.length
+          const selectableCount = selectedAgentIds.size
+          const canConfirm = selectableCount > 0 && selectableCount <= availableSlots && !addingAgents
+
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* 顶部提示 */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 12, color: '#64748b' }}>
+                  剩余空位 <span style={{ color: '#c4b5fd', fontWeight: 700 }}>{availableSlots}</span> 个
+                </span>
+                {selectableCount > 0 && (
+                  <span style={{ fontSize: 12, color: '#a78bfa', fontWeight: 700 }}>
+                    已选 {selectableCount} 位
+                  </span>
+                )}
               </div>
-              {agent.alreadyJoined && <span style={{ fontSize: 11, color: '#34d399', background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.3)', borderRadius: 8, padding: '2px 8px' }}>已加入</span>}
-            </button>
-          ))}
-        </div>
+
+              {/* AI 列表 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 300, overflowY: 'auto' }}>
+                {!agentsLoaded || agentsLoading ? (
+                  <div style={{ textAlign: 'center', color: '#475569', padding: '24px 0' }}>加载中...</div>
+                ) : agents.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#475569', fontSize: 13, padding: '24px 0' }}>暂无可用 AI</div>
+                ) : agents.map(agent => {
+                  const isSelected = selectedAgentIds.has(agent.userId)
+                  const disabled = agent.alreadyJoined || addingAgents
+
+                  return (
+                    <button
+                      key={agent.userId}
+                      onClick={() => { if (!disabled) toggleAgent(agent.userId) }}
+                      disabled={disabled}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12,
+                        padding: '12px 14px', borderRadius: 14,
+                        background: isSelected
+                          ? 'rgba(109,40,217,0.2)'
+                          : agent.alreadyJoined
+                            ? 'rgba(255,255,255,0.02)'
+                            : 'rgba(255,255,255,0.04)',
+                        border: `1px solid ${isSelected ? 'rgba(139,92,246,0.6)' : 'rgba(255,255,255,0.08)'}`,
+                        cursor: disabled ? 'default' : 'pointer',
+                        opacity: agent.alreadyJoined ? 0.45 : 1,
+                        width: '100%', textAlign: 'left',
+                        transition: 'all 120ms',
+                      }}
+                    >
+                      {/* 头像 */}
+                      <div style={{
+                        width: 38, height: 38, borderRadius: '50%', flexShrink: 0,
+                        background: isSelected ? 'rgba(139,92,246,0.3)' : 'rgba(255,255,255,0.08)',
+                        border: `2px solid ${isSelected ? 'rgba(139,92,246,0.7)' : 'transparent'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 16, fontWeight: 700,
+                        color: isSelected ? '#c4b5fd' : '#94a3b8',
+                        transition: 'all 120ms',
+                      }}>
+                        {getInitial(agent.displayName)}
+                      </div>
+
+                      {/* 名称 */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 14, fontWeight: 600,
+                          color: isSelected ? '#e2e8f0' : '#94a3b8',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {agent.displayName}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#475569', marginTop: 1 }}>AI 玩家</div>
+                      </div>
+
+                      {/* 右侧状态 */}
+                      {agent.alreadyJoined ? (
+                        <span style={{
+                          fontSize: 11, color: '#34d399',
+                          background: 'rgba(52,211,153,0.1)',
+                          border: '1px solid rgba(52,211,153,0.3)',
+                          borderRadius: 8, padding: '3px 8px', flexShrink: 0,
+                        }}>已加入</span>
+                      ) : (
+                        <div style={{
+                          width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                          border: `2px solid ${isSelected ? '#8b5cf6' : 'rgba(255,255,255,0.15)'}`,
+                          background: isSelected ? '#8b5cf6' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 120ms',
+                        }}>
+                          {isSelected && (
+                            <span style={{ color: '#fff', fontSize: 12, fontWeight: 800, lineHeight: 1 }}>✓</span>
+                          )}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* 错误提示 */}
+              {addAgentError && (
+                <div style={{
+                  marginTop: 10, padding: '8px 12px', borderRadius: 10,
+                  background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
+                  fontSize: 12, color: '#f87171', textAlign: 'center',
+                }}>
+                  {addAgentError}
+                </div>
+              )}
+
+              {/* 确认按钮 */}
+              <button
+                onClick={() => { void handleConfirmAddAgents() }}
+                disabled={!canConfirm}
+                style={{
+                  marginTop: 14, width: '100%', height: 52, borderRadius: 16,
+                  background: canConfirm
+                    ? 'linear-gradient(135deg, #5b21b6, #7c3aed)'
+                    : 'rgba(255,255,255,0.06)',
+                  border: canConfirm
+                    ? '1px solid rgba(255,209,102,0.4)'
+                    : '1px solid rgba(255,255,255,0.08)',
+                  color: canConfirm ? '#ffd166' : '#475569',
+                  fontSize: 15, fontWeight: 800,
+                  cursor: canConfirm ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'all 150ms',
+                }}
+              >
+                {addingAgents ? (
+                  <>
+                    <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)', borderTopColor: '#fff', display: 'inline-block' }} />
+                    添加中...
+                  </>
+                ) : selectableCount > 0 ? (
+                  `🤖 确认添加 ${selectableCount} 位 AI`
+                ) : (
+                  '请选择 AI 玩家'
+                )}
+              </button>
+            </div>
+          )
+        })()}
       </BottomSheet>
     </div>
   )

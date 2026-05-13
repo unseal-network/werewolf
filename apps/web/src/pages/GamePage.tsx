@@ -32,7 +32,7 @@ interface GamePageProps {
   onSelectSeat: (seatNo: number) => Promise<void>
   onReady: () => Promise<void>
   onLoadAgents: () => Promise<void>
-  onAddAgent: (agentUserId: string, displayName: string) => Promise<void>
+  onAddAgents: (agents: Array<{ userId: string; displayName: string }>) => Promise<void>
   // game
   onRefresh: () => Promise<void>
   onAction: (body: { kind: string; targetPlayerId?: string; speech?: string }) => Promise<void>
@@ -43,7 +43,7 @@ interface GamePageProps {
 export function GamePage({
   gameRoomId: _gameRoomId, userId, isAdmin, room, projection, privateStates, events,
   livekitToken, livekitServerUrl, subscribeUrl,
-  agents, agentsLoading, onStart, onSelectSeat, onReady, onLoadAgents, onAddAgent,
+  agents, agentsLoading, onStart, onSelectSeat, onReady, onLoadAgents, onAddAgents,
   onRefresh, onAction, onBackToLobby, iframeMessage,
 }: GamePageProps) {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
@@ -88,6 +88,23 @@ export function GamePage({
 
   useGameSSE(subscribeUrl, handleSSEEvent, () => { void onRefresh() })
 
+  // 长按头像 → 计算气泡位置 → 打开 picker
+  // ⚠️ 必须在所有 early return 之前声明，避免违反 hooks 调用顺序规则
+  const handleLongPress = useCallback((playerId: string, rect: DOMRect) => {
+    const midY = rect.top + rect.height / 2
+    const direction: BubblePosition['direction'] = midY > window.innerHeight / 2 ? 'up' : 'down'
+    const isLeft = rect.left < window.innerWidth / 2
+    setPickerTarget({
+      playerId,
+      pos: {
+        x: isLeft ? rect.left : rect.right,
+        y: direction === 'down' ? rect.bottom : rect.top,
+        direction,
+        align: isLeft ? 'left' : 'right',
+      },
+    })
+  }, [])
+
   // ── Waiting room（游戏未开始）──────────────────────────────────
   const isWaiting = !projection || projection.status === 'waiting'
   if (isWaiting) {
@@ -102,7 +119,7 @@ export function GamePage({
         onSelectSeat={onSelectSeat}
         onReady={onReady}
         onLoadAgents={onLoadAgents}
-        onAddAgent={onAddAgent}
+        onAddAgents={onAddAgents}
         onLeave={onBackToLobby}
       />
     )
@@ -158,22 +175,6 @@ export function GamePage({
       setSubmitting(false)
     }
   }
-
-  // 长按头像 → 计算气泡位置 → 打开 picker
-  const handleLongPress = useCallback((playerId: string, rect: DOMRect) => {
-    const midY = rect.top + rect.height / 2
-    const direction: BubblePosition['direction'] = midY > window.innerHeight / 2 ? 'up' : 'down'
-    const isLeft = rect.left < window.innerWidth / 2
-    setPickerTarget({
-      playerId,
-      pos: {
-        x: isLeft ? rect.left : rect.right,
-        y: direction === 'down' ? rect.bottom : rect.top,
-        direction,
-        align: isLeft ? 'left' : 'right',
-      },
-    })
-  }, [])
 
   const actionHint = !canAct ? undefined
     : actionKind === 'speech' ? '🎙 轮到你发言'

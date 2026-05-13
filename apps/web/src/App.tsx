@@ -2,6 +2,9 @@ import { useState, useCallback, useRef } from 'react'
 import { useIframeAuth } from './hooks/useIframeAuth'
 import { useGameState } from './hooks/useGameState'
 import { createApiClient } from './api/client'
+import { createUnsealClient, UnsealApiError } from './api/unsealClient'
+import type { UnsealClient } from './api/unsealClient'
+import { isInIframe } from './mocks/iframeMessageMock'
 import { LoadingPage } from './pages/LoadingPage'
 import { LobbyPage } from './pages/LobbyPage'
 import { GamePage } from './pages/GamePage'
@@ -30,6 +33,10 @@ function clearUrlGameRoomId() {
   window.history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname)
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(r => setTimeout(r, ms))
+}
+
 // ── App ──────────────────────────────────────────────────────────────────────
 export function App() {
   const { info, getToken, getTokenSync, iframeMessage, init } = useIframeAuth()
@@ -43,6 +50,13 @@ export function App() {
   const [gameRoomId, setGameRoomId] = useState<string | null>(null)
   const [livekitToken, setLivekitToken] = useState<string | null>(null)
   const [livekitServerUrl, setLivekitServerUrl] = useState<string | null>(null)
+
+  // Unseal JWT（与 Matrix token 分开存储）
+  const unsealJwtRef = useRef<string>('')
+  // Unseal 客户端（baseUrl = gameInfo.config.streamURL + '/app-mgr/room'）
+  const unsealClientRef = useRef<UnsealClient | null>(null)
+  // 用于中止非 admin 轮询
+  const pollAbortRef = useRef(false)
   const initDoneRef = useRef(false)
 
   const getClient = useCallback(() => {
@@ -62,12 +76,11 @@ export function App() {
   // ── reconnect：已有 gameRoomId 时自动加入并拉取状态 ────────────────────────
   const reconnectGame = useCallback(async (id: string) => {
     const client = getClient()
-    // join 可能已在房间中，忽略错误
     try { await client.joinGame(id) } catch { /* already joined */ }
     const data = await client.getGame(id)
     updateFromSnapshot(data)
     setGameRoomId(id)
-    // 如果游戏已开始，尝试拿 LiveKit token
+    setUrlGameRoomId(id)
     if (data.projection?.status === 'active' || data.projection?.status === 'waiting') {
       try {
         const lkData = await client.getLivekitToken(id)
@@ -78,24 +91,96 @@ export function App() {
     setStage('playing')
   }, [getClient, updateFromSnapshot])
 
+  // ── 轮询宿主房间直到 linkRoomId 出现（非 admin 专用）─────────────────────
+  const pollUntilLinked = useCallback(async (roomId: string): Promise<string> => {
+    pollAbortRef.current = false
+    while (!pollAbortRef.current) {
+      try {
+        const roomData = await unsealClientRef.current?.getRoom(roomId, unsealJwtRef.current)
+        if (roomData?.linkRoomId) return roomData.linkRoomId
+      } catch { /* 暂时忽略网络错误，继续轮询 */ }
+      await sleep(1000)
+    }
+    throw new Error('Polling aborted')
+  }, [])
+
   // ── init ───────────────────────────────────────────────────────────────────
   const handleInit = useCallback(async () => {
     setInitError(null)
-    try {
-      await getToken()
-      await init()
+    pollAbortRef.current = true // 中止可能正在进行的轮询
 
+    try {
+      // 1. 先用 URL 中已有的 gameRoomId 快速恢复（刷新场景）
       const urlId = getUrlGameRoomId()
       if (urlId) {
-        // 刷新场景：URL 中有 gameRoomId，自动重连
+        await getToken()
+        await init()
         await reconnectGame(urlId)
-      } else {
+        return
+      }
+
+      // 2. 获取 Matrix token
+      const unsealToken = await getToken()
+      const gameInfo = await init()
+
+      // 3. 非 iframe（本地开发）：跳过 Unseal 服务，直接进大厅
+      if (!isInIframe()) {
+        const adminFromPowerLevel = (gameInfo?.powerLevel ?? 0) >= 100
+        if (adminFromPowerLevel) {
+          setStage('lobby')
+        } else {
+          // 本地 mock 非 admin：直接进大厅等待
+          setStage('lobby')
+        }
+        return
+      }
+
+      // 3.5 创建 Unseal 客户端（baseUrl = streamURL + '/app-mgr/room'）
+      unsealClientRef.current = createUnsealClient(
+        (gameInfo?.config?.streamURL ?? '') + '/app-mgr/room'
+      )
+
+      // 4. 用 unsealToken 换取 JWT
+      const { token: jwt } = await unsealClientRef.current.enter(unsealToken)
+      unsealJwtRef.current = jwt
+
+      // 5. 查询宿主房间
+      const roomId = gameInfo?.gameRoomId
+      if (!roomId) {
+        // 没有 roomId，直接进大厅
         setStage('lobby')
+        return
+      }
+      const adminFromPowerLevel = (gameInfo?.powerLevel ?? 0) >= 100
+
+      // 5a. 查询宿主房间（ROOM_002 = 房间不存在，视为尚无 linkRoomId）
+      let linkRoomId: string | null = null
+      try {
+        const roomData = await unsealClientRef.current.getRoom(roomId, jwt)
+        linkRoomId = roomData.linkRoomId
+      } catch (e) {
+        if (e instanceof UnsealApiError && e.code === 'ROOM_002') {
+          setInitError('房间不存在')
+          return
+        }
+        throw e
+      }
+
+      if (linkRoomId) {
+        // 6a. 宿主已绑定游戏房间 → 直接进入
+        await reconnectGame(linkRoomId)
+      } else if (adminFromPowerLevel) {
+        // 6b. Admin 且未创建 → 进大厅手动创建
+        setStage('lobby')
+      } else {
+        // 6c. 非 Admin → 轮询等待 admin 创建
+        const linkedId = await pollUntilLinked(roomId)
+        await reconnectGame(linkedId)
       }
     } catch (e) {
       setInitError(e instanceof Error ? e.message : '初始化失败')
     }
-  }, [init, getToken, reconnectGame])
+  }, [init, getToken, reconnectGame, pollUntilLinked])
 
   // Auto-init on mount
   useState(() => {
@@ -109,33 +194,37 @@ export function App() {
   const userId = info?.userId ?? ''
 
   // ── handlers ───────────────────────────────────────────────────────────────
-  const handleCreateAndJoin = useCallback(async (config: { targetPlayerCount: number; language: string; meetingRequired: boolean }) => {
+  const handleCreateAndJoin = useCallback(async (config: {
+    targetPlayerCount: number
+    language: string
+    meetingRequired: boolean
+  }) => {
     await getToken()
     const client = getClient()
 
-    // 若宿主 App 预绑定了房间 ID，直接使用；否则创建新空房间
-    const linkRoomId = info?.linkRoomId ?? info?.gameRoomId
-    let roomId: string
-    if (linkRoomId) {
-      roomId = linkRoomId
-    } else {
-      const res = await client.createRoom()
-      roomId = res.gameRoomId
-    }
+    // 创建空房间
+    const { gameRoomId: newRoomId } = await client.createRoom()
 
     // 配置房间参数
-    await client.updateRoomSettings(roomId, {
-      sourceMatrixRoomId: info?.roomId ?? '',
+    await client.updateRoomSettings(newRoomId, {
+      sourceMatrixRoomId: info?.gameRoomId ?? '',
       title: '狼人杀',
       targetPlayerCount: config.targetPlayerCount,
       language: config.language as 'zh-CN' | 'en',
       timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
     })
 
-    setGameRoomId(roomId)
-    setUrlGameRoomId(roomId)                   // 写入 URL
-    await client.joinGame(roomId)
-    await refreshGame(roomId)
+    // 加入房间
+    await client.joinGame(newRoomId)
+
+    // 绑定到宿主房间（供非 admin 玩家发现，仅 iframe 模式生效）
+    if (isInIframe() && info?.gameRoomId && unsealClientRef.current && unsealJwtRef.current) {
+      await unsealClientRef.current.linkRoom(info.gameRoomId, newRoomId, unsealJwtRef.current)
+    }
+
+    setGameRoomId(newRoomId)
+    setUrlGameRoomId(newRoomId)
+    await refreshGame(newRoomId)
     setStage('playing')
   }, [getToken, getClient, info, refreshGame])
 
@@ -169,8 +258,21 @@ export function App() {
     try {
       await getToken()
       const client = getClient()
-      const res = await client.listAgentCandidates(gameRoomId)
-      setAgents(res.agents)
+      if (isInIframe()) {
+        const members = await iframeMessage.getMembers()
+        setAgents(members.filter((r: any) => !!r.isAgent).map((r: any) => ({
+          userId: r.userId,
+          displayName: r.displayName,
+          alreadyJoined: false,
+          membership: '',
+          userType: ''
+        })))
+      } else {
+        const res = await client.listAgentCandidates(gameRoomId)
+        setAgents(res.agents)
+      }
+
+
     } finally {
       setAgentsLoading(false)
     }
@@ -181,6 +283,19 @@ export function App() {
     await getToken()
     const client = getClient()
     await client.addAgentPlayer(gameRoomId, agentUserId, displayName)
+    await refreshGame()
+  }, [gameRoomId, getToken, getClient, refreshGame])
+
+  // 批量添加 AI：逐个添加，最后刷新一次
+  const handleAddAgents = useCallback(async (
+    agentList: Array<{ userId: string; displayName: string }>
+  ) => {
+    if (!gameRoomId || agentList.length === 0) return
+    await getToken()
+    const client = getClient()
+    for (const agent of agentList) {
+      await client.addAgentPlayer(gameRoomId, agent.userId, agent.displayName)
+    }
     await refreshGame()
   }, [gameRoomId, getToken, getClient, refreshGame])
 
@@ -202,7 +317,11 @@ export function App() {
     } catch { /* voice optional */ }
   }, [gameRoomId, getToken, getClient, updateFromSnapshot, gameState])
 
-  const handleAction = useCallback(async (body: { kind: string; targetPlayerId?: string; speech?: string }) => {
+  const handleAction = useCallback(async (body: {
+    kind: string
+    targetPlayerId?: string
+    speech?: string
+  }) => {
     if (!gameRoomId) return
     await getToken()
     const client = getClient()
@@ -211,7 +330,8 @@ export function App() {
   }, [gameRoomId, getToken, getClient, refreshGame])
 
   const handleBackToLobby = useCallback(() => {
-    clearUrlGameRoomId()                      // 清除 URL
+    pollAbortRef.current = true  // 中止轮询
+    clearUrlGameRoomId()
     setLivekitToken(null)
     setLivekitServerUrl(null)
     resetGame()
@@ -264,6 +384,7 @@ export function App() {
         onSelectSeat={handleSelectSeat}
         onReady={handleReady}
         onAddAgent={handleAddAgent}
+        onAddAgents={handleAddAgents}
         onLoadAgents={handleLoadAgents}
         onStart={handleStart}
         onLeave={handleLeave}
@@ -291,7 +412,7 @@ export function App() {
         onSelectSeat={handleSelectSeat}
         onReady={handleReady}
         onLoadAgents={handleLoadAgents}
-        onAddAgent={handleAddAgent}
+        onAddAgents={handleAddAgents}
         onRefresh={refreshGame}
         onAction={handleAction}
         onBackToLobby={handleBackToLobby}
