@@ -118,10 +118,14 @@ export function PlayerRadialPicker({
   const isPressDraggingRef = useRef(false);
   const suppressClickRef = useRef(false);
   const longPressTimerRef = useRef<number | null>(null);
+  const hoverFrameRef = useRef<number | null>(null);
+  const pendingHoverPointRef = useRef<{ x: number; y: number; allowOutsideWheel: boolean } | null>(null);
   const pressStartRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const wheelGeometryRef = useRef<{ centerX: number; centerY: number; radius: number } | null>(null);
   const [wheelOpen, setWheelOpen] = useState(defaultOpen);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectionPulseId, setSelectionPulseId] = useState<string | null>(null);
+  const hoveredIdRef = useRef<string | null>(null);
   const selectedTarget = useMemo(
     () => targets.find((target) => target.playerId === selectedTargetId),
     [selectedTargetId, targets]
@@ -135,9 +139,16 @@ export function PlayerRadialPicker({
   const activeTarget = wheelOpen ? hoveredTarget : selectedTarget;
 
   useEffect(() => {
+    hoveredIdRef.current = hoveredId;
+  }, [hoveredId]);
+
+  useEffect(() => {
     return () => {
       if (longPressTimerRef.current !== null) {
         window.clearTimeout(longPressTimerRef.current);
+      }
+      if (hoverFrameRef.current !== null) {
+        window.cancelAnimationFrame(hoverFrameRef.current);
       }
     };
   }, []);
@@ -162,7 +173,8 @@ export function PlayerRadialPicker({
       isPressDraggingRef.current = false;
       suppressClickRef.current = false;
       pressStartRef.current = null;
-      setHoveredId(null);
+      setHoveredIdIfChanged(null);
+      wheelGeometryRef.current = null;
       setWheelOpen(false);
     };
     document.addEventListener("pointerdown", closeOnOutsidePointer);
@@ -175,37 +187,76 @@ export function PlayerRadialPicker({
     longPressTimerRef.current = null;
   }
 
-  function getHoverTargetId(event: PointerEvent<HTMLElement>, allowOutsideWheel = false) {
+  function measureWheelGeometry() {
     const rect = wheelRef.current?.getBoundingClientRect();
     if (!rect) return null;
-    const wheelRadius = Math.min(rect.width, rect.height) / 2;
+    const geometry = {
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2,
+      radius: Math.min(rect.width, rect.height) / 2,
+    };
+    wheelGeometryRef.current = geometry;
+    return geometry;
+  }
+
+  function getHoverTargetIdFromPoint(
+    point: { x: number; y: number },
+    allowOutsideWheel = false
+  ) {
+    const geometry = wheelGeometryRef.current ?? measureWheelGeometry();
+    if (!geometry) return null;
     const { index } = getRadialSelectionState({
-      point: { x: event.clientX, y: event.clientY },
-      center: { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 },
+      point,
+      center: { x: geometry.centerX, y: geometry.centerY },
       count: targets.length,
-      minRadius: wheelRadius * PLAYER_PICKER_INNER_HIT_RATIO,
+      minRadius: geometry.radius * PLAYER_PICKER_INNER_HIT_RATIO,
       maxRadius: allowOutsideWheel
         ? Number.POSITIVE_INFINITY
-        : wheelRadius * PLAYER_PICKER_OUTER_HIT_RATIO,
+        : geometry.radius * PLAYER_PICKER_OUTER_HIT_RATIO,
     });
     return targets[index]?.playerId ?? null;
   }
 
+  function setHoveredIdIfChanged(nextId: string | null) {
+    if (hoveredIdRef.current === nextId) return;
+    hoveredIdRef.current = nextId;
+    setHoveredId(nextId);
+  }
+
+  function scheduleHoverUpdate(
+    point: { x: number; y: number },
+    allowOutsideWheel = false
+  ) {
+    pendingHoverPointRef.current = { ...point, allowOutsideWheel };
+    if (hoverFrameRef.current !== null) return;
+    hoverFrameRef.current = window.requestAnimationFrame(() => {
+      hoverFrameRef.current = null;
+      const pending = pendingHoverPointRef.current;
+      pendingHoverPointRef.current = null;
+      if (!pending) return;
+      setHoveredIdIfChanged(
+        getHoverTargetIdFromPoint(pending, pending.allowOutsideWheel)
+      );
+    });
+  }
+
   function updateHover(event: PointerEvent<HTMLElement>) {
-    setHoveredId(getHoverTargetId(event, true));
+    scheduleHoverUpdate({ x: event.clientX, y: event.clientY }, true);
   }
 
   function clearSelectionAndClose() {
     onClear();
     setWheelOpen(false);
-    setHoveredId(null);
+    setHoveredIdIfChanged(null);
+    wheelGeometryRef.current = null;
   }
 
   function commitHover() {
     if (hoveredId) {
       onSelect(hoveredId);
       setWheelOpen(false);
-      setHoveredId(null);
+      setHoveredIdIfChanged(null);
+      wheelGeometryRef.current = null;
     }
   }
 
@@ -220,7 +271,7 @@ export function PlayerRadialPicker({
         : 0;
     const startIndex = currentIndex >= 0 ? currentIndex : 0;
     const nextIndex = (startIndex + step + targets.length) % targets.length;
-    setHoveredId(targets[nextIndex]?.playerId ?? null);
+    setHoveredIdIfChanged(targets[nextIndex]?.playerId ?? null);
   }
 
   function handleWheelKeyDown(event: KeyboardEvent<HTMLDivElement>) {
@@ -248,7 +299,8 @@ export function PlayerRadialPicker({
         if (hoveredId) {
           onSelect(hoveredId);
           setWheelOpen(false);
-          setHoveredId(null);
+          setHoveredIdIfChanged(null);
+          wheelGeometryRef.current = null;
         } else if (selectedTarget) {
           onConfirm();
         }
@@ -257,7 +309,8 @@ export function PlayerRadialPicker({
         event.preventDefault();
         if (wheelOpen) {
           setWheelOpen(false);
-          setHoveredId(null);
+          setHoveredIdIfChanged(null);
+          wheelGeometryRef.current = null;
         } else if (selectedTarget) {
           clearSelectionAndClose();
         }
@@ -271,13 +324,17 @@ export function PlayerRadialPicker({
     clearLongPressTimer();
     pressStartRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
+    wheelGeometryRef.current = measureWheelGeometry();
     if (wheelOpen) return;
     longPressTimerRef.current = window.setTimeout(() => {
       longPressTimerRef.current = null;
       isPressDraggingRef.current = true;
       suppressClickRef.current = true;
       setWheelOpen(true);
-      setHoveredId(null);
+      setHoveredIdIfChanged(null);
+      window.requestAnimationFrame(() => {
+        wheelGeometryRef.current = measureWheelGeometry();
+      });
     }, PLAYER_PICKER_LONG_PRESS_MS);
   }
 
@@ -292,7 +349,7 @@ export function PlayerRadialPicker({
     }
     if (!isPressDraggingRef.current) return;
     event.stopPropagation();
-    setHoveredId(getHoverTargetId(event, true));
+    scheduleHoverUpdate({ x: event.clientX, y: event.clientY }, true);
   }
 
   function endPressDrag(event: PointerEvent<HTMLButtonElement>) {
@@ -311,11 +368,15 @@ export function PlayerRadialPicker({
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     pressStartRef.current = null;
-    const targetId = getHoverTargetId(event, true);
+    const targetId = getHoverTargetIdFromPoint(
+      { x: event.clientX, y: event.clientY },
+      true
+    );
     if (targetId) {
       onSelect(targetId);
       setWheelOpen(false);
-      setHoveredId(null);
+      setHoveredIdIfChanged(null);
+      wheelGeometryRef.current = null;
     } else if (selectedTarget) {
       clearSelectionAndClose();
     }
@@ -331,7 +392,10 @@ export function PlayerRadialPicker({
       onKeyDown={handleWheelKeyDown}
       onPointerMove={wheelOpen ? updateHover : undefined}
       onPointerUp={wheelOpen ? commitHover : undefined}
-      onPointerLeave={() => setHoveredId(null)}
+      onPointerLeave={() => {
+        setHoveredIdIfChanged(null);
+        wheelGeometryRef.current = null;
+      }}
     >
       {wheelOpen ? (
         <div className="player-picker-slices" aria-hidden>
@@ -356,7 +420,8 @@ export function PlayerRadialPicker({
               onClick={() => {
                 onSelect(target.playerId);
                 setWheelOpen(false);
-                setHoveredId(null);
+                setHoveredIdIfChanged(null);
+                wheelGeometryRef.current = null;
               }}
             >
               {renderTargetAvatar(target)}

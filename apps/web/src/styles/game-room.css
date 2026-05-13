@@ -5376,6 +5376,77 @@ body {
   }
 }
 
+@media (pointer: coarse) {
+  .player-picker-wheel {
+    filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.30));
+    transition: width 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: width;
+  }
+
+  .player-picker-wheel.open {
+    filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.44));
+  }
+
+  .player-picker-wheel.open::before {
+    background:
+      radial-gradient(circle at 50% 50%, transparent 0 30%, rgba(3, 2, 8, 0.90) 31% 43%, transparent 44%),
+      radial-gradient(circle at 50% 50%, transparent 0 54%, rgba(216, 183, 107, 0.15) 55% 56%, transparent 58%),
+      repeating-conic-gradient(from calc(var(--player-picker-slice-deg) / -2), rgba(242, 228, 196, 0.13) 0deg 0.45deg, transparent 0.45deg var(--player-picker-slice-deg)),
+      conic-gradient(from 18deg, rgba(216, 183, 107, 0.17), rgba(58, 18, 36, 0.20), rgba(13, 14, 24, 0.26), rgba(216, 183, 107, 0.17));
+    box-shadow:
+      inset 0 0 0 1px rgba(242, 228, 196, 0.06),
+      inset 0 0 44px rgba(0, 0, 0, 0.38),
+      0 0 0 8px rgba(5, 4, 10, 0.30);
+  }
+
+  .player-picker-wheel.open::after {
+    box-shadow:
+      0 0 0 7px rgba(2, 2, 7, 0.64),
+      0 0 0 10px rgba(143, 33, 49, 0.12),
+      0 12px 30px rgba(0, 0, 0, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .player-picker-sector {
+    transition: opacity 70ms linear;
+  }
+
+  .player-picker-sector.hovered {
+    filter: none;
+  }
+
+  .player-picker-slice,
+  .player-picker-avatar {
+    transition:
+      border-color 80ms linear,
+      box-shadow 80ms linear,
+      transform 80ms linear;
+  }
+
+  .player-picker-slice.hovered,
+  .player-picker-slice:hover,
+  .player-picker-avatar:hover,
+  .player-picker-avatar.expanded.has-target {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .player-picker-slice.hovered,
+  .player-picker-slice:hover {
+    transform: translate(-50%, -50%) scale(1.015);
+  }
+
+  .player-picker-slice.hovered,
+  .player-picker-slice:hover,
+  .player-picker-avatar:hover {
+    box-shadow:
+      0 0 0 2px rgba(5, 4, 10, 0.84),
+      0 0 0 4px rgba(143, 33, 49, 0.20),
+      0 10px 20px rgba(0, 0, 0, 0.34),
+      inset 0 0 14px rgba(242, 228, 196, 0.10);
+  }
+}
+
 .action-mode-switch {
   width: 100%;
   display: grid;
