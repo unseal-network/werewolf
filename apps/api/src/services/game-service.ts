@@ -2333,7 +2333,12 @@ export class InMemoryGameService {
     const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
       prompt: `${this.languageInstruction(room)} You are ${player.displayName} in a Werewolf game. Speak briefly for ${room.projection.phase}. Your role is ${state.role}.`,
     });
-    const speech = stringValue(result.input?.speech) ?? result.text;
+    const toolSpeech =
+      result.toolName === "saySpeech"
+        ? stringValue(result.input?.speech)
+        : undefined;
+    const speech =
+      toolSpeech ?? `${player.displayName} did not provide a valid speech.`;
     // Synthesize agent speech via TTS and wait for the TTS WebSocket to finish
     // and for the generated PCM frames to be handed to LiveKit before rotating
     // to the next speaker.
@@ -2344,6 +2349,7 @@ export class InMemoryGameService {
     if (
       this.voiceAgents &&
       player.kind === "agent" &&
+      toolSpeech !== undefined &&
       speech.trim() &&
       !result.fallback
     ) {

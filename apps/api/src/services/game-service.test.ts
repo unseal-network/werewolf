@@ -1151,6 +1151,44 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("does not treat raw agent text as a completed saySpeech tool call", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const speak = vi.fn();
+
+    games.setVoiceAgents({
+      get: () => ({ speak }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "raw text that did not come from saySpeech",
+      input: {},
+    }));
+
+    const speechEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      );
+    expect(speak).not.toHaveBeenCalled();
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(speechEvent?.payload.speech).toBe(
+      `${agentSpeaker.displayName} did not provide a valid speech.`
+    );
+  });
+
   it("starts the next human speaker deadline after agent TTS completes", async () => {
     vi.useFakeTimers();
     try {
