@@ -318,6 +318,67 @@ describe("games API", () => {
       "https://matrix.example/_matrix/media/v3/download/example.com/avatar123"
     );
   });
+
+  it("returns the fixed agent candidate list with joined state", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.addAgentPlayer(
+      room.id,
+      "@alice:example.com",
+      "@game-10:keepsecret.io",
+      "game-10"
+    );
+
+    const response = await app.request(`/games/${room.id}/agent-candidates`, {
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.total).toBe(17);
+    expect(body.roomId).toBe("!source:example.com");
+    expect(body.agents.map((agent: { userId: string }) => agent.userId)).toEqual([
+      "@game-10:keepsecret.io",
+      "@game-12:keepsecret.io",
+      "@game-13:keepsecret.io",
+      "@game-1:keepsecret.io",
+      "@game-2:keepsecret.io",
+      "@game-3:keepsecret.io",
+      "@game-4:keepsecret.io",
+      "@game-5:keepsecret.io",
+      "@game-6:keepsecret.io",
+      "@game-7:keepsecret.io",
+      "@game-8:keepsecret.io",
+      "@kimigame1:keepsecret.io",
+      "@kimigame2:keepsecret.io",
+      "@kimigame3:keepsecret.io",
+      "@kimigame4:keepsecret.io",
+      "@kimigame5:keepsecret.io",
+      "@kimigame6:keepsecret.io",
+    ]);
+    expect(body.agents[0]).toMatchObject({
+      userId: "@game-10:keepsecret.io",
+      displayName: "game-10",
+      userType: "bot",
+      membership: "join",
+      alreadyJoined: true,
+    });
+    expect(body.agents[11]).toMatchObject({
+      userId: "@kimigame1:keepsecret.io",
+      displayName: "kimi game 1",
+      avatarUrl: "https://api.dicebear.com/9.x/bottts/svg?seed=Felix",
+      alreadyJoined: false,
+    });
+  });
 });
 
 async function readNextSseJson(

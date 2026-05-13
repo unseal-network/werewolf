@@ -4,6 +4,7 @@ import { SeatAvatar } from "./SeatAvatar";
 import type { SeatData } from "./SeatAvatar";
 import { GameEngine, type EngineGameState } from "../engine/GameEngine";
 import { RoleRevealEngine } from "./RoleRevealEngine";
+import { computeVisibleSeatCount } from "../game/seatLayout";
 
 export type SceneId = "lobby" | "deal" | "night" | "day" | "vote" | "tie" | "end" | "waiting";
 
@@ -57,19 +58,19 @@ function useCountdown(deadlineAt: string | null | undefined) {
 function phaseIcon(scene: SceneId) {
   switch (scene) {
     case "night":
-      return "🌙";
+      return "夜";
     case "day":
-      return "☀️";
+      return "昼";
     case "vote":
-      return "🗳";
+      return "票";
     case "tie":
-      return "⚖️";
+      return "决";
     case "deal":
-      return "🃏";
+      return "牌";
     case "end":
-      return "🏁";
+      return "终";
     default:
-      return "M";
+      return "局";
   }
 }
 
@@ -149,10 +150,11 @@ export function GameRoomShell({
     () => seats.filter((seat) => seat.seatNo <= seatCount),
     [seatCount, seats]
   );
-  const visibleSeatCount = Math.min(
+  const visibleSeatCount = computeVisibleSeatCount({
     seatCount,
-    Math.max(6, playerCount, activeSeats.filter((seat) => !seat.isEmpty).length)
-  );
+    playerCount,
+    occupiedSeatCount: activeSeats.filter((seat) => !seat.isEmpty).length,
+  });
   const boardSeats = activeSeats.slice(0, visibleSeatCount);
   const compact = boardSeats.length >= 10;
   const rootStyle = {

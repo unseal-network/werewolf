@@ -1193,6 +1193,50 @@ describe("InMemoryGameService rules", () => {
     expect(new Date(room.projection.deadlineAt!).getTime()).toBeGreaterThan(Date.now());
   });
 
+  it("ends immediately during night resolution when witch poison kills the last wolf", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const witch = room.privateStates.find((state) => state.role === "witch");
+    const wolf = room.privateStates.find((state) => state.role === "werewolf");
+    expect(witch).toBeDefined();
+    expect(wolf).toBeDefined();
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_resolution",
+      day: 1,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [
+      {
+        actorPlayerId: witch!.playerId,
+        kind: "witchPoison",
+        targetPlayerId: wolf!.playerId,
+        day: 1,
+        phase: "night_witch_poison",
+      },
+    ];
+
+    await games.advanceGame(gameRoomId, passAgentTurn);
+
+    expect(room.status).toBe("ended");
+    expect(room.projection?.phase).toBe("post_game");
+    expect(room.projection?.winner).toBe("good");
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "game_ended",
+        payload: expect.objectContaining({ winner: "good" }),
+      })
+    );
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "phase_started" && event.payload?.phase === "day_speak"
+      )
+    ).toBe(false);
+  });
+
   it("does not advance when a stale deadline from an older phase fires", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

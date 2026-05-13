@@ -23,6 +23,7 @@ import {
   upsertRoomPlayers,
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
+import { computeVisibleSeatCount } from "../game/seatLayout";
 import {
   DEMO_DISPLAY_NAME,
   DEMO_USER_ID,
@@ -614,15 +615,15 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     };
   }, [connectSSE]);
 
-  // Seat layout grows from 6 (lobby default) up to the room's max as more
-  // players join. Capped at targetPlayerCount (12) so we never show more
-  // seats than the room allows.
+  // Seat layout grows from 6 (lobby default) up to the room's max. While the
+  // room is not full, keep one extra empty seat visible so users can join.
   const activeSeatCount =
     room?.players.filter((player) => !player.leftAt).length ?? 0;
-  const targetCount = Math.min(
-    Math.max(6, activeSeatCount),
-    room?.targetPlayerCount ?? 12
-  );
+  const targetCount = computeVisibleSeatCount({
+    seatCount: room?.targetPlayerCount ?? 12,
+    playerCount: activeSeatCount,
+    occupiedSeatCount: activeSeatCount,
+  });
   const currentViewerPlayerId =
     timelineDisplayState.perspective.playerId ?? undefined;
   const currentViewerSeatNo =

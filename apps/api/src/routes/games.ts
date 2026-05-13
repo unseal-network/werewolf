@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { listRoomAgents } from "@werewolf/agent-client";
 import { AppError, gamePhaseSchema, type GameEvent } from "@werewolf/shared";
 import {
   authenticateRequest,
@@ -20,6 +19,36 @@ export interface GamesRouteDeps {
   matrixHomeserverUrl?: string;
   runAgentTurn?: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>;
 }
+
+type DefaultAgentCandidate = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+};
+
+const DEFAULT_AGENT_CANDIDATES: readonly DefaultAgentCandidate[] = [
+  { userId: "@game-10:keepsecret.io", displayName: "game-10" },
+  { userId: "@game-12:keepsecret.io", displayName: "game-12" },
+  { userId: "@game-13:keepsecret.io", displayName: "game-13" },
+  { userId: "@game-1:keepsecret.io", displayName: "game-1" },
+  { userId: "@game-2:keepsecret.io", displayName: "game-2" },
+  { userId: "@game-3:keepsecret.io", displayName: "game-3" },
+  { userId: "@game-4:keepsecret.io", displayName: "game-4" },
+  { userId: "@game-5:keepsecret.io", displayName: "game-5" },
+  { userId: "@game-6:keepsecret.io", displayName: "game-6" },
+  { userId: "@game-7:keepsecret.io", displayName: "game-7" },
+  { userId: "@game-8:keepsecret.io", displayName: "game-8" },
+  {
+    userId: "@kimigame1:keepsecret.io",
+    displayName: "kimi game 1",
+    avatarUrl: "https://api.dicebear.com/9.x/bottts/svg?seed=Felix",
+  },
+  { userId: "@kimigame2:keepsecret.io", displayName: "kimi game 2" },
+  { userId: "@kimigame3:keepsecret.io", displayName: "kimi game 3" },
+  { userId: "@kimigame4:keepsecret.io", displayName: "kimi game 4" },
+  { userId: "@kimigame5:keepsecret.io", displayName: "kimi game 5" },
+  { userId: "@kimigame6:keepsecret.io", displayName: "kimi game 6" },
+] as const;
 
 export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   const app = new Hono();
@@ -323,36 +352,21 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     try {
       await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
-      const homeserverUrl =
-        deps.matrixHomeserverUrl ??
-        process.env.MATRIX_BASE_URL ??
-        "https://keepsecret.io";
-      const matrixToken = extractBearer(c.req.raw);
-      // Single source of truth: the Matrix room. If Synapse is unreachable or
-      // returns an error, propagate it to the client — we used to silently
-      // fall back to a hardcoded list which made the "demo" path look like a
-      // separate mode. There is no demo mode now: the demo user is just a
-      // pre-configured login, the game flow is identical to any other user.
-      const result = await listRoomAgents({
-        homeserverUrl,
-        roomId: room.agentSourceMatrixRoomId,
-        matrixToken,
-      });
       const seenAgentIds = new Set(
         room.players
           .filter((player) => !player.leftAt && player.kind === "agent")
           .map((player) => player.agentId)
       );
       return c.json({
-        agents: result.agents.map((agent) => ({
+        agents: DEFAULT_AGENT_CANDIDATES.map((agent) => ({
           userId: agent.userId,
           displayName: agent.displayName,
           avatarUrl: matrixMediaUrl(agent.avatarUrl),
-          userType: agent.userType,
-          membership: agent.membership,
+          userType: "bot",
+          membership: "join",
           alreadyJoined: seenAgentIds.has(agent.userId),
         })),
-        total: result.total,
+        total: DEFAULT_AGENT_CANDIDATES.length,
         roomId: room.agentSourceMatrixRoomId,
       });
     } catch (error) {
@@ -431,15 +445,6 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   });
 
   return app;
-}
-
-function extractBearer(request: Request): string {
-  const header = request.headers.get("authorization") ?? "";
-  const match = header.match(/^Bearer\s+(.+)$/);
-  if (!match?.[1]) {
-    throw new AppError("unauthorized", "Matrix bearer token is required", 401);
-  }
-  return match[1];
 }
 
 async function readOptionalJson(request: Request): Promise<Record<string, unknown>> {

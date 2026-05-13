@@ -1394,6 +1394,11 @@ export class InMemoryGameService {
       this.markEliminated(room, resolved.eliminatedPlayerIds);
 
       room.pendingNightActions = [];
+      const winner = determineWinner(room.privateStates);
+      if (winner) {
+        this.endGame(room, gameRoomId, winner, room.projection.day, now);
+        return this.tickResult(room, before);
+      }
       this.startPhase(room, "day_speak", now);
       this.beginSpeechQueue(
         room,
@@ -1454,33 +1459,7 @@ export class InMemoryGameService {
     } else if (room.projection.phase === "day_resolution") {
       const winner = determineWinner(room.privateStates);
       if (winner) {
-        this.assignAndAppendEvents(room, [
-          {
-            id: "pending",
-            gameRoomId: room.id,
-            seq: 1,
-            type: "game_ended",
-            visibility: "public",
-            actorId: "runtime",
-            payload: { day: room.projection.day, winner },
-            createdAt: now.toISOString(),
-          },
-        ]);
-        room.status = "ended";
-        room.projection = {
-          ...room.projection,
-          status: "ended",
-          phase: "post_game",
-          winner,
-          deadlineAt: null,
-          currentSpeakerPlayerId: null,
-        };
-        // Tear down voice agent when the game ends.
-        if (this.voiceAgents) {
-          void this.voiceAgents
-            .destroy(gameRoomId)
-            .catch((err) => console.error("[VoiceAgent] destroy failed:", err));
-        }
+        this.endGame(room, gameRoomId, winner, room.projection.day, now);
       } else {
         room.projection.day += 1;
         this.startPhase(room, "night_guard", now);
@@ -2520,6 +2499,43 @@ export class InMemoryGameService {
         (playerId) => !eliminated.has(playerId)
       ),
     };
+  }
+
+  private endGame(
+    room: StoredGameRoom,
+    gameRoomId: string,
+    winner: "wolf" | "good",
+    day: number,
+    now: Date
+  ): void {
+    if (!room.projection) throw new Error("projection is required");
+    this.assignAndAppendEvents(room, [
+      {
+        id: "pending",
+        gameRoomId: room.id,
+        seq: 1,
+        type: "game_ended",
+        visibility: "public",
+        actorId: "runtime",
+        payload: { day, winner },
+        createdAt: now.toISOString(),
+      },
+    ]);
+    room.status = "ended";
+    room.projection = {
+      ...room.projection,
+      status: "ended",
+      phase: "post_game",
+      winner,
+      deadlineAt: null,
+      currentSpeakerPlayerId: null,
+    };
+    // Tear down voice agent when the game ends.
+    if (this.voiceAgents) {
+      void this.voiceAgents
+        .destroy(gameRoomId)
+        .catch((err) => console.error("[VoiceAgent] destroy failed:", err));
+    }
   }
 
   private revealWolfKillToWitch(room: StoredGameRoom, now: Date): void {
