@@ -1,10 +1,7 @@
 import {
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { useT } from "../i18n/I18nProvider";
@@ -229,10 +226,6 @@ function formatEventWith(
   };
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(value, max));
-}
-
 export function TimelineCapsule({
   enabled,
   events,
@@ -257,18 +250,6 @@ export function TimelineCapsule({
   );
   const [open, setOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
-  const [dragging, setDragging] = useState(false);
-  const dragRef = useRef<{
-    startX: number;
-    startY: number;
-    moved: boolean;
-    width: number;
-    height: number;
-    pointerId: number;
-  } | null>(null);
-  const suppressClickRef = useRef(false);
-  const peekRef = useRef<HTMLButtonElement | null>(null);
 
   const visibleEvents = useMemo(
     () =>
@@ -302,45 +283,6 @@ export function TimelineCapsule({
     if (!enabled) setOpen(false);
   }, [enabled]);
 
-  const onPointerDown = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    const target = event.currentTarget;
-    dragRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
-      moved: false,
-      width: target.offsetWidth,
-      height: target.offsetHeight,
-      pointerId: event.pointerId,
-    };
-    target.setPointerCapture(event.pointerId);
-    setDragging(true);
-  }, []);
-
-  const onPointerMove = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    const dx = event.clientX - drag.startX;
-    const dy = event.clientY - drag.startY;
-    if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
-    const x = clamp(event.clientX - drag.width / 2, 8, window.innerWidth - drag.width - 8);
-    const y = clamp(event.clientY - drag.height / 2, 8, window.innerHeight - drag.height - 8);
-    setPosition({ x, y });
-  }, []);
-
-  const onPointerUp = useCallback((event: ReactPointerEvent<HTMLButtonElement>) => {
-    const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    setDragging(false);
-    suppressClickRef.current = drag.moved;
-    if (!drag.moved) {
-      setOpen(true);
-    }
-    dragRef.current = null;
-  }, []);
-
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds((prev) => {
       const next = new Set(prev);
@@ -352,53 +294,22 @@ export function TimelineCapsule({
 
   if (!enabled) return null;
 
-  const peekStyle: CSSProperties =
-    position !== null
-      ? {
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          right: "auto",
-          bottom: "auto",
-          transform: "none",
-        }
-      : {};
-
-  const sheetOriginStyle: CSSProperties = position
-    ? {
-        transformOrigin: `${position.x + 100}px ${position.y + 25}px`,
-      }
-    : {};
-
   return (
     <>
       <button
-        ref={peekRef}
         type="button"
-        className={`log-peek ${dragging ? "dragging" : ""} ${open ? "is-hidden" : ""}`}
-        style={peekStyle}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onClick={() => {
-          if (suppressClickRef.current) {
-            suppressClickRef.current = false;
-            return;
-          }
-          setOpen(true);
-        }}
+        className={`log-peek ${open ? "is-hidden" : ""}`}
+        onClick={() => setOpen(true)}
         aria-label={t("timeline.capsule")}
       >
-        <span className="log-peek-icon" aria-hidden>
-          📝
-        </span>
+        {t("timeline.title")}
       </button>
 
       <div
         className={`sheet-backdrop timeline-backdrop ${open ? "show" : ""}`}
         onClick={() => setOpen(false)}
       />
-      <section className={`log-sheet ${open ? "open" : ""}`} style={sheetOriginStyle}>
+      <section className={`log-sheet ${open ? "open" : ""}`}>
         <div className="sheet-head">
           <div>
             <div className="sheet-title">{t("timeline.title")}</div>
