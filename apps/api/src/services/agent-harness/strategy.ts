@@ -115,7 +115,10 @@ export function buildSpeechRules(language: CreateGameRequest["language"]): strin
     "<speech_rules>",
     languageLine,
     "必须调用 saySpeech 工具提交发言。",
-    "把要播报的内容放在 saySpeech 的 speech 字段里。",
+    "只能调用一次工具，但是要输入3～5句话、顿号或分号做自然停顿分段。",
+    "必须给出至少一个具体怀疑、信任判断或归票方向。",
+    "只基于当前局势发言，不要编造没有发生的发言、查验、投票或死亡。",
+    "不要说自己是 AI，不要输出舞台动作。",
     "</speech_rules>",
   ].join("\n");
 }

@@ -82,9 +82,11 @@ describe("agent harness strategy", () => {
   it("builds speech rules for tool-call public speech", () => {
     const rules = buildSpeechRules("zh-CN");
     expect(rules).toContain("必须调用 saySpeech");
-    expect(rules).toContain("speech 字段");
+    expect(rules).toContain("只能调用一次工具");
+    expect(rules).toContain("3～5句话");
+    expect(rules).toContain("必须给出至少一个具体怀疑、信任判断或归票方向");
+    expect(rules).toContain("不要编造没有发生的发言、查验、投票或死亡");
+    expect(rules).toContain("不要说自己是 AI，不要输出舞台动作");
     expect(rules).not.toContain("优先一句话说完");
-    expect(rules).not.toContain("2-5");
-    expect(rules).not.toContain("不要说自己是 AI");
   });
 });
