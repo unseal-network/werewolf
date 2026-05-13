@@ -169,6 +169,9 @@ export class VoiceAgentService {
       void this.handlePlayerTrack(identity, track as RemoteTrack);
     });
     try {
+      console.info("[VoiceAgent] connecting to LiveKit", {
+        gameRoomId: this.gameRoomId,
+      });
       await withTimeout(
         room.connect(this.config.livekitUrl, token, {
           autoSubscribe: true,
@@ -192,6 +195,11 @@ export class VoiceAgentService {
         throw new Error("LiveKit local participant unavailable after connect");
       }
       await room.localParticipant.publishTrack(track, opts);
+      console.info("[VoiceAgent] published agent voice track", {
+        gameRoomId: this.gameRoomId,
+        participantIdentity: room.localParticipant.identity,
+        trackName: AGENT_VOICE_TRACK_NAME,
+      });
     } catch (err) {
       this.connected = false;
       this.audioSource = null;
@@ -330,6 +338,12 @@ export class VoiceAgentService {
   ): Promise<boolean> {
     const trimmed = text.trim();
     if (!trimmed) return false;
+    console.info("[VoiceAgent] speak start", {
+      gameRoomId: this.gameRoomId,
+      playerId: playerId ?? null,
+      textLength: trimmed.length,
+      playbackRate,
+    });
     try {
       await this.connect();
     } catch (err) {
@@ -344,6 +358,7 @@ export class VoiceAgentService {
 
     const sampleRate = TTS_AUDIO_SOURCE_SAMPLE_RATE; // we always request pcm_16000
     let capturedAny = false;
+    let firstChunkLogged = false;
     // Serialize captureFrame calls — the LiveKit rtc-node AudioSource native
     // FFI rejects concurrent captures with "InvalidState - failed to capture
     // frame", so we feed PCM chunks one at a time through a Promise chain.
@@ -358,6 +373,15 @@ export class VoiceAgentService {
         const rate = frameRate ?? sampleRate;
         const int16Length = Math.floor(chunk.byteLength / Int16Array.BYTES_PER_ELEMENT);
         if (int16Length <= 0) return;
+        if (!firstChunkLogged) {
+          firstChunkLogged = true;
+          console.info("[VoiceAgent] first TTS audio chunk", {
+            gameRoomId: this.gameRoomId,
+            playerId: playerId ?? null,
+            byteLength: chunk.byteLength,
+            frameRate: rate,
+          });
+        }
         // Copy out — chunk.buffer is shared and may be reused.
         const int16 = new Int16Array(int16Length);
         for (let i = 0; i < int16Length; i += 1) {
@@ -392,6 +416,13 @@ export class VoiceAgentService {
     } finally {
       ttsClient.close();
     }
+
+    console.info("[VoiceAgent] speak complete", {
+      gameRoomId: this.gameRoomId,
+      playerId: playerId ?? null,
+      capturedAny,
+      firstChunkLogged,
+    });
 
     // At this point the generated PCM has been handed to the LiveKit audio
     // track. The game turn can be submitted immediately; do not wait for

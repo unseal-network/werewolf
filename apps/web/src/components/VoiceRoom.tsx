@@ -90,9 +90,12 @@ export function VoiceRoomProvider({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
   const audioContainerRef = useRef<HTMLDivElement | null>(null);
+  const audioUnlockCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!serverUrl || !token) {
+      audioUnlockCleanupRef.current?.();
+      audioUnlockCleanupRef.current = null;
       setRoom((current) => {
         if (current) {
           void current.disconnect().catch(() => {});
@@ -111,6 +114,36 @@ export function VoiceRoomProvider({
       dynacast: true,
     });
 
+    const clearUnlockListener = () => {
+      audioUnlockCleanupRef.current?.();
+      audioUnlockCleanupRef.current = null;
+    };
+
+    const ensureAudioUnlocked = () => {
+      if (cancelled || lkRoom.canPlaybackAudio) {
+        clearUnlockListener();
+        return;
+      }
+      if (audioUnlockCleanupRef.current) return;
+      const unlock = () => {
+        void lkRoom.startAudio().catch(() => {});
+      };
+      const cleanup = () => {
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("keydown", unlock);
+      };
+      audioUnlockCleanupRef.current = cleanup;
+      window.addEventListener("pointerdown", unlock, { once: true });
+      window.addEventListener("keydown", unlock, { once: true });
+    };
+
+    const eagerStartAudio = () => {
+      void lkRoom.startAudio().catch(() => {
+        console.warn("[VoiceRoom] startAudio blocked; waiting for user gesture");
+        ensureAudioUnlocked();
+      });
+    };
+
     const attachAudio = (
       track: RemoteTrack,
       _publication: RemoteTrackPublication,
@@ -125,13 +158,32 @@ export function VoiceRoomProvider({
       ) {
         return;
       }
+      console.info("[VoiceRoom] attaching remote audio", {
+        trackSid: track.sid ?? "",
+        participantIdentity: _participant.identity,
+      });
       const el = track.attach() as HTMLAudioElement;
       el.autoplay = true;
       el.setAttribute("playsinline", "true");
       el.dataset.lkSid = track.sid ?? "";
       const host = audioContainerRef.current ?? document.body;
       host.appendChild(el);
-      void el.play().catch(() => {});
+      void el
+        .play()
+        .then(() => {
+          console.info("[VoiceRoom] remote audio playing", {
+            trackSid: track.sid ?? "",
+            participantIdentity: _participant.identity,
+          });
+        })
+        .catch((err) => {
+          console.warn("[VoiceRoom] remote audio play blocked", {
+            trackSid: track.sid ?? "",
+            participantIdentity: _participant.identity,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          ensureAudioUnlocked();
+        });
     };
 
     const detachAudio = (track: RemoteTrack) => {
@@ -147,16 +199,44 @@ export function VoiceRoomProvider({
     };
 
     lkRoom
+      .on(RoomEvent.TrackPublished, (publication, participant) => {
+        if (publication.kind === Track.Kind.Audio) {
+          console.info("[VoiceRoom] remote audio published", {
+            trackSid: publication.trackSid,
+            participantIdentity: participant.identity,
+          });
+          publication.setSubscribed(true);
+        }
+      })
       .on(RoomEvent.TrackSubscribed, attachAudio)
+      .on(RoomEvent.TrackSubscriptionFailed, (trackSid, participant) => {
+        console.error("[VoiceRoom] track subscription failed", {
+          trackSid,
+          participantIdentity: participant.identity,
+        });
+      })
       .on(RoomEvent.TrackUnsubscribed, detachAudio)
       .on(RoomEvent.ConnectionStateChanged, (lkState) => {
         if (cancelled) return;
+        console.info("[VoiceRoom] connection state", { state: lkState });
         setState(mapConnectionState(lkState));
+      })
+      .on(RoomEvent.AudioPlaybackStatusChanged, () => {
+        if (cancelled) return;
+        if (lkRoom.canPlaybackAudio) {
+          console.info("[VoiceRoom] playback audio enabled");
+          clearUnlockListener();
+          return;
+        }
+        console.warn("[VoiceRoom] playback audio blocked");
+        ensureAudioUnlocked();
       })
       .on(RoomEvent.Disconnected, () => {
         if (cancelled) return;
+        console.warn("[VoiceRoom] disconnected");
         setState("disconnected");
         setIsMicrophoneEnabled(false);
+        clearUnlockListener();
       })
       .on(RoomEvent.LocalTrackPublished, updateMicState)
       .on(RoomEvent.LocalTrackUnpublished, updateMicState)
@@ -165,6 +245,12 @@ export function VoiceRoomProvider({
 
     setState("connecting");
     setErrorMessage(null);
+    console.info("[VoiceRoom] preparing connection", {
+      hasServerUrl: Boolean(serverUrl),
+      hasToken: Boolean(token),
+    });
+    void lkRoom.prepareConnection(serverUrl, token).catch(() => {});
+    eagerStartAudio();
 
     void lkRoom
       .connect(serverUrl, token, { autoSubscribe: true })
@@ -173,18 +259,26 @@ export function VoiceRoomProvider({
           void lkRoom.disconnect().catch(() => {});
           return;
         }
+        console.info("[VoiceRoom] connected", {
+          remoteParticipantCount: lkRoom.remoteParticipants.size,
+        });
         setRoom(lkRoom);
         for (const participant of lkRoom.remoteParticipants.values()) {
           for (const publication of participant.trackPublications.values()) {
+            if (publication.kind === Track.Kind.Audio) {
+              publication.setSubscribed(true);
+            }
             if (publication.track && publication.isSubscribed) {
               attachAudio(publication.track, publication, participant);
             }
           }
         }
         updateMicState();
+        eagerStartAudio();
       })
       .catch((err: unknown) => {
         if (cancelled) return;
+        console.error("[VoiceRoom] connect failed", err);
         setState("error");
         setErrorMessage(err instanceof Error ? err.message : String(err));
       });
@@ -196,6 +290,7 @@ export function VoiceRoomProvider({
       if (host) {
         while (host.firstChild) host.removeChild(host.firstChild);
       }
+      clearUnlockListener();
       void lkRoom.disconnect().catch(() => {});
       setRoom((current) => (current === lkRoom ? null : current));
     };
@@ -243,7 +338,18 @@ export function VoiceRoomProvider({
 
   return (
     <VoiceRoomContext.Provider value={value}>
-      <div ref={audioContainerRef} style={{ display: "none" }} aria-hidden />
+      <div
+        ref={audioContainerRef}
+        style={{
+          position: "fixed",
+          width: 0,
+          height: 0,
+          overflow: "hidden",
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+        aria-hidden
+      />
       {children}
     </VoiceRoomContext.Provider>
   );

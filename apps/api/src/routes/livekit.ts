@@ -65,6 +65,12 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       });
 
       const token = await at.toJwt();
+      console.info("[LiveKit] issued player token", {
+        gameRoomId,
+        userId: user.id,
+        identity,
+        canPublish: isPlayer,
+      });
 
       // Ensure the LiveKit room exists before the client tries to connect.
       try {

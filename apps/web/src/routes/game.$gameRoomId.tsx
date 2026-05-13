@@ -682,6 +682,12 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       .getLivekitToken(gameRoomId)
       .then((res) => {
         if (cancelled) return;
+        console.info("[VoiceRoom] livekit token ready", {
+          gameRoomId,
+          identity: res.identity,
+          canPublish: Boolean(res.canPublish),
+          hasServerUrl: Boolean(res.serverUrl),
+        });
         setLivekitToken(res.token);
         setLivekitServerUrl(res.serverUrl);
       })
