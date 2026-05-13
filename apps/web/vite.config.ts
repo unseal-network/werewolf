@@ -12,6 +12,13 @@ export default defineConfig({
   plugins: [react()],
   server: {
     allowedHosts: ["keepsecret.io"],
+    hmr: process.env.VITE_HMR_HOST
+      ? {
+          host: process.env.VITE_HMR_HOST,
+          protocol: process.env.VITE_HMR_PROTOCOL === "ws" ? "ws" : "wss",
+          clientPort: Number(process.env.VITE_HMR_CLIENT_PORT ?? 443),
+        }
+      : undefined,
   },
   preview: {
     allowedHosts: ["keepsecret.io"],
