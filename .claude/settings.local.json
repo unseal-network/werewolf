@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx --prefix \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf\" tsc --noEmit -p \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/tsconfig.json\")"
+    ]
+  }
+}
