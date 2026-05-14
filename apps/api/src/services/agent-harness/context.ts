@@ -36,6 +36,8 @@ export function buildHarnessContext(
   const sections = [
     buildPrivateInfoSection(room, player, state, playersById),
     buildCurrentStatusSection(room, player, state),
+    buildSeatIndexSection(room, player, playersById, aliveSet),
+    buildNightResultSection(room, playersById),
     buildGameStateSection(room, player, playersById, aliveSet),
     buildHistorySection(
       visibleEvents,
@@ -65,12 +67,23 @@ function buildTimelineText(
   selfPlayerId: string,
   maxLines: number
 ): string {
-  return visibleEvents
-    .filter((event) => event.visibility !== "runtime")
+  const publicSpeechLines = buildSpeechLinesBySeat(
+    visibleEvents.filter((event) => event.visibility === "public"),
+    playersById,
+    selfPlayerId,
+    maxLines
+  );
+  const otherLines = visibleEvents
+    .filter(
+      (event) =>
+        event.visibility !== "runtime" &&
+        event.type !== "speech_submitted"
+    )
     .slice(-maxLines)
     .map((event) => formatTimelineEvent(event, playersById, selfPlayerId))
     .filter(Boolean)
-    .join("\n");
+    .filter((line): line is string => Boolean(line));
+  return [...publicSpeechLines, ...otherLines].join("\n");
 }
 
 function buildSelfSpeechText(
@@ -99,7 +112,8 @@ function formatTimelineEvent(
   const actor = event.actorId ? playersById.get(event.actorId) : undefined;
   const actorLabel = actor ? labelPlayer(actor) : event.actorId ?? "系统";
   if (event.type === "speech_submitted") {
-    return `${actorLabel}: ${String(event.payload?.speech ?? "")}`;
+    const speechDay = Number(event.payload?.day ?? 1);
+    return `第${speechDay}天 ${actorLabel}发言：${String(event.payload?.speech ?? "")}`;
   }
   if (event.type === "vote_submitted") {
     const target = event.subjectId ? playersById.get(event.subjectId) : undefined;
@@ -111,6 +125,10 @@ function formatTimelineEvent(
   }
   if (event.type === "phase_started") {
     return `进入阶段 ${String(event.payload?.phase ?? "")}`;
+  }
+  if (event.type === "player_eliminated") {
+    const subject = event.subjectId ? playersById.get(event.subjectId) : undefined;
+    return `${subject ? labelPlayer(subject) : event.subjectId ?? "未知玩家"} 死亡`;
   }
   if (event.type === "seer_result_revealed") {
     const inspectedId = String(event.payload?.inspectedPlayerId ?? "");
@@ -220,6 +238,61 @@ function buildCurrentStatusSection(
   ].join("\n");
 }
 
+function buildSeatIndexSection(
+  room: HarnessContextInput["room"],
+  player: StoredPlayer,
+  playersById: Map<string, StoredPlayer>,
+  aliveSet: Set<string>
+): string {
+  const players = Array.from(playersById.values()).sort(
+    (a, b) => a.seatNo - b.seatNo
+  );
+  return [
+    "<seat_index>",
+    ...players.map((candidate) => {
+      const status = aliveSet.has(candidate.id) ? "存活" : "死亡";
+      const self = candidate.id === player.id ? "，你" : "";
+      return `座位${candidate.seatNo} = ${candidate.displayName}（${status}${self}）`;
+    }),
+    "</seat_index>",
+  ].join("\n");
+}
+
+function buildNightResultSection(
+  room: HarnessContextInput["room"],
+  playersById: Map<string, StoredPlayer>
+): string {
+  const projection = room.projection;
+  if (!projection) return "";
+  const latestResolved = [...room.events]
+    .reverse()
+    .find(
+      (event) =>
+        event.type === "night_resolved" &&
+        event.actorId === "runtime" &&
+        Number(event.payload?.day ?? 0) <= projection.day
+    );
+  if (!latestResolved) return "";
+  const resolvedDay = Number(latestResolved.payload?.day ?? projection.day);
+  const eliminatedIds = Array.isArray(latestResolved.payload?.eliminatedPlayerIds)
+    ? latestResolved.payload.eliminatedPlayerIds
+        .map((id) => String(id))
+        .filter(Boolean)
+    : [];
+  const result =
+    eliminatedIds.length > 0
+      ? eliminatedIds
+          .map((id) => {
+            const player = playersById.get(id);
+            return player ? labelPlayer(player) : id;
+          })
+          .join("、")
+      : "平安夜，没有玩家死亡";
+  return ["<night_result>", `第${resolvedDay}夜结果：${result}`, "</night_result>"].join(
+    "\n"
+  );
+}
+
 function buildGameStateSection(
   room: HarnessContextInput["room"],
   player: StoredPlayer,
@@ -247,25 +320,58 @@ function buildHistorySection(
   maxSpeechHistory: number,
   includeWolfPrivate: boolean
 ): string {
-  const speeches = visibleEvents
+  const publicSpeechLines = buildSpeechLinesBySeat(
+    visibleEvents.filter((event) => event.visibility === "public"),
+    playersById,
+    "",
+    maxSpeechHistory
+  );
+  const wolfSpeeches = visibleEvents
     .filter(
       (event) =>
         event.type === "speech_submitted" &&
         event.actorId &&
         event.actorId !== "runtime" &&
-        (event.visibility === "public" ||
-          (includeWolfPrivate && event.visibility === "private:team:wolf"))
+        includeWolfPrivate &&
+        event.visibility === "private:team:wolf"
     )
     .slice(-maxSpeechHistory);
-  if (speeches.length === 0) return "";
+  if (publicSpeechLines.length === 0 && wolfSpeeches.length === 0) return "";
   return [
     "<history>",
-    ...speeches.map((event) => {
+    ...publicSpeechLines,
+    ...wolfSpeeches.map((event) => {
       const actor = event.actorId ? playersById.get(event.actorId) : undefined;
-      return `${actor ? labelPlayer(actor) : event.actorId}: ${String(event.payload?.speech ?? "")}`;
+      const day = Number(event.payload?.day ?? 1);
+      return `第${day}天 狼队讨论 ${actor ? labelPlayer(actor) : event.actorId}: ${String(event.payload?.speech ?? "")}`;
     }),
     "</history>",
   ].join("\n");
+}
+
+function buildSpeechLinesBySeat(
+  events: GameEvent[],
+  playersById: Map<string, StoredPlayer>,
+  selfPlayerId: string,
+  maxSpeechHistory: number
+): string[] {
+  return events
+    .filter(
+      (event) =>
+        event.type === "speech_submitted" &&
+        event.actorId &&
+        event.actorId !== "runtime"
+    )
+    .slice(-maxSpeechHistory)
+    .map((event) => {
+      const actor = event.actorId ? playersById.get(event.actorId) : undefined;
+      const day = Number(event.payload?.day ?? 1);
+      const self = selfPlayerId && event.actorId === selfPlayerId ? "（你）" : "";
+      const speaker = actor
+        ? `座位${actor.seatNo}（${actor.displayName}）${self}`
+        : event.actorId;
+      return `第${day}天 ${speaker}发言：${String(event.payload?.speech ?? "")}`;
+    });
 }
 
 function buildVotesSection(
@@ -319,7 +425,7 @@ function buildActionOptionsSection(
     "<action_options>",
     ...targetPlayerIds.map((id) => {
       const player = playersById.get(id);
-      return player ? `${id}(座位${player.seatNo} ${player.displayName})` : id;
+      return player ? `targetPlayerId 可填座位号 ${player.seatNo}（${player.displayName}）` : id;
     }),
     "</action_options>",
   ].join("\n");

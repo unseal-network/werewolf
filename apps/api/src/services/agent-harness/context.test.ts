@@ -127,10 +127,71 @@ describe("buildHarnessContext", () => {
     });
 
     expect(context.text).toContain("<current_status>");
+    expect(context.text).toContain("<seat_index>");
+    expect(context.text).toContain("座位1 = 一号狼（存活，你）");
     expect(context.text).toContain("<history>");
+    expect(context.text).toContain("第1天 座位4（四号村民）发言：我觉得 1 号视角不太自然。");
     expect(context.text).toContain("我觉得 1 号视角不太自然。");
     expect(context.text).not.toContain("secret night plan");
     expect(context.text).not.toContain("<wolf_team_history>");
+  });
+
+  it("summarizes resolved night result without making the agent infer deaths", () => {
+    const { room, wolfState } = makeRoom("day_speak");
+    room.events.push({
+      id: "night_resolved",
+      gameRoomId: "room_1",
+      seq: 5,
+      type: "night_resolved",
+      visibility: "runtime",
+      actorId: "runtime",
+      payload: { day: 1, eliminatedPlayerIds: ["player_4"] },
+      createdAt: "2026-05-13T00:00:04.000Z",
+    });
+    room.events.push({
+      id: "player_eliminated",
+      gameRoomId: "room_1",
+      seq: 6,
+      type: "player_eliminated",
+      visibility: "public",
+      actorId: "runtime",
+      subjectId: "player_4",
+      payload: { playerId: "player_4", reason: "night" },
+      createdAt: "2026-05-13T00:00:04.000Z",
+    });
+    room.projection!.alivePlayerIds = ["player_1", "player_2", "player_3"];
+    const context = buildHarnessContext({
+      room,
+      player: room.players[0]!,
+      state: wolfState,
+      maxSpeechHistory: 6,
+    });
+
+    expect(context.text).toContain("<night_result>");
+    expect(context.text).toContain("第1夜结果：四号村民(座位4)");
+    expect(context.text).toContain("座位4 = 四号村民（死亡）");
+  });
+
+  it("states peaceful night explicitly when a resolved night has no deaths", () => {
+    const { room, wolfState } = makeRoom("day_speak");
+    room.events.push({
+      id: "night_resolved",
+      gameRoomId: "room_1",
+      seq: 5,
+      type: "night_resolved",
+      visibility: "runtime",
+      actorId: "runtime",
+      payload: { day: 1, eliminatedPlayerIds: [] },
+      createdAt: "2026-05-13T00:00:04.000Z",
+    });
+    const context = buildHarnessContext({
+      room,
+      player: room.players[0]!,
+      state: wolfState,
+      maxSpeechHistory: 6,
+    });
+
+    expect(context.text).toContain("第1夜结果：平安夜，没有玩家死亡");
   });
 
   it("includes wolf team history during wolf night", () => {
@@ -161,7 +222,7 @@ describe("buildHarnessContext", () => {
     expect(context.text).toContain("一号狼(座位1)：狼人");
   });
 
-  it("includes legal target ids and vote history", () => {
+  it("includes legal target seats and vote history", () => {
     const { room, wolfState } = makeRoom("day_speak");
     const context = buildHarnessContext({
       room,
@@ -171,7 +232,7 @@ describe("buildHarnessContext", () => {
     });
 
     expect(context.text).toContain("<action_options>");
-    expect(context.text).toContain("player_2(座位2 二号狼)");
+    expect(context.text).toContain("targetPlayerId 可填座位号 2（二号狼）");
     expect(context.text).toContain("<votes>");
     expect(context.text).toContain("四号村民 -> 一号狼");
   });

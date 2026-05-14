@@ -1253,7 +1253,7 @@ describe("InMemoryGameService rules", () => {
       .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
       .join("\n");
     expect(promptText).toContain(
-      `${wolf.playerId}(座位${wolfPlayer.seatNo} ${wolfPlayer.displayName})`
+      `targetPlayerId 可填座位号 ${wolfPlayer.seatNo}（${wolfPlayer.displayName}）`
     );
     expect(promptText).not.toContain(`Use seerInspect on ${wolfPlayer.displayName}`);
     expect(promptText).not.toContain("角色：狼人");
@@ -1459,7 +1459,7 @@ describe("InMemoryGameService rules", () => {
       .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
       .join("\n");
     expect(promptText).toContain(
-      `${wolfPlayer.id}(座位${wolfPlayer.seatNo} ${wolfPlayer.displayName})`
+      `targetPlayerId 可填座位号 ${wolfPlayer.seatNo}（${wolfPlayer.displayName}）`
     );
     expect(promptText).not.toContain(`Use submitVote on ${wolfPlayer.displayName}`);
     expect(promptText).not.toContain("角色：狼人");
