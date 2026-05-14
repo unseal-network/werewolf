@@ -1,0 +1,107 @@
+/* Responsive rules for the region-based game room layout. */
+@media (max-width: 720px) {
+  .game-layout-root {
+    --layout-edge: clamp(8px, 2.8vw, 14px);
+    --layout-seat: clamp(64px, 18vw, 72px);
+    --layout-avatar: calc(var(--layout-seat) * 0.72);
+    --layout-rail-height: min(58dvh, calc(100dvh - 250px));
+    --layout-action-width: min(270px, calc(100vw - 138px));
+  }
+
+  .game-layout-root .game-ui-layout {
+    gap: 8px;
+  }
+
+  .game-layout-root .hud-region {
+    grid-template-columns: 40px 38px minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+
+  .game-layout-root .hud-back-button,
+  .game-layout-root .hud-phase-token,
+  .game-layout-root .hud-countdown,
+  .game-layout-root .hud-alive-count {
+    height: 34px;
+  }
+
+  .game-layout-root .hud-back-button {
+    width: 40px;
+  }
+
+  .game-layout-root .hud-phase-token {
+    width: 38px;
+  }
+
+  .game-layout-root .hud-phase-line {
+    font-size: 17px;
+  }
+
+  .game-layout-root .hud-room-title,
+  .game-layout-root .hud-room-source {
+    font-size: 11px;
+  }
+
+  .game-layout-root .hud-metrics {
+    grid-auto-flow: row;
+    gap: 4px;
+  }
+
+  .game-layout-root .hud-countdown,
+  .game-layout-root .hud-alive-count {
+    min-width: 42px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .game-layout-root .table-region {
+    grid-template-columns: var(--layout-seat) minmax(0, 1fr) var(--layout-seat);
+    column-gap: 6px;
+  }
+
+  .game-layout-root .player-rail {
+    grid-auto-rows: var(--layout-seat-slot);
+  }
+
+  .game-layout-root .player-rail .seat {
+    height: var(--layout-seat-slot);
+  }
+
+  .game-layout-root .player-rail .seat-number-badge {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 9px !important;
+  }
+
+  .game-layout-root .center-info-region {
+    width: min(220px, 100%);
+    margin-top: clamp(18px, 7vh, 56px);
+  }
+
+  .game-layout-root .center-info-panel {
+    max-height: min(38dvh, 360px);
+    padding: 7px 9px;
+  }
+
+  .game-layout-root .center-info-title {
+    font-size: 15px;
+  }
+
+  .game-layout-root .center-info-meta {
+    font-size: 11px;
+  }
+
+  .game-layout-root .action-region .phase-card:not(.action-bubble) {
+    max-height: 28dvh;
+    overflow: auto;
+  }
+
+  .game-layout-root .utility-region {
+    min-height: 64px;
+  }
+
+  .game-layout-root .utility-region .role-card-entry {
+    width: 48px !important;
+    height: 68px !important;
+  }
+}

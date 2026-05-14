@@ -51,6 +51,30 @@ export function avatarPalette(seed: string): { bg: string; fg: string } {
   return AVATAR_COLORS[stableHash(seed) % AVATAR_COLORS.length] ?? AVATAR_COLORS[0]!;
 }
 
+export function firstReadableInitial(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  const [matrixLocalPart = ""] = trimmed.slice(1).split(":");
+  const localPart = trimmed.startsWith("@") ? matrixLocalPart : trimmed;
+  const match = localPart.match(/[A-Za-z0-9\u4e00-\u9fff]/u);
+  return match?.[0]?.toUpperCase();
+}
+
+function avatarIdentitySeed(seat: SeatData, fullName: string): string {
+  return seat.userId ?? seat.agentId ?? seat.playerId ?? seat.displayName ?? fullName;
+}
+
+export function avatarInitial(seat: SeatData, fullName: string): string {
+  return (
+    firstReadableInitial(seat.userId) ??
+    firstReadableInitial(seat.agentId) ??
+    firstReadableInitial(seat.playerId) ??
+    firstReadableInitial(seat.displayName) ??
+    firstReadableInitial(fullName) ??
+    "?"
+  );
+}
+
 export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatarProps) {
   const t = useT();
   const fallbackName = t("seat.fallbackName", { n: seat.seatNo });
@@ -60,8 +84,9 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
   const roleColor = roleId ? ROLE_COLOR[roleId] : undefined;
   const hasImageAvatar = Boolean(seat.avatarUrl && !seat.isEmpty && !roleImg);
   const hasLetterAvatar = Boolean(!seat.isEmpty && !roleImg && !hasImageAvatar);
+  const identitySeed = avatarIdentitySeed(seat, fullName);
   const palette = hasLetterAvatar
-    ? avatarPalette(seat.userId ?? seat.agentId ?? seat.playerId ?? fullName)
+    ? avatarPalette(identitySeed)
     : undefined;
   const avatarStyle = {
     ...(roleColor ? { ["--seat-role-color" as string]: roleColor } : {}),
@@ -74,14 +99,7 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
   };
   const classes = [
     "seat",
-    seat.isEmpty ? "empty" : "",
-    roleImg ? "has-role-avatar" : "",
-    hasImageAvatar ? "has-image-avatar" : "",
-    hasLetterAvatar ? "has-letter-avatar" : "",
-    seat.isDead ? "dead" : "",
-    seat.isActionTarget ? "selectable" : "",
-    seat.isCurrentUser || seat.isCurrentSpeaker ? "active" : "",
-    seat.isSelected ? "selected" : "",
+    seat.isDead ? "seat-state-dead" : seat.isEmpty ? "seat-state-ready" : "seat-state-alive",
   ]
     .filter(Boolean)
     .join(" ");
@@ -115,20 +133,10 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
             draggable={false}
           />
         ) : (
-          <span>{seat.isEmpty ? "+" : fullName.charAt(0).toUpperCase()}</span>
+          <span>{seat.isEmpty ? "+" : avatarInitial(seat, fullName)}</span>
         )}
         {!seat.isEmpty ? <span className="seat-number-badge">{seat.seatNo}</span> : null}
-        {seat.isSelected ? <span className="seat-selected-mark">✓</span> : null}
-        {seat.isCurrentSpeaker && !seat.isDead ? <span className="seat-speaking-mark" /> : null}
       </div>
-      <div className="seat-name">
-        {seat.isEmpty
-          ? t("seat.empty")
-          : fullName}
-      </div>
-      <div className="seat-tooltip">{fullName}</div>
-      {seat.isDead ? <span className="seat-dead-tag">{t("seat.dead")}</span> : null}
-      {seat.isWolfTeammate ? <span className="seat-wolf-tag">{t("seat.wolfTeammate")}</span> : null}
     </button>
   );
 });

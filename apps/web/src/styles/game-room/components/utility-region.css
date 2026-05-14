@@ -1,0 +1,53 @@
+/* Component: bottom utility region, role card entry, and timeline trigger. */
+.game-layout-root .utility-region {
+  grid-area: utility;
+  z-index: 7;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: end;
+  min-height: 70px;
+}
+
+.game-layout-root .utility-role-card {
+  justify-self: start;
+}
+
+.game-layout-root .utility-timeline {
+  justify-self: end;
+}
+
+.game-layout-root .utility-region .role-card-entry {
+  position: relative !important;
+  left: auto !important;
+  bottom: auto !important;
+  width: 52px !important;
+  height: 74px !important;
+  border: 0;
+  border-radius: 10px;
+  background: var(--role-card-back-url) center / cover no-repeat;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.42);
+}
+
+.game-layout-root .utility-region .role-card-entry-back,
+.game-layout-root .utility-region .role-card-entry-mark,
+.game-layout-root .utility-region .role-card-entry-text {
+  display: none !important;
+}
+
+.game-layout-root .utility-region .log-peek,
+.game-layout-root[data-scene="night"] .utility-region .log-peek {
+  position: relative !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: auto !important;
+  min-width: 92px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 14px !important;
+  border: 1px solid rgba(224, 216, 185, 0.28) !important;
+  border-radius: 12px !important;
+  background: rgba(2, 8, 10, 0.34) !important;
+  color: #fff7d8 !important;
+  box-shadow: none !important;
+}

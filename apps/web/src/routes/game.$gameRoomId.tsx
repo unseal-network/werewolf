@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createApiClient, defaultApiBaseUrl, type GameEventDto, type GameRoom, type RoomPlayer, type PlayerPrivateState, type RoomProjection } from "../api/client";
 import { GameRoomShell } from "../components/GameRoomShell";
 import { CenterStage, type ActionMode, type ConfirmMode } from "../components/CenterStage";
+import { CenterInfoPanel } from "../components/CenterInfoPanel";
 import { TimelineCapsule } from "../components/TimelineCapsule";
 import { RoleCardLayer } from "../components/RoleCardLayer";
 import { UserInfoPanel } from "../components/UserInfoPanel";
@@ -23,7 +24,7 @@ import {
   upsertRoomPlayers,
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
-import { computeVisibleSeatCount } from "../game/seatLayout";
+import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
   DEMO_DISPLAY_NAME,
   DEMO_USER_ID,
@@ -33,6 +34,7 @@ import {
   readMatrixToken,
   writeMatrixIdentity,
 } from "../matrix/session";
+import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
 
 interface PhaseDressing {
   scene: SceneId;
@@ -404,7 +406,16 @@ function buildSeatView(
   const active = uniqueSeatOrder(room.players);
   const seats: UserSeatState[] = [];
 
-  for (let seatNo = 1; seatNo <= targetPlayerCount; seatNo += 1) {
+  const isGameStarted =
+    (room.status !== "created" && room.status !== "waiting") ||
+    (room.projection !== null && room.projection.status !== "created" && room.projection.status !== "waiting");
+  const visibleSeatNos = visibleSeatNumbersForRoom({
+    targetPlayerCount,
+    occupiedSeatNos: active.map((player) => player.seatNo),
+    isGameStarted,
+  });
+
+  for (const seatNo of visibleSeatNos) {
     const player = active.find((candidate) => candidate.seatNo === seatNo);
     const playerId = player?.id;
     seats.push({
@@ -476,8 +487,6 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   // events. The projection's deadlineAt is absolute, so we just need to
   // recompute (now - deadlineAt) on a steady cadence.
   const [nowTick, setNowTick] = useState(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const sseReconnectTimerRef = useRef<number | null>(null);
   const autoTickPhaseRef = useRef<string>("");
   const seerResultTimeoutRef = useRef<number | null>(null);
   const lastShownSeerResultKeyRef = useRef<string | null>(null);
@@ -530,100 +539,52 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   const applyServerEvent = useCallback(
     (event: GameEventDto) => {
-      setTimeline((current) => {
-        if (current.some((candidate) => candidate.id === event.id)) return current;
-        const sameSpeechStream = (candidate: GameEventDto) =>
-          candidate.type === "speech_transcript_delta" &&
-          candidate.actorId === event.actorId &&
-          candidate.payload.day === event.payload.day &&
-          candidate.payload.phase === event.payload.phase;
-        const next =
-          event.type === "speech_transcript_delta"
-            ? [...current.filter((candidate) => !sameSpeechStream(candidate)), event]
-            : event.type === "speech_submitted"
-              ? [
-                  ...current.filter(
-                    (candidate) =>
-                      !(
-                        candidate.type === "speech_transcript_delta" &&
-                        candidate.actorId === event.actorId &&
-                        candidate.payload.day === event.payload.day
-                      )
-                  ),
-                  event,
-                ]
-              : [...current, event];
-        return next.length <= 260 ? next : next.slice(-260);
-      });
+      setTimeline((current) => appendTimelineEvent(current, event));
     },
     []
   );
-
-  const connectSSE = useCallback(() => {
-    if (sseReconnectTimerRef.current !== null) {
-      window.clearTimeout(sseReconnectTimerRef.current);
-      sseReconnectTimerRef.current = null;
-    }
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    // Page-scoped read model: /subscribe is the only game-room read source.
-    // Do not add GET /games/:id refresh calls or state-driven reconnects here.
-    const source = new EventSource(client.subscribeUrl(gameRoomId));
-    source.onmessage = (event) => {
-      const parsed = parseSubscribeMessage(stripPayloadFromEvent(event.data));
-      if (!parsed) return;
-      if (parsed.kind === "snapshot") {
-        setRoomSnapshot(parsed.snapshot.room);
-        setProjectionSnapshot(parsed.snapshot.projection);
-        setPrivateStates(parsed.snapshot.privateStates);
-        setTimeline(parsed.snapshot.events);
-        setTimelineBaseSeq(computeTimelineBaseSeq(parsed.snapshot.events));
-        return;
-      }
-      if (sseEventVisibleToMe(parsed.event, myPrivateStateRef.current)) {
-        applyServerEvent(parsed.event);
-      }
-    };
-    source.onerror = () => {
-      source.close();
-      eventSourceRef.current = null;
-      sseReconnectTimerRef.current = window.setTimeout(() => {
-        sseReconnectTimerRef.current = null;
-        connectSSE();
-      }, 1000);
-    };
-    eventSourceRef.current = source;
-  }, [applyServerEvent, client, gameRoomId]);
 
   useEffect(() => {
     autoTickPhaseRef.current = "";
   }, [gameRoomId]);
 
-  useEffect(() => {
-    let mounted = true;
-    if (mounted) connectSSE();
-    return () => {
-      mounted = false;
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
+  // Page-scoped read model: /subscribe is the only game-room read source.
+  // On refresh, the SSE route sends a snapshot first; that snapshot rebuilds
+  // room/projection/private state and the timeline without a separate GET.
+  useSnapshotSse({
+    subscribeUrl: client.subscribeUrl(gameRoomId),
+    onSnapshot(snapshot) {
+      setRoomSnapshot(snapshot.room);
+      setProjectionSnapshot(snapshot.projection);
+      setPrivateStates(snapshot.privateStates);
+      setTimeline(snapshot.events);
+      setTimelineBaseSeq(computeTimelineBaseSeq(snapshot.events));
+    },
+    onEvent(event) {
+      if (sseEventVisibleToMe(event, myPrivateStateRef.current)) {
+        applyServerEvent(event);
       }
-      if (sseReconnectTimerRef.current !== null) {
-        window.clearTimeout(sseReconnectTimerRef.current);
-      }
-    };
-  }, [connectSSE]);
+    },
+  });
 
-  // Seat layout grows from 6 (lobby default) up to the room's max. While the
-  // room is not full, keep one extra empty seat visible so users can join.
+  const isGameStarted = Boolean(
+    room &&
+      ((room.status !== "created" && room.status !== "waiting") ||
+        (projection !== null &&
+          projection.status !== "created" &&
+          projection.status !== "waiting"))
+  );
+  const maxSeatCount = room?.targetPlayerCount ?? 12;
+  // In the lobby, keep one extra open seat visible so users can join. After
+  // start, the board only shows actual participants even if max seats is 12.
   const activeSeatCount =
     room?.players.filter((player) => !player.leftAt).length ?? 0;
   const targetCount = computeVisibleSeatCount({
-    seatCount: room?.targetPlayerCount ?? 12,
+    seatCount: maxSeatCount,
     playerCount: activeSeatCount,
     occupiedSeatCount: activeSeatCount,
   });
+  const participantCount = isGameStarted ? activeSeatCount : targetCount;
   const currentViewerPlayerId =
     timelineDisplayState.perspective.playerId ?? undefined;
   const currentViewerSeatNo =
@@ -889,7 +850,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
     () =>
       buildSeatView(
         room,
-        targetCount,
+        maxSeatCount,
         myPlayer?.id,
         selectedTargetId,
         legalTargetIds,
@@ -899,7 +860,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
       ),
     [
       myPlayer?.id,
-      targetCount,
+      maxSeatCount,
       room,
       legalTargetIds,
       selectedTargetId,
@@ -1530,7 +1491,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         roomCode={gameRoomId}
         sourceMatrixRoomId={room?.createdFromMatrixRoomId}
         playerCount={activeSeatCount}
-        targetPlayerCount={targetCount}
+        targetPlayerCount={participantCount}
         phaseLabel={uiProjection.label}
         day={projection?.day}
         rawPhase={projection?.phase ?? null}
@@ -1539,11 +1500,24 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         scene={dressing.scene}
         accent={dressing.accent}
         seats={seatView}
-        seatCount={targetCount}
+        seatCount={maxSeatCount}
         onSeatClick={onSeatClick}
         onHomeClick={goHome}
         isLoading={runtimeInProgress}
         errorMessage={errorMessage || undefined}
+        centerInfo={
+          <CenterInfoPanel
+            phaseLabel={uiProjection.label}
+            rawPhase={projection?.phase ?? null}
+            scene={dressing.scene}
+            day={projection?.day}
+            living={projection?.alivePlayerIds.length ?? activeSeatCount}
+            total={participantCount || activeSeatCount}
+            players={room?.players ?? []}
+            events={events}
+            currentSpeakerPlayerId={projection?.currentSpeakerPlayerId}
+          />
+        }
         center={
           <CenterStage
             kicker={t(dressing.kickerKey)}

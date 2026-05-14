@@ -1,0 +1,87 @@
+/* Component: top HUD. */
+.game-layout-root .hud-region {
+  grid-area: hud;
+  z-index: 5;
+  width: min(100%, 720px);
+  justify-self: center;
+  display: grid;
+  grid-template-columns: 44px 42px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  color: #fff7d8;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+}
+
+.game-layout-root .hud-back-button,
+.game-layout-root .hud-phase-token,
+.game-layout-root .hud-countdown,
+.game-layout-root .hud-alive-count {
+  min-width: 0;
+  height: 38px;
+  border: 1px solid rgba(224, 216, 185, 0.22);
+  border-radius: 999px;
+  background: rgba(2, 8, 10, 0.34);
+  color: #fff7d8;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.game-layout-root .hud-back-button {
+  width: 44px;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.game-layout-root .hud-phase-token {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  color: #ffe58c;
+  font-weight: 900;
+}
+
+.game-layout-root .hud-status {
+  min-width: 0;
+}
+
+.game-layout-root .hud-phase-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(18px, 3.3vw, 26px);
+  font-weight: 950;
+  line-height: 1.06;
+}
+
+.game-layout-root .hud-room-title,
+.game-layout-root .hud-room-source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 247, 216, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.game-layout-root .hud-metrics {
+  display: inline-grid;
+  grid-auto-flow: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-layout-root .hud-countdown,
+.game-layout-root .hud-alive-count {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  padding: 0 10px;
+  font-size: 14px;
+  font-weight: 950;
+}
+
+.game-layout-root .hud-countdown.danger {
+  color: #ffc1b5;
+  border-color: rgba(255, 118, 91, 0.45);
+}

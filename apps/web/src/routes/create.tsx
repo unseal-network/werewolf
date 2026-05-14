@@ -108,8 +108,10 @@ function FormSelect({
 
 export function CreateGamePage({
   initialError,
+  onGameCreated,
 }: {
   initialError?: string | undefined;
+  onGameCreated?: ((gameRoomId: string, sourceMatrixRoomId: string) => Promise<void> | void) | undefined;
 } = {}) {
   const { t, locale, setLocale } = useI18n();
   const [title, setTitle] = useState(t("create.gameTitleDefault"));
@@ -288,6 +290,7 @@ export function CreateGamePage({
           agentSpeechRate,
         },
       });
+      await onGameCreated?.(result.gameRoomId, roomId);
       const url = `${window.location.pathname}?gameRoomId=${result.gameRoomId}`;
       window.location.href = url;
     } catch (caught) {
