@@ -966,9 +966,10 @@ export class InMemoryGameService {
         kind: nightActionKind,
         targetPlayerId: action.targetPlayerId,
       } as RuntimeNightAction;
-      this.recordNightAction(room, nightAction);
+      const submittedEvent = this.recordNightAction(room, nightAction);
+      this.resolveWolfPhaseIfAllWolfVotesSubmitted(room, now);
       void this.scheduleAdvance(gameRoomId);
-      return room.events[room.events.length - 1]!;
+      return submittedEvent;
     }
 
     if (action.kind === "pass") {
@@ -1696,7 +1697,7 @@ export class InMemoryGameService {
   private recordNightAction(
     room: StoredGameRoom,
     action: RuntimeNightAction
-  ): void {
+  ): GameEvent {
     if (!room.projection) throw new Error("projection is required");
     const scopedAction = {
       ...action,
@@ -1705,7 +1706,7 @@ export class InMemoryGameService {
     } as RuntimeNightAction;
     room.pendingNightActions.push(scopedAction);
     this.consumeWitchItemForAction(room, scopedAction);
-    this.assignAndAppendEvents(room, [
+    const [submittedEvent] = this.assignAndAppendEvents(room, [
       {
         id: "pending",
         gameRoomId: room.id,
@@ -1723,6 +1724,7 @@ export class InMemoryGameService {
         createdAt: new Date().toISOString(),
       },
     ]);
+    if (!submittedEvent) throw new Error("night action event was not appended");
     if (scopedAction.kind === "seerInspect") {
       const inspected = this.requirePrivateState(room, scopedAction.targetPlayerId);
       this.assignAndAppendEvents(room, [
@@ -1744,6 +1746,28 @@ export class InMemoryGameService {
         },
       ]);
     }
+    if (
+      scopedAction.kind === "wolfKill" &&
+      scopedAction.actorPlayerId !== "wolf_team"
+    ) {
+      this.assignAndAppendEvents(room, [
+        {
+          id: "pending",
+          gameRoomId: room.id,
+          seq: 1,
+          type: "wolf_vote_submitted",
+          visibility: "private:team:wolf",
+          actorId: scopedAction.actorPlayerId,
+          subjectId: scopedAction.targetPlayerId,
+          payload: {
+            day: room.projection.day,
+            targetPlayerId: scopedAction.targetPlayerId,
+          },
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
+    return submittedEvent;
   }
 
   private consumeWitchItemForAction(
@@ -1929,6 +1953,15 @@ export class InMemoryGameService {
       }
     }
 
+    this.resolveWolfKillVotes(room, votes, now);
+  }
+
+  private resolveWolfKillVotes(
+    room: StoredGameRoom,
+    votes: Array<{ actorPlayerId: string; targetPlayerId: string }>,
+    now: Date
+  ): void {
+    if (!room.projection) throw new Error("projection is required");
     const tally: Record<string, number> = {};
     for (const vote of votes) {
       tally[vote.targetPlayerId] = (tally[vote.targetPlayerId] ?? 0) + 1;
@@ -2006,6 +2039,41 @@ export class InMemoryGameService {
         },
       ]);
     }
+  }
+
+  private resolveWolfPhaseIfAllWolfVotesSubmitted(
+    room: StoredGameRoom,
+    now: Date
+  ): boolean {
+    if (!room.projection || room.projection.phase !== "night_wolf") {
+      return false;
+    }
+    const wolfPlayerIds = room.privateStates
+      .filter((state) => state.role === "werewolf" && state.alive)
+      .map((state) => state.playerId);
+    const allWolvesSubmitted = wolfPlayerIds.every((playerId) =>
+      this.hasNightActionForCurrentPhase(room, playerId, [
+        "wolfKill",
+        "passAction",
+      ])
+    );
+    if (!allWolvesSubmitted) return false;
+    const votes = room.pendingNightActions
+      .filter(
+        (action): action is Extract<RuntimeNightAction, { kind: "wolfKill" }> =>
+          action.kind === "wolfKill" &&
+          this.isNightActionForCurrentPhase(room, action) &&
+          action.actorPlayerId !== "wolf_team" &&
+          wolfPlayerIds.includes(action.actorPlayerId)
+      )
+      .map((action) => ({
+        actorPlayerId: action.actorPlayerId,
+        targetPlayerId: action.targetPlayerId,
+      }));
+    this.resolveWolfKillVotes(room, votes, now);
+    this.revealWolfKillToWitch(room, now);
+    this.startPhase(room, "night_witch_heal", now);
+    return true;
   }
 
   private async runNightAgentAction(

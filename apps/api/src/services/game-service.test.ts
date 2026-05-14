@@ -801,6 +801,130 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("lets each human wolf vote before resolving the team kill", async () => {
+    const { games, gameRoomId } = createStartedServiceGameWithPlayers(7);
+    const room = games.snapshot(gameRoomId);
+    const wolves = room.privateStates.filter(
+      (state) => state.role === "werewolf"
+    );
+    const goodTargets = room.privateStates.filter(
+      (state) => state.team === "good" && state.alive
+    );
+    expect(wolves).toHaveLength(2);
+    expect(goodTargets.length).toBeGreaterThanOrEqual(2);
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 56,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    await games.submitAction(gameRoomId, wolves[0]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: goodTargets[0]!.playerId,
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 56,
+    });
+
+    expect(room.projection.phase).toBe("night_wolf");
+
+    await games.submitAction(gameRoomId, wolves[1]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: goodTargets[0]!.playerId,
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 56,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "wolf_vote_resolved",
+        visibility: "private:team:wolf",
+        subjectId: goodTargets[0]!.playerId,
+        payload: expect.objectContaining({
+          tally: { [goodTargets[0]!.playerId]: 2 },
+          targetPlayerId: goodTargets[0]!.playerId,
+          valid: true,
+        }),
+      })
+    );
+    expect(room.pendingNightActions).toContainEqual(
+      expect.objectContaining({
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: goodTargets[0]!.playerId,
+      })
+    );
+  });
+
+  it("asks each agent wolf for a kill vote before resolving the team kill", async () => {
+    const { games, gameRoomId } = createStartedServiceGameWithPlayers(7);
+    const room = games.snapshot(gameRoomId);
+    const wolves = room.privateStates.filter(
+      (state) => state.role === "werewolf"
+    );
+    const target = room.privateStates.find(
+      (state) => state.team === "good" && state.alive
+    );
+    expect(wolves).toHaveLength(2);
+    expect(target).toBeDefined();
+
+    for (const wolf of wolves) {
+      const player = room.players.find((candidate) => candidate.id === wolf.playerId)!;
+      player.kind = "agent";
+      player.agentId = `@${player.displayName.toLowerCase()}-wolf:example.com`;
+    }
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+    let wolfVoteTurns = 0;
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      if (input.tools && "saySpeech" in input.tools) {
+        return {
+          text: JSON.stringify(["今晚统一刀口。"]),
+          toolName: "saySpeech",
+          input: { speech: "今晚统一刀口。" },
+        };
+      }
+      if (input.tools && "wolfKill" in input.tools) {
+        wolfVoteTurns += 1;
+        return {
+          text: "",
+          toolName: "wolfKill",
+          input: { targetPlayerId: target!.playerId },
+        };
+      }
+      return { text: "pass", toolName: "passAction", input: {} };
+    });
+
+    expect(wolfVoteTurns).toBe(2);
+    expect(
+      room.events.filter((event) => event.type === "wolf_vote_submitted")
+    ).toHaveLength(2);
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "wolf_vote_resolved",
+        payload: expect.objectContaining({
+          tally: { [target!.playerId]: 2 },
+          targetPlayerId: target!.playerId,
+          valid: true,
+        }),
+      })
+    );
+  });
+
   it("allows the witch to heal themself when they are the wolf target", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
