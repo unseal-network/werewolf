@@ -1,15 +1,44 @@
 /* Responsive rules for the region-based game room layout. */
 @media (max-width: 720px) {
+  html:has(.game-layout-root),
+  body:has(.game-layout-root),
+  html:has(.game-layout-root) #root {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  body:has(.game-layout-root) {
+    position: fixed;
+    inset: 0;
+  }
+
   .game-layout-root {
     --layout-edge: clamp(8px, 2.8vw, 14px);
-    --layout-seat: clamp(64px, 18vw, 72px);
+    --layout-seat: clamp(48px, 13vw, 56px);
     --layout-avatar: calc(var(--layout-seat) * 0.72);
-    --layout-rail-height: min(58dvh, calc(100dvh - 250px));
-    --layout-action-width: min(270px, calc(100vw - 138px));
+    --layout-seat-slot: calc(var(--layout-avatar) * 1.55 + 10px);
+    --layout-rail-height: min(72dvh, calc(100dvh - 190px));
+    --layout-action-width: min(300px, calc(100vw - 96px));
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
   }
 
   .game-layout-root .game-ui-layout {
-    gap: 8px;
+    height: 100dvh;
+    overflow: hidden;
+    grid-template-areas:
+      "hud"
+      "table"
+      "utility";
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 7px;
+    padding-bottom: calc(var(--layout-safe-bottom) + 10px);
   }
 
   .game-layout-root .hud-region {
@@ -61,6 +90,8 @@
 
   .game-layout-root .player-rail {
     grid-auto-rows: var(--layout-seat-slot);
+    height: var(--layout-rail-height);
+    max-height: none;
   }
 
   .game-layout-root .player-rail .seat {
@@ -68,9 +99,9 @@
   }
 
   .game-layout-root .player-rail .seat-number-badge {
-    width: 18px !important;
-    height: 18px !important;
-    font-size: 9px !important;
+    min-width: 16px !important;
+    height: 16px !important;
+    font-size: 8px !important;
   }
 
   .game-layout-root .center-info-region {
@@ -94,6 +125,28 @@
   .game-layout-root .action-region .phase-card:not(.action-bubble) {
     max-height: 28dvh;
     overflow: auto;
+  }
+
+  .game-layout-root .action-region {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--layout-safe-bottom) + 82px);
+    z-index: 20;
+    width: var(--layout-action-width);
+    min-height: 0;
+    transform: translateX(-50%);
+  }
+
+  .game-layout-root .action-region .phase-card,
+  .game-layout-root .action-region .phase-card.action-bubble {
+    background: transparent;
+  }
+
+  .game-layout-root .action-region .stage-start,
+  .game-layout-root .action-region .stage-confirm,
+  .game-layout-root .action-region .stage-skip,
+  .game-layout-root .action-region .player-picker-action {
+    max-width: 100%;
   }
 
   .game-layout-root .utility-region {
