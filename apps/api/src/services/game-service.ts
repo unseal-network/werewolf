@@ -734,8 +734,8 @@ export class InMemoryGameService {
 
     // Lazily connect the voice agent for this room. Best-effort: if LiveKit
     // or the Unseal gateway is unavailable, the game still works via text.
-    // Once connected, register each player's Unseal agent_id so STT/TTS use
-    // the same per-player id we already pass to the LLM `generate` endpoint.
+    // Once connected, bind each internal player to the Matrix identity used
+    // by LiveKit and Unseal STT/TTS.
     if (this.voiceAgents) {
       const registry = this.voiceAgents;
       void registry
@@ -743,10 +743,9 @@ export class InMemoryGameService {
         .then((voiceAgent) => {
           for (const player of room.players) {
             if (player.leftAt) continue;
-            voiceAgent.registerPlayerAgentId(
-              player.id,
-              resolvePlayerAgentId(player)
-            );
+            const matrixUserId = resolvePlayerMatrixUserId(player);
+            if (!matrixUserId) continue;
+            voiceAgent.registerPlayerVoiceIdentity(player.id, matrixUserId);
           }
         })
         .catch((err) => console.error("[VoiceAgent] getOrCreate failed:", err));
@@ -2786,4 +2785,8 @@ function isAgentPassText(text: string): boolean {
 
 function resolvePlayerAgentId(player: StoredPlayer): string {
   return player.userId ?? player.agentId ?? player.displayName;
+}
+
+function resolvePlayerMatrixUserId(player: StoredPlayer): string | undefined {
+  return player.userId ?? player.agentId ?? undefined;
 }

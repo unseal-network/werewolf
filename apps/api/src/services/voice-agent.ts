@@ -33,7 +33,7 @@ export interface VoiceAgentConfig {
   livekitApiSecret: string;
   unsealApiBaseUrl: string;
   unsealApiKey: string;
-  unsealAgentId: string; // fallback agent ID for STT/TTS when a player has no registered agent ID
+  unsealAgentId: string; // explicit fallback agent ID for TTS when no Matrix binding exists
 }
 
 interface PlayerSttSession {
@@ -55,6 +55,11 @@ export interface VoiceTranscriptUpdate {
 }
 
 export type VoiceTranscriptHandler = (update: VoiceTranscriptUpdate) => void;
+
+interface PlayerVoiceIdentityBinding {
+  playerId: string;
+  matrixUserId: string;
+}
 
 /**
  * VoiceAgentService bridges a LiveKit room (audio I/O) with the Unseal
@@ -79,10 +84,13 @@ export class VoiceAgentService {
   private audioSource: AudioSource | null = null;
   private agentTrack: LocalAudioTrack | null = null;
   private playerSessions = new Map<string, PlayerSttSession>();
-  /** Per-player agent ID lookup. STT for player X and TTS when agent X speaks
-   *  should hit the same agent_id we already use for the LLM (typically the
-   *  player's matrix ID). Falls back to config.unsealAgentId when missing. */
-  private playerAgentIds = new Map<string, string>();
+  /** Matrix IDs are the external identity for LiveKit/Unseal. Internal
+   *  player IDs stay inside game state and transcript attribution only. */
+  private playerVoiceIdentityByPlayerId = new Map<string, PlayerVoiceIdentityBinding>();
+  private playerVoiceIdentityByMatrixUserId = new Map<
+    string,
+    PlayerVoiceIdentityBinding
+  >();
   private connected = false;
   private connectPromise: Promise<void> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -102,26 +110,39 @@ export class VoiceAgentService {
   }
 
   /**
-   * Register the Unseal agent_id for a player. STT calls for this player's
-   * audio and TTS calls when this player speaks will both use this id. Should
-   * be set to the same id we pass to the LLM `generate` endpoint (typically
-   * `player.userId ?? player.agentId ?? player.displayName`).
+   * Register the Matrix identity for a player. LiveKit participants and
+   * Unseal STT/TTS calls must use this external ID; `playerId` is only for
+   * internal game attribution.
    */
-  registerPlayerAgentId(playerId: string, agentId: string): void {
-    if (!playerId || !agentId) return;
-    this.playerAgentIds.set(playerId, agentId);
-  }
-
-  unregisterPlayerAgentId(playerId: string): void {
-    this.playerAgentIds.delete(playerId);
-  }
-
-  private resolveAgentId(playerId?: string | null): string {
-    if (playerId) {
-      const registered = this.playerAgentIds.get(playerId);
-      if (registered) return registered;
+  registerPlayerVoiceIdentity(playerId: string, matrixUserId: string): void {
+    if (!playerId || !matrixUserId) return;
+    const previous = this.playerVoiceIdentityByPlayerId.get(playerId);
+    if (previous) {
+      this.playerVoiceIdentityByMatrixUserId.delete(previous.matrixUserId);
     }
-    return this.config.unsealAgentId;
+    const binding = { playerId, matrixUserId };
+    this.playerVoiceIdentityByPlayerId.set(playerId, binding);
+    this.playerVoiceIdentityByMatrixUserId.set(matrixUserId, binding);
+  }
+
+  unregisterPlayerVoiceIdentity(playerId: string): void {
+    const previous = this.playerVoiceIdentityByPlayerId.get(playerId);
+    if (previous) {
+      this.playerVoiceIdentityByMatrixUserId.delete(previous.matrixUserId);
+    }
+    this.playerVoiceIdentityByPlayerId.delete(playerId);
+  }
+
+  private resolveMatrixUserIdForPlayer(playerId?: string | null): string | null {
+    if (playerId) {
+      const binding = this.playerVoiceIdentityByPlayerId.get(playerId);
+      if (binding) return binding.matrixUserId;
+    }
+    return null;
+  }
+
+  private resolveTtsAgentId(playerId?: string | null): string {
+    return this.resolveMatrixUserIdForPlayer(playerId) ?? this.config.unsealAgentId;
   }
 
   async connect(): Promise<void> {
@@ -341,6 +362,7 @@ export class VoiceAgentService {
     console.info("[VoiceAgent] speak start", {
       gameRoomId: this.gameRoomId,
       playerId: playerId ?? null,
+      matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
       textLength: trimmed.length,
       playbackRate,
     });
@@ -366,7 +388,7 @@ export class VoiceAgentService {
 
     const ttsClient = new TtsWebSocketClient({
       apiBaseUrl: this.config.unsealApiBaseUrl,
-      agentId: this.resolveAgentId(playerId),
+      agentId: this.resolveTtsAgentId(playerId),
       apiKey: this.config.unsealApiKey,
       connectTimeoutMs: TTS_CONNECT_TIMEOUT_MS,
       onAudioChunk: (chunk, frameRate) => {
@@ -378,6 +400,7 @@ export class VoiceAgentService {
           console.info("[VoiceAgent] first TTS audio chunk", {
             gameRoomId: this.gameRoomId,
             playerId: playerId ?? null,
+            matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
             byteLength: chunk.byteLength,
             frameRate: rate,
           });
@@ -420,6 +443,7 @@ export class VoiceAgentService {
     console.info("[VoiceAgent] speak complete", {
       gameRoomId: this.gameRoomId,
       playerId: playerId ?? null,
+      matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
       capturedAny,
       firstChunkLogged,
     });
@@ -431,7 +455,19 @@ export class VoiceAgentService {
     return capturedAny;
   }
 
-  private async handlePlayerTrack(playerId: string, track: RemoteTrack): Promise<void> {
+  private async handlePlayerTrack(
+    participantIdentity: string,
+    track: RemoteTrack
+  ): Promise<void> {
+    const binding = this.playerVoiceIdentityByMatrixUserId.get(participantIdentity);
+    if (!binding) {
+      console.warn("[VoiceAgent] ignoring audio track without Matrix binding", {
+        gameRoomId: this.gameRoomId,
+        participantIdentity,
+      });
+      return;
+    }
+    const { playerId, matrixUserId } = binding;
     const prior = this.playerSessions.get(playerId);
     if (prior) {
       prior.active = false;
@@ -441,7 +477,7 @@ export class VoiceAgentService {
 
     const sttClient = new SttWebSocketClient({
       apiBaseUrl: this.config.unsealApiBaseUrl,
-      agentId: this.resolveAgentId(playerId),
+      agentId: matrixUserId,
       apiKey: this.config.unsealApiKey,
       onPartialTranscript: (text) => {
         this.transcriptHandler?.({
@@ -459,12 +495,23 @@ export class VoiceAgentService {
           final: true,
         });
       },
-      onError: (err) => console.error(`[VoiceAgent] STT error for ${playerId}:`, err),
+      onError: (err) =>
+        console.error("[VoiceAgent] STT error", {
+          gameRoomId: this.gameRoomId,
+          playerId,
+          matrixUserId,
+          err,
+        }),
     });
     try {
       await sttClient.connect();
     } catch (err) {
-      console.error(`[VoiceAgent] STT connect failed for ${playerId}:`, err);
+      console.error("[VoiceAgent] STT connect failed", {
+        gameRoomId: this.gameRoomId,
+        playerId,
+        matrixUserId,
+        err,
+      });
       return;
     }
     const session: PlayerSttSession = {
@@ -493,7 +540,12 @@ export class VoiceAgentService {
         }
       }
     } catch (err) {
-      console.error(`[VoiceAgent] audio stream error for ${playerId}:`, err);
+      console.error("[VoiceAgent] audio stream error", {
+        gameRoomId: this.gameRoomId,
+        playerId,
+        matrixUserId,
+        err,
+      });
     } finally {
       try {
         reader.releaseLock();
@@ -509,7 +561,12 @@ export class VoiceAgentService {
             }
           }
         } catch (err) {
-          console.error(`[VoiceAgent] resampler flush failed for ${playerId}:`, err);
+          console.error("[VoiceAgent] resampler flush failed", {
+            gameRoomId: this.gameRoomId,
+            playerId,
+            matrixUserId,
+            err,
+          });
         }
       }
       session.client.close();

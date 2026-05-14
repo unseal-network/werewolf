@@ -179,6 +179,38 @@ describe("games API", () => {
     expect(body.card.targetPlayerCount).toBe(6);
   });
 
+  it("issues LiveKit tokens with Matrix user id as participant identity", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    const player = deps.games.join(
+      room.id,
+      "@alice:example.com",
+      "Alice",
+      undefined,
+      1
+    );
+
+    const response = await app.request(`/games/${room.id}/livekit-token`, {
+      method: "POST",
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.identity).toBe("@alice:example.com");
+    expect(body.identity).not.toBe(player.id);
+    expect(body.canPublish).toBe(true);
+  });
+
   it("downloads a visible transcript event by id", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);

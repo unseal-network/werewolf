@@ -57,6 +57,55 @@ function passAgentTurn(input: RuntimeAgentTurnInput) {
 }
 
 describe("InMemoryGameService rules", () => {
+  it("registers Matrix identities with the voice agent instead of internal player ids", async () => {
+    const games = new InMemoryGameService();
+    const registrations: Array<{ playerId: string; matrixUserId: string }> = [];
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: (playerId: string, matrixUserId: string) => {
+          registrations.push({ playerId, matrixUserId });
+        },
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Rules",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 2)) {
+      games.join(room.id, userId, name);
+    }
+    for (let seatNo = 3; seatNo <= 6; seatNo += 1) {
+      games.addAgentPlayer(
+        room.id,
+        players[0][0],
+        `@agent${seatNo}:example.com`,
+        `Agent ${seatNo}`
+      );
+    }
+
+    games.start(room.id, players[0][0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(registrations).toEqual(
+      expect.arrayContaining([
+        { playerId: "player_1", matrixUserId: "@alice:example.com" },
+        { playerId: "player_2", matrixUserId: "@bob:example.com" },
+        { playerId: "player_3", matrixUserId: "@agent3:example.com" },
+      ])
+    );
+    expect(registrations.map((entry) => entry.matrixUserId)).not.toContain(
+      "player_2"
+    );
+  });
+
   it("emits lobby player join events for humans and agents", () => {
     const games = new InMemoryGameService();
     const { room } = games.createGame(
