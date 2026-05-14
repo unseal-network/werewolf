@@ -1052,6 +1052,120 @@ describe("InMemoryGameService rules", () => {
     expect(capturedInputs[0]!.prompt).toContain("白天发言");
   });
 
+  it("does not suggest the hidden werewolf to an agent seer", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const seer = room.privateStates.find((state) => state.role === "seer")!;
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const seerPlayer = room.players.find((player) => player.id === seer.playerId)!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    seerPlayer.kind = "agent";
+    seerPlayer.agentId = "@seer-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_seer",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      return { text: "pass", toolName: "passAction", input: {} };
+    });
+
+    const promptText = capturedInputs
+      .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
+      .join("\n");
+    expect(promptText).not.toContain(`Use seerInspect on ${wolfPlayer.displayName}`);
+    expect(promptText).not.toContain(
+      `${wolfPlayer.displayName} (seat ${wolfPlayer.seatNo})`
+    );
+  });
+
+  it("does not suggest hidden-role targets to agent wolf kill votes", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    wolfPlayer.kind = "agent";
+    wolfPlayer.agentId = "@wolf-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      if (input.tools && "saySpeech" in input.tools) {
+        return {
+          text: "private speech",
+          toolName: "saySpeech",
+          input: { speech: "今晚先看发言和站边。" },
+        };
+      }
+      return { text: "pass", toolName: "passAction", input: {} };
+    });
+
+    const wolfKillPrompt = capturedInputs.find(
+      (input) => input.tools && "wolfKill" in input.tools
+    );
+    const promptText = wolfKillPrompt
+      ? (wolfKillPrompt.messages?.map((message) => message.content).join("\n") ??
+        wolfKillPrompt.prompt)
+      : "";
+    expect(wolfKillPrompt).toBeDefined();
+    expect(promptText).not.toContain("Suggested target");
+  });
+
+  it("does not tell public voting agents to vote the hidden werewolf", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const villager = room.privateStates.find((state) => state.role === "villager")!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const villagerPlayer = room.players.find(
+      (player) => player.id === villager.playerId
+    )!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    villagerPlayer.kind = "agent";
+    villagerPlayer.agentId = "@villager-agent:example.com";
+    room.privateStates = room.privateStates.map((state) => ({
+      ...state,
+      alive: state.playerId === villagerPlayer.id || state.playerId === wolfPlayer.id,
+    }));
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      alivePlayerIds: [villagerPlayer.id, wolfPlayer.id],
+    };
+    room.pendingVotes = [];
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      return {
+        text: "vote",
+        toolName: "submitVote",
+        input: { targetPlayerId: wolfPlayer.id },
+      };
+    });
+
+    const promptText = capturedInputs
+      .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
+      .join("\n");
+    expect(promptText).not.toContain(`Use submitVote on ${wolfPlayer.displayName}`);
+  });
+
   it("scheduleAdvance advances an agent speaker immediately before the speech deadline", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

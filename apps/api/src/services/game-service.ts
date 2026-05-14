@@ -1207,16 +1207,12 @@ export class InMemoryGameService {
             });
           }
         } else {
-          const target = this.findRolePlayer(room, "seer");
-          const targetPlayer = target ? room.players.find((p) => p.id === target.playerId) : undefined;
           await this.runNightAgentAction(
             room,
             guard.playerId,
             runAgentTurn,
             now,
-            targetPlayer
-              ? `Use guardProtect on ${targetPlayer.displayName} (seat ${targetPlayer.seatNo}). You must respond by calling one tool.`
-              : "Use passAction. You must respond by calling one tool."
+            "Choose one alive player to guard based only on your visible context, or use passAction if you cannot make a useful guard. You must respond by calling one tool."
           );
         }
       } else if (!this.advanceAfterAbsentNightActor(room, "night_wolf", now)) {
@@ -1364,16 +1360,12 @@ export class InMemoryGameService {
             });
           }
         } else {
-          const wolf = this.findRolePlayer(room, "werewolf");
-          const wolfPlayer = wolf ? room.players.find((p) => p.id === wolf.playerId) : undefined;
           await this.runNightAgentAction(
             room,
             seer.playerId,
             runAgentTurn,
             now,
-            wolfPlayer
-              ? `Use seerInspect on ${wolfPlayer.displayName} (seat ${wolfPlayer.seatNo}). You must respond by calling one tool.`
-              : "Use passAction. You must respond by calling one tool."
+            "Choose one alive player to inspect based only on your visible context and previous inspection records, or use passAction if you cannot make a useful inspection. You must respond by calling one tool."
           );
         }
       } else if (
@@ -1887,12 +1879,6 @@ export class InMemoryGameService {
     const votes: Array<{ actorPlayerId: string; targetPlayerId: string }> = [
       ...existingVotes,
     ];
-    const fallbackTarget = room.privateStates.find(
-      (state) => state.team === "good" && state.alive
-    );
-    if (!fallbackTarget) throw new AppError("conflict", "No wolf target", 409);
-    const fallbackTargetPlayer = room.players.find((p) => p.id === fallbackTarget.playerId);
-
     for (const playerId of wolfPlayerIds) {
       // Skip wolves that already voted (human wolves who submitted their target)
       const alreadyVoted = votes.some((v) => v.actorPlayerId === playerId);
@@ -1908,11 +1894,8 @@ export class InMemoryGameService {
       }
 
       const state = this.requirePrivateState(room, playerId);
-      const fallbackName = fallbackTargetPlayer
-        ? `${fallbackTargetPlayer.displayName} (seat ${fallbackTargetPlayer.seatNo})`
-        : fallbackTarget.playerId;
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: `${this.languageInstruction(room)} Wolf team voting phase. Use wolfKill on the player you vote to kill tonight. Suggested target: ${fallbackName}.`,
+        prompt: `${this.languageInstruction(room)} Wolf team voting phase. Choose the player you vote to kill tonight based only on visible public context and wolf team discussion. Use wolfKill or passAction.`,
       });
       const targetPlayerId = stringValue(result.input?.targetPlayerId);
       if (
@@ -2118,10 +2101,6 @@ export class InMemoryGameService {
   ): Promise<Array<{ actorPlayerId: string; targetPlayerId: string }> | null> {
     if (!room.projection) throw new Error("projection is required");
     const allowedTargets = allowedTargetPlayerIds ?? room.projection.alivePlayerIds;
-    const wolf = room.privateStates.find(
-      (state) => state.role === "werewolf" && state.alive
-    );
-
     for (const playerId of room.projection.alivePlayerIds) {
       const alreadyVoted = room.pendingVotes.some((v) => v.actorPlayerId === playerId);
       if (alreadyVoted) continue;
@@ -2136,16 +2115,6 @@ export class InMemoryGameService {
       }
 
       const state = this.requirePrivateState(room, playerId);
-      const suggestedTargetId =
-        wolf && state.role !== "werewolf" && allowedTargets.includes(wolf.playerId)
-          ? wolf.playerId
-          : allowedTargets.find((candidate) => candidate !== playerId) ??
-            allowedTargets[0];
-      if (!suggestedTargetId) continue;
-      const suggestedTargetPlayer = room.players.find((p) => p.id === suggestedTargetId);
-      const suggestedTargetName = suggestedTargetPlayer
-        ? `${suggestedTargetPlayer.displayName} (seat ${suggestedTargetPlayer.seatNo})`
-        : suggestedTargetId;
       const allowedTargetNames = allowedTargets
         .map((id) => {
           const p = room.players.find((pl) => pl.id === id);
@@ -2159,7 +2128,7 @@ export class InMemoryGameService {
           room.projection.phase === "tie_vote"
             ? `This is a tie revote. Allowed exile targets are: ${allowedTargetNames}.`
             : `This is the public exile vote.`,
-          `Use submitVote on ${suggestedTargetName}. You must respond by calling one tool.`,
+          `Choose one allowed exile target based only on visible public context. You must respond by calling one tool.`,
         ].join(" "),
       });
       const targetPlayerId = stringValue(result.input?.targetPlayerId);
