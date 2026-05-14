@@ -68,10 +68,10 @@ describe("buildAgentPrompt", () => {
       { role: "system", content: prompt.system },
       { role: "user", content: prompt.user },
     ]);
-    expect(prompt.system).toContain("白天发言");
-    expect(prompt.system).toContain("必须调用 saySpeech");
+    expect(prompt.system).toContain("白天讨论环节");
+    expect(prompt.system).toContain("返回 JSON 字符串数组");
     expect(prompt.user).toContain("<speaking_order>");
-    expect(prompt.user).toContain("<focus_angle>");
+    expect(prompt.user).toContain("轮到你发言，返回JSON数组");
   });
 
   it("builds tool-only day vote messages", () => {
@@ -84,9 +84,9 @@ describe("buildAgentPrompt", () => {
       tools: { submitVote: {}, abstain: {} },
     });
 
-    expect(prompt.system).toContain("白天投票");
-    expect(prompt.system).toContain("必须调用且只调用一个工具");
-    expect(prompt.user).toContain("<action_options>");
+    expect(prompt.system).toContain("【投票规则】");
+    expect(prompt.system).toContain("可选: 2号(二号), 3号(三号)");
+    expect(prompt.user).toContain("你投几号？");
   });
 
   it("builds wolf night prompt with wolf strategy", () => {
@@ -99,8 +99,8 @@ describe("buildAgentPrompt", () => {
       tools: { wolfKill: {}, passAction: {} },
     });
 
-    expect(prompt.system).toContain("狼人夜间");
-    expect(prompt.system).toContain("不要暴露狼队友");
+    expect(prompt.system).toContain("【狼人技能】");
+    expect(prompt.system).toContain("可选: 2号(二号)、3号(三号)");
     expect(prompt.user).toContain("<your_private_info>");
   });
 
@@ -114,8 +114,8 @@ describe("buildAgentPrompt", () => {
       tools: { seerInspect: {}, passAction: {} },
     });
 
-    expect(prompt.system).toContain("夜间角色行动");
-    expect(prompt.system).toContain("预言家策略库");
-    expect(prompt.user).toContain("<action_options>");
+    expect(prompt.system).toContain("【预言家技能】");
+    expect(prompt.system).toContain("可选: 2号(二号)、3号(三号)");
+    expect(prompt.user).toContain("你要查验几号？");
   });
 });

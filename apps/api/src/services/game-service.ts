@@ -1212,7 +1212,7 @@ export class InMemoryGameService {
             guard.playerId,
             runAgentTurn,
             now,
-            "Choose one alive player to guard based only on your visible context, or use passAction if you cannot make a useful guard. You must respond by calling one tool."
+            ""
           );
         }
       } else if (!this.advanceAfterAbsentNightActor(room, "night_wolf", now)) {
@@ -1365,7 +1365,7 @@ export class InMemoryGameService {
             seer.playerId,
             runAgentTurn,
             now,
-            "Choose one alive player to inspect based only on your visible context and previous inspection records, or use passAction if you cannot make a useful inspection. You must respond by calling one tool."
+            ""
           );
         }
       } else if (
@@ -1827,7 +1827,7 @@ export class InMemoryGameService {
       const player = this.requirePlayer(room, playerId);
       const state = this.requirePrivateState(room, playerId);
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: `${this.languageInstruction(room)} You are ${player.displayName}, a werewolf. Speak briefly to your wolf teammates about tonight's kill target before the team acts.`,
+        prompt: "",
         tools: {
           saySpeech: {
             description: "Say a private speech to the wolf team.",
@@ -1895,7 +1895,7 @@ export class InMemoryGameService {
 
       const state = this.requirePrivateState(room, playerId);
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: `${this.languageInstruction(room)} Wolf team voting phase. Choose the player you vote to kill tonight based only on visible public context and wolf team discussion. Use wolfKill or passAction.`,
+        prompt: "",
       });
       const targetPlayerId = stringValue(result.input?.targetPlayerId);
       if (
@@ -2008,18 +2008,13 @@ export class InMemoryGameService {
     playerId: string,
     runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
     now: Date,
-    instruction: string
+    _instruction: string
   ): Promise<void> {
     if (!room.projection) throw new Error("projection is required");
     const player = this.requirePlayer(room, playerId);
     const state = this.requirePrivateState(room, playerId);
     const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-      prompt: [
-        this.languageInstruction(room),
-        `You are ${player.displayName} in a Werewolf game.`,
-        `Your role is ${state.role}. Current phase is ${room.projection.phase}.`,
-        instruction,
-      ].join(" "),
+      prompt: "",
     });
     const action = this.nightActionFromTool(room, playerId, result);
     this.recordNightAction(room, action);
@@ -2115,21 +2110,8 @@ export class InMemoryGameService {
       }
 
       const state = this.requirePrivateState(room, playerId);
-      const allowedTargetNames = allowedTargets
-        .map((id) => {
-          const p = room.players.find((pl) => pl.id === id);
-          return p ? `${p.displayName} (seat ${p.seatNo})` : id;
-        })
-        .join(", ");
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: [
-          `You are ${player.displayName} in a Werewolf game. Your role is ${state.role}.`,
-          this.languageInstruction(room),
-          room.projection.phase === "tie_vote"
-            ? `This is a tie revote. Allowed exile targets are: ${allowedTargetNames}.`
-            : `This is the public exile vote.`,
-          `Choose one allowed exile target based only on visible public context. You must respond by calling one tool.`,
-        ].join(" "),
+        prompt: "",
       });
       const targetPlayerId = stringValue(result.input?.targetPlayerId);
       if (
@@ -2309,7 +2291,7 @@ export class InMemoryGameService {
     }
 
     const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-      prompt: `${this.languageInstruction(room)} You are ${player.displayName} in a Werewolf game. Speak briefly for ${room.projection.phase}. Your role is ${state.role}.`,
+      prompt: "",
     });
     const toolSpeech =
       result.toolName === "saySpeech"

@@ -46,6 +46,8 @@ export interface HarnessContextInput {
 
 export interface HarnessContextResult {
   text: string;
+  timelineText: string;
+  selfSpeechText: string;
   phase: GamePhase;
   role: Role;
   alivePlayerIds: string[];

@@ -1044,15 +1044,15 @@ describe("InMemoryGameService rules", () => {
 
     expect(capturedInputs).toHaveLength(1);
     expect(capturedInputs[0]!.messages).toEqual([
-      { role: "system", content: expect.stringContaining("白天发言") },
+      { role: "system", content: expect.stringContaining("白天讨论环节") },
       { role: "user", content: expect.stringContaining("<speaking_order>") },
     ]);
-    expect(capturedInputs[0]!.messages![0]!.content).toContain("必须调用 saySpeech");
-    expect(capturedInputs[0]!.messages![1]!.content).toContain("<focus_angle>");
-    expect(capturedInputs[0]!.prompt).toContain("白天发言");
+    expect(capturedInputs[0]!.messages![0]!.content).toContain("返回 JSON 字符串数组");
+    expect(capturedInputs[0]!.messages![1]!.content).toContain("轮到你发言，返回JSON数组");
+    expect(capturedInputs[0]!.prompt).toContain("白天讨论环节");
   });
 
-  it("does not suggest the hidden werewolf to an agent seer", async () => {
+  it("does not derive the agent seer task target from hidden wolf identity", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const seer = room.privateStates.find((state) => state.role === "seer")!;
@@ -1079,13 +1079,14 @@ describe("InMemoryGameService rules", () => {
     const promptText = capturedInputs
       .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
       .join("\n");
-    expect(promptText).not.toContain(`Use seerInspect on ${wolfPlayer.displayName}`);
-    expect(promptText).not.toContain(
-      `${wolfPlayer.displayName} (seat ${wolfPlayer.seatNo})`
+    expect(promptText).toContain(
+      `${wolf.playerId}(座位${wolfPlayer.seatNo} ${wolfPlayer.displayName})`
     );
+    expect(promptText).not.toContain(`Use seerInspect on ${wolfPlayer.displayName}`);
+    expect(promptText).not.toContain("角色：狼人");
   });
 
-  it("does not suggest hidden-role targets to agent wolf kill votes", async () => {
+  it("does not derive agent wolf kill targets from hidden good-team identity", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
@@ -1125,7 +1126,7 @@ describe("InMemoryGameService rules", () => {
     expect(promptText).not.toContain("Suggested target");
   });
 
-  it("does not tell public voting agents to vote the hidden werewolf", async () => {
+  it("does not derive public voting task targets from hidden wolf identity", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
@@ -1163,7 +1164,11 @@ describe("InMemoryGameService rules", () => {
     const promptText = capturedInputs
       .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
       .join("\n");
+    expect(promptText).toContain(
+      `${wolfPlayer.id}(座位${wolfPlayer.seatNo} ${wolfPlayer.displayName})`
+    );
     expect(promptText).not.toContain(`Use submitVote on ${wolfPlayer.displayName}`);
+    expect(promptText).not.toContain("角色：狼人");
   });
 
   it("scheduleAdvance advances an agent speaker immediately before the speech deadline", async () => {

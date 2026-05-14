@@ -9,6 +9,8 @@ export function buildHarnessContext(
   if (!room.projection) {
     return {
       text: "",
+      timelineText: "",
+      selfSpeechText: "",
       phase: "role_assignment",
       role: state.role,
       alivePlayerIds: [],
@@ -48,11 +50,75 @@ export function buildHarnessContext(
 
   return {
     text: sections.join("\n\n"),
+    timelineText: buildTimelineText(visibleEvents, playersById, player.id, maxSpeechHistory),
+    selfSpeechText: buildSelfSpeechText(visibleEvents, player.id, maxSpeechHistory),
     phase: room.projection.phase,
     role: state.role,
     alivePlayerIds: room.projection.alivePlayerIds,
     targetPlayerIds,
   };
+}
+
+function buildTimelineText(
+  visibleEvents: GameEvent[],
+  playersById: Map<string, StoredPlayer>,
+  selfPlayerId: string,
+  maxLines: number
+): string {
+  return visibleEvents
+    .filter((event) => event.visibility !== "runtime")
+    .slice(-maxLines)
+    .map((event) => formatTimelineEvent(event, playersById, selfPlayerId))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildSelfSpeechText(
+  visibleEvents: GameEvent[],
+  selfPlayerId: string,
+  maxLines: number
+): string {
+  return visibleEvents
+    .filter(
+      (event) =>
+        event.type === "speech_submitted" &&
+        event.actorId === selfPlayerId &&
+        event.visibility === "public"
+    )
+    .slice(-maxLines)
+    .map((event) => String(event.payload?.speech ?? ""))
+    .filter(Boolean)
+    .join("\n");
+}
+
+function formatTimelineEvent(
+  event: GameEvent,
+  playersById: Map<string, StoredPlayer>,
+  _selfPlayerId: string
+): string {
+  const actor = event.actorId ? playersById.get(event.actorId) : undefined;
+  const actorLabel = actor ? labelPlayer(actor) : event.actorId ?? "系统";
+  if (event.type === "speech_submitted") {
+    return `${actorLabel}: ${String(event.payload?.speech ?? "")}`;
+  }
+  if (event.type === "vote_submitted") {
+    const target = event.subjectId ? playersById.get(event.subjectId) : undefined;
+    return `${actorLabel} 投票给 ${target ? labelPlayer(target) : "弃权"}`;
+  }
+  if (event.type === "turn_started") {
+    const subject = event.subjectId ? playersById.get(event.subjectId) : undefined;
+    return `轮到 ${subject ? labelPlayer(subject) : event.subjectId ?? "未知玩家"} 行动`;
+  }
+  if (event.type === "phase_started") {
+    return `进入阶段 ${String(event.payload?.phase ?? "")}`;
+  }
+  if (event.type === "seer_result_revealed") {
+    const inspectedId = String(event.payload?.inspectedPlayerId ?? "");
+    const inspected = playersById.get(inspectedId);
+    const alignment = event.payload?.alignment === "wolf" ? "狼人" : "好人";
+    return `查验结果：${inspected ? labelPlayer(inspected) : inspectedId} 是 ${alignment}`;
+  }
+  return "";
 }
 
 function canSeeEvent(
