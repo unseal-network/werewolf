@@ -1,0 +1,1422 @@
+{
+  "version": 1,
+  "renderer": "pixijs",
+  "basePath": "/assets/ui",
+  "assets": {
+    "bg.village.day": {
+      "path": "backgrounds/village-day.webp",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 1,
+      "status": "planned"
+    },
+    "bg.village.night": {
+      "path": "backgrounds/village-night.webp",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 1,
+      "status": "planned"
+    },
+    "bg.village.vote": {
+      "path": "backgrounds/village-vote.webp",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 1,
+      "status": "planned"
+    },
+    "button.cancel.frame": {
+      "status": "planned",
+      "path": "buttons/cancel-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        280,
+        96
+      ],
+      "priority": 3,
+      "nineSlice": [
+        32,
+        32,
+        30,
+        30
+      ]
+    },
+    "button.cancel.pressed": {
+      "status": "planned",
+      "path": "buttons/cancel-pressed.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        280,
+        96
+      ],
+      "priority": 3,
+      "nineSlice": [
+        32,
+        32,
+        30,
+        30
+      ]
+    },
+    "button.circular.active": {
+      "status": "planned",
+      "path": "buttons/circular-active.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        180,
+        180
+      ],
+      "priority": 3
+    },
+    "button.circular.frame": {
+      "path": "buttons/circular-frame.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        160,
+        160
+      ],
+      "priority": 3,
+      "status": "planned"
+    },
+    "button.confirm.frame": {
+      "status": "planned",
+      "path": "buttons/confirm-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3,
+      "nineSlice": [
+        36,
+        36,
+        32,
+        32
+      ]
+    },
+    "button.confirm.glow": {
+      "status": "planned",
+      "path": "buttons/confirm-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        420,
+        140
+      ],
+      "priority": 3,
+      "blendMode": "add"
+    },
+    "button.danger.frame": {
+      "status": "planned",
+      "path": "buttons/danger-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3,
+      "nineSlice": [
+        36,
+        36,
+        32,
+        32
+      ]
+    },
+    "button.danger.glow": {
+      "path": "buttons/danger-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        420,
+        140
+      ],
+      "priority": 3,
+      "blendMode": "add",
+      "status": "planned"
+    },
+    "button.primary.disabled": {
+      "path": "buttons/primary-disabled.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3,
+      "nineSlice": [
+        36,
+        36,
+        32,
+        32
+      ],
+      "status": "planned"
+    },
+    "button.primary.fill": {
+      "status": "planned",
+      "path": "buttons/primary-fill.webp",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3
+    },
+    "button.primary.frame": {
+      "path": "buttons/primary-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3,
+      "nineSlice": [
+        36,
+        36,
+        32,
+        32
+      ],
+      "status": "planned"
+    },
+    "button.primary.pressed": {
+      "path": "buttons/primary-pressed.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3,
+      "nineSlice": [
+        36,
+        36,
+        32,
+        32
+      ],
+      "status": "planned"
+    },
+    "button.rect.small": {
+      "status": "planned",
+      "path": "buttons/rect-small-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        240,
+        88
+      ],
+      "priority": 3,
+      "nineSlice": [
+        30,
+        30,
+        28,
+        28
+      ]
+    },
+    "button.secondary.frame": {
+      "status": "planned",
+      "path": "buttons/secondary-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        360,
+        104
+      ],
+      "priority": 3,
+      "nineSlice": [
+        36,
+        36,
+        32,
+        32
+      ]
+    },
+    "button.square.active": {
+      "status": "planned",
+      "path": "buttons/square-active.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 3
+    },
+    "button.square.disabled": {
+      "status": "planned",
+      "path": "buttons/square-disabled.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        128,
+        128
+      ],
+      "priority": 3
+    },
+    "button.square.frame": {
+      "status": "planned",
+      "path": "buttons/square-frame.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        128,
+        128
+      ],
+      "priority": 3
+    },
+    "card.back": {
+      "status": "existing",
+      "path": "../role-cards/card-back.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "card.entry.frame": {
+      "status": "planned",
+      "path": "cards/role-entry-frame.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        160,
+        240
+      ],
+      "priority": 6
+    },
+    "card.flip.streak": {
+      "path": "cards/flip-streak.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        512,
+        192
+      ],
+      "priority": 6,
+      "blendMode": "add",
+      "status": "planned"
+    },
+    "card.frame": {
+      "status": "planned",
+      "path": "cards/card-frame.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "card.reveal.glow": {
+      "path": "cards/reveal-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        640,
+        640
+      ],
+      "priority": 6,
+      "blendMode": "add",
+      "status": "planned"
+    },
+    "card.role.guard": {
+      "status": "existing",
+      "path": "../role-cards/guard.png",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "card.role.seer": {
+      "status": "existing",
+      "path": "../role-cards/seer.png",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "card.role.villager": {
+      "status": "existing",
+      "path": "../role-cards/villager.png",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "card.role.werewolf": {
+      "status": "existing",
+      "path": "../role-cards/werewolf.png",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "card.role.witch": {
+      "status": "existing",
+      "path": "../role-cards/witch.png",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        384,
+        576
+      ],
+      "priority": 6
+    },
+    "frame.event.bar": {
+      "status": "planned",
+      "path": "frames/event-bar-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        112
+      ],
+      "priority": 2,
+      "nineSlice": [
+        34,
+        34,
+        28,
+        28
+      ]
+    },
+    "frame.hud.nav": {
+      "status": "planned",
+      "path": "frames/hud-nav-button-frame.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        112,
+        112
+      ],
+      "priority": 2
+    },
+    "frame.hud.phase": {
+      "status": "planned",
+      "path": "frames/phase-badge-frame.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        112,
+        112
+      ],
+      "priority": 2
+    },
+    "frame.hud.timer": {
+      "status": "planned",
+      "path": "frames/timer-badge-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        128,
+        128
+      ],
+      "priority": 2,
+      "nineSlice": [
+        28,
+        28,
+        28,
+        28
+      ]
+    },
+    "frame.hud.top": {
+      "path": "frames/top-hud-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        640,
+        128
+      ],
+      "priority": 2,
+      "nineSlice": [
+        44,
+        44,
+        44,
+        44
+      ],
+      "status": "planned"
+    },
+    "frame.loading.thumb": {
+      "status": "planned",
+      "path": "frames/loading-thumb.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        180,
+        40
+      ],
+      "priority": 2,
+      "nineSlice": [
+        20,
+        20,
+        16,
+        16
+      ]
+    },
+    "frame.loading.track": {
+      "status": "planned",
+      "path": "frames/loading-track.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        520,
+        40
+      ],
+      "priority": 2,
+      "nineSlice": [
+        20,
+        20,
+        16,
+        16
+      ]
+    },
+    "frame.log.panel": {
+      "status": "planned",
+      "path": "frames/log-panel-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        640,
+        900
+      ],
+      "priority": 2,
+      "nineSlice": [
+        48,
+        48,
+        48,
+        48
+      ]
+    },
+    "frame.modal": {
+      "path": "frames/modal-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        640,
+        760
+      ],
+      "priority": 2,
+      "nineSlice": [
+        56,
+        56,
+        56,
+        56
+      ],
+      "status": "planned"
+    },
+    "frame.notice": {
+      "path": "frames/central-notice-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        512,
+        256
+      ],
+      "priority": 2,
+      "nineSlice": [
+        42,
+        42,
+        42,
+        42
+      ],
+      "status": "planned"
+    },
+    "frame.notice.board": {
+      "status": "planned",
+      "path": "frames/notice-board-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        600,
+        360
+      ],
+      "priority": 2,
+      "nineSlice": [
+        48,
+        48,
+        48,
+        48
+      ]
+    },
+    "frame.notice.fill": {
+      "path": "frames/central-notice-fill.webp",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        512,
+        256
+      ],
+      "priority": 2,
+      "status": "planned"
+    },
+    "frame.notice.glow": {
+      "status": "planned",
+      "path": "frames/central-notice-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        512,
+        256
+      ],
+      "priority": 2,
+      "blendMode": "add"
+    },
+    "frame.popup.compact": {
+      "status": "planned",
+      "path": "frames/popup-compact-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        480,
+        320
+      ],
+      "priority": 2,
+      "nineSlice": [
+        42,
+        42,
+        42,
+        42
+      ]
+    },
+    "frame.speech.bubble": {
+      "status": "planned",
+      "path": "frames/speech-bubble-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        520,
+        220
+      ],
+      "priority": 2,
+      "nineSlice": [
+        40,
+        40,
+        34,
+        34
+      ]
+    },
+    "frame.timeline": {
+      "path": "frames/timeline-entry-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        192,
+        96
+      ],
+      "priority": 2,
+      "nineSlice": [
+        28,
+        28,
+        24,
+        24
+      ],
+      "status": "planned"
+    },
+    "frame.toast.error": {
+      "status": "planned",
+      "path": "frames/error-toast-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        120
+      ],
+      "priority": 2,
+      "nineSlice": [
+        34,
+        34,
+        30,
+        30
+      ]
+    },
+    "light.button.active": {
+      "status": "planned",
+      "path": "particles/button-active-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        512,
+        180
+      ],
+      "priority": 7,
+      "blendMode": "add"
+    },
+    "light.moonbeam": {
+      "status": "planned",
+      "path": "particles/moonbeam.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        384,
+        1024
+      ],
+      "priority": 7,
+      "blendMode": "add"
+    },
+    "mockup.pixi.master": {
+      "path": "mockups/pixi-master.png",
+      "type": "image",
+      "alpha": false,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 0,
+      "status": "planned"
+    },
+    "overlay.day": {
+      "path": "overlays/day-mist.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 1,
+      "blendMode": "normal",
+      "status": "planned"
+    },
+    "overlay.night": {
+      "path": "overlays/night-vignette.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 1,
+      "blendMode": "normal",
+      "status": "planned"
+    },
+    "overlay.vote": {
+      "path": "overlays/vote-crimson.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        768,
+        1600
+      ],
+      "priority": 1,
+      "blendMode": "normal",
+      "status": "planned"
+    },
+    "panel.agent.picker": {
+      "status": "planned",
+      "path": "panels/agent-picker-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        620,
+        760
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        48,
+        48,
+        44,
+        44
+      ]
+    },
+    "panel.agent.row": {
+      "status": "planned",
+      "path": "panels/agent-row-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        104
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        30,
+        30,
+        26,
+        26
+      ]
+    },
+    "panel.announcement": {
+      "status": "planned",
+      "path": "panels/announcement-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        600,
+        320
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        48,
+        48,
+        42,
+        42
+      ]
+    },
+    "panel.choice.row": {
+      "status": "planned",
+      "path": "panels/choice-row-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        520,
+        104
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        32,
+        32,
+        28,
+        28
+      ]
+    },
+    "panel.event.toast": {
+      "status": "planned",
+      "path": "panels/event-toast-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        128
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        34,
+        34,
+        30,
+        30
+      ]
+    },
+    "panel.log.drawer": {
+      "status": "planned",
+      "path": "panels/log-drawer-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        640,
+        1000
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        50,
+        50,
+        50,
+        50
+      ]
+    },
+    "panel.log.item": {
+      "status": "planned",
+      "path": "panels/log-item-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        112
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        30,
+        30,
+        26,
+        26
+      ]
+    },
+    "panel.phase.banner": {
+      "status": "planned",
+      "path": "panels/phase-banner-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        620,
+        160
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        42,
+        42,
+        34,
+        34
+      ]
+    },
+    "panel.private.result": {
+      "status": "planned",
+      "path": "panels/private-result-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        260
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        42,
+        42,
+        36,
+        36
+      ]
+    },
+    "panel.seer.result": {
+      "status": "planned",
+      "path": "panels/seer-result-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        360
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        44,
+        44,
+        40,
+        40
+      ]
+    },
+    "panel.speech.current": {
+      "status": "planned",
+      "path": "panels/speech-current-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        240
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        42,
+        42,
+        38,
+        38
+      ]
+    },
+    "panel.speech.history": {
+      "status": "planned",
+      "path": "panels/speech-history-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        220
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        42,
+        42,
+        38,
+        38
+      ]
+    },
+    "panel.target.chip": {
+      "status": "planned",
+      "path": "panels/target-chip-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        160,
+        64
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        24,
+        24,
+        20,
+        20
+      ]
+    },
+    "panel.user.info": {
+      "status": "planned",
+      "path": "panels/user-info-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        420
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        44,
+        44,
+        40,
+        40
+      ]
+    },
+    "panel.voice.bubble": {
+      "status": "planned",
+      "path": "panels/voice-bubble-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        240,
+        160
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        36,
+        36,
+        34,
+        34
+      ]
+    },
+    "panel.voice.container": {
+      "status": "planned",
+      "path": "panels/voice-container-panel.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        600,
+        300
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        42,
+        42,
+        38,
+        38
+      ]
+    },
+    "panel.voice.recording": {
+      "status": "planned",
+      "path": "panels/voice-recording-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        280,
+        200
+      ],
+      "priority": 4.5,
+      "blendMode": "add"
+    },
+    "panel.voice.text": {
+      "status": "planned",
+      "path": "panels/voice-text-input-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        560,
+        180
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        34,
+        34,
+        30,
+        30
+      ]
+    },
+    "panel.vote.progress": {
+      "status": "planned",
+      "path": "panels/vote-progress-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        520,
+        64
+      ],
+      "priority": 4.5,
+      "nineSlice": [
+        28,
+        28,
+        24,
+        24
+      ]
+    },
+    "particle.crimson": {
+      "path": "particles/crimson-spark.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        32,
+        32
+      ],
+      "priority": 7,
+      "blendMode": "add",
+      "status": "planned"
+    },
+    "particle.ember": {
+      "path": "particles/ember-dot.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        32,
+        32
+      ],
+      "priority": 7,
+      "blendMode": "add",
+      "status": "planned"
+    },
+    "particle.fog": {
+      "path": "particles/fog-puff.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        256,
+        128
+      ],
+      "priority": 7,
+      "status": "planned"
+    },
+    "particle.moon": {
+      "path": "particles/moon-dust.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        32,
+        32
+      ],
+      "priority": 7,
+      "blendMode": "add",
+      "status": "planned"
+    },
+    "radial.base": {
+      "path": "radial/wheel-base.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        640,
+        640
+      ],
+      "priority": 5,
+      "status": "planned"
+    },
+    "radial.inner.hub": {
+      "path": "radial/hub-button.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        180,
+        180
+      ],
+      "priority": 5,
+      "status": "planned"
+    },
+    "radial.inner.hub.active": {
+      "status": "planned",
+      "path": "radial/hub-button-active.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        196,
+        196
+      ],
+      "priority": 5
+    },
+    "radial.outer.glow": {
+      "status": "planned",
+      "path": "radial/wheel-outer-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        720,
+        720
+      ],
+      "priority": 5,
+      "blendMode": "add"
+    },
+    "radial.target.snap": {
+      "status": "planned",
+      "path": "radial/target-snap-glow.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        180,
+        180
+      ],
+      "priority": 5,
+      "blendMode": "add"
+    },
+    "result.good.frame": {
+      "status": "planned",
+      "path": "cards/result-good-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        640,
+        520
+      ],
+      "priority": 6,
+      "nineSlice": [
+        56,
+        56,
+        48,
+        48
+      ]
+    },
+    "result.wolf.frame": {
+      "status": "planned",
+      "path": "cards/result-wolf-frame.png",
+      "type": "nineSlice",
+      "alpha": true,
+      "size": [
+        640,
+        520
+      ],
+      "priority": 6,
+      "nineSlice": [
+        56,
+        56,
+        48,
+        48
+      ]
+    },
+    "seat.badge.dead": {
+      "status": "planned",
+      "path": "seats/dead-badge.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        64,
+        96
+      ],
+      "priority": 4
+    },
+    "seat.badge.number": {
+      "path": "seats/number-badge.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        56,
+        40
+      ],
+      "priority": 4,
+      "status": "planned"
+    },
+    "seat.badge.offline": {
+      "status": "planned",
+      "path": "seats/offline-badge.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        64,
+        96
+      ],
+      "priority": 4
+    },
+    "seat.ring.action": {
+      "path": "seats/ring-action.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        168,
+        168
+      ],
+      "priority": 4,
+      "status": "planned"
+    },
+    "seat.ring.dead": {
+      "path": "seats/ring-dead.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 4,
+      "status": "planned"
+    },
+    "seat.ring.empty": {
+      "status": "planned",
+      "path": "seats/ring-empty.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 4
+    },
+    "seat.ring.hover": {
+      "status": "planned",
+      "path": "seats/ring-hover.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        160,
+        160
+      ],
+      "priority": 4
+    },
+    "seat.ring.idle": {
+      "status": "planned",
+      "path": "seats/ring-idle.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 4
+    },
+    "seat.ring.normal": {
+      "path": "seats/ring-normal.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 4,
+      "status": "planned"
+    },
+    "seat.ring.offline": {
+      "status": "planned",
+      "path": "seats/ring-offline.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 4
+    },
+    "seat.ring.selected": {
+      "path": "seats/ring-selected.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        168,
+        168
+      ],
+      "priority": 4,
+      "status": "planned"
+    },
+    "seat.ring.speaking": {
+      "path": "seats/ring-speaking.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        160,
+        160
+      ],
+      "priority": 4,
+      "status": "planned"
+    },
+    "seat.ring.voted": {
+      "status": "planned",
+      "path": "seats/ring-voted.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        144,
+        144
+      ],
+      "priority": 4
+    },
+    "radial.sector.fill": {
+      "path": "radial/sector-fill-tile.png",
+      "type": "texture",
+      "alpha": true,
+      "size": [
+        256,
+        256
+      ],
+      "priority": 5,
+      "blendMode": "normal",
+      "status": "planned",
+      "usage": "Tile or mask inside Pixi-generated selector sector geometry."
+    },
+    "radial.sector.fill.danger": {
+      "path": "radial/sector-fill-danger-tile.png",
+      "type": "texture",
+      "alpha": true,
+      "size": [
+        256,
+        256
+      ],
+      "priority": 5,
+      "blendMode": "normal",
+      "status": "planned",
+      "usage": "Tile or mask inside Pixi-generated danger/vote selector sector geometry."
+    },
+    "radial.edge.stroke": {
+      "path": "radial/sector-edge-stroke.png",
+      "type": "texture",
+      "alpha": true,
+      "size": [
+        32,
+        256
+      ],
+      "priority": 5,
+      "blendMode": "normal",
+      "status": "planned",
+      "usage": "Repeat or stretch along dynamically calculated sector start/end radial edges."
+    },
+    "radial.edge.glow": {
+      "path": "radial/sector-edge-glow.png",
+      "type": "texture",
+      "alpha": true,
+      "size": [
+        48,
+        256
+      ],
+      "priority": 5,
+      "blendMode": "add",
+      "status": "planned",
+      "usage": "Additive glow along dynamically calculated sector start/end radial edges."
+    },
+    "radial.arc.stroke": {
+      "path": "radial/arc-stroke-tile.png",
+      "type": "texture",
+      "alpha": true,
+      "size": [
+        256,
+        32
+      ],
+      "priority": 5,
+      "blendMode": "normal",
+      "status": "planned",
+      "usage": "Repeat along dynamically calculated outer arc length."
+    },
+    "radial.arc.glow": {
+      "path": "radial/arc-glow-tile.png",
+      "type": "texture",
+      "alpha": true,
+      "size": [
+        256,
+        48
+      ],
+      "priority": 5,
+      "blendMode": "add",
+      "status": "planned",
+      "usage": "Additive hover/selected glow repeated along dynamically calculated outer arc length."
+    },
+    "radial.cap.node": {
+      "path": "radial/sector-cap-node.png",
+      "type": "image",
+      "alpha": true,
+      "size": [
+        64,
+        64
+      ],
+      "priority": 5,
+      "blendMode": "normal",
+      "status": "planned",
+      "usage": "Optional endpoint node positioned at calculated sector arc endpoints."
+    }
+  }
+}
