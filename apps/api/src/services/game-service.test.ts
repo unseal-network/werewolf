@@ -1564,6 +1564,138 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("streams agent speech transcript deltas before final speech submission", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    let resolveSpeak: () => void = () => undefined;
+    const speakDone = new Promise<boolean>((resolve) => {
+      resolveSpeak = () => resolve(true);
+    });
+
+    games.setVoiceAgents({
+      get: () => ({
+        speak: () => speakDone,
+      }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    const advance = games.advanceGame(gameRoomId, async () => ({
+      text: "unused",
+      toolName: "saySpeech",
+      input: {
+        speech: "我先说结论。3号这轮发言偏防守，我今天会先归3号。",
+      },
+    }));
+
+    await vi.waitFor(() => {
+      expect(
+        room.events.some(
+          (event) =>
+            event.type === "speech_transcript_delta" &&
+            event.actorId === agentSpeaker.id
+        )
+      ).toBe(true);
+    });
+
+    expect(room.projection.currentSpeakerPlayerId).toBe(agentSpeaker.id);
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      )
+    ).toBe(false);
+
+    resolveSpeak();
+    await advance;
+
+    const agentEvents = room.events.filter(
+      (event) => event.actorId === agentSpeaker.id
+    );
+    const deltaEvents = agentEvents.filter(
+      (event) => event.type === "speech_transcript_delta"
+    );
+    const speechEventIndex = room.events.findIndex(
+      (event) =>
+        event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+    );
+    const lastDeltaIndex = room.events.findLastIndex(
+      (event) =>
+        event.type === "speech_transcript_delta" && event.actorId === agentSpeaker.id
+    );
+
+    expect(deltaEvents.length).toBeGreaterThanOrEqual(2);
+    expect(deltaEvents[0]).toMatchObject({
+      visibility: "public",
+      payload: {
+        day: room.projection.day,
+        phase: "day_speak",
+        final: false,
+        source: "agent",
+      },
+    });
+    expect(String(deltaEvents[0]!.payload.text)).toBe("我先说结论。");
+    expect(String(deltaEvents.at(-1)!.payload.text)).toBe(
+      "我先说结论。3号这轮发言偏防守，我今天会先归3号。"
+    );
+    expect(lastDeltaIndex).toBeGreaterThan(-1);
+    expect(speechEventIndex).toBeGreaterThan(lastDeltaIndex);
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+  });
+
+  it("submits final agent speech even when TTS fails after deltas", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+
+    games.setVoiceAgents({
+      get: () => ({
+        speak: () => Promise.reject(new Error("tts unavailable")),
+      }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "unused",
+      toolName: "saySpeech",
+      input: { speech: "我怀疑2号。今天先归2号。" },
+    }));
+
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "speech_transcript_delta" &&
+          event.actorId === agentSpeaker.id
+      )
+    ).toBe(true);
+    const speechEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      );
+    expect(speechEvent?.payload.speech).toBe("我怀疑2号。今天先归2号。");
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+  });
+
   it("uses wolfcha JSON array text as agent speech when saySpeech is absent", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
@@ -1639,6 +1771,13 @@ describe("InMemoryGameService rules", () => {
       );
     expect(speak).not.toHaveBeenCalled();
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "speech_transcript_delta" &&
+          event.actorId === agentSpeaker.id
+      )
+    ).toBe(false);
     expect(speechEvent?.payload.speech).toBe(
       `${agentSpeaker.displayName} did not provide a valid speech.`
     );
