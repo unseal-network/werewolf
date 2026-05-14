@@ -1897,9 +1897,11 @@ export class InMemoryGameService {
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
         prompt: "",
       });
-      const targetPlayerId =
-        stringValue(result.input?.targetPlayerId) ??
-        targetPlayerIdFromAgentOutput(room, result.text);
+      const targetPlayerId = targetPlayerIdFromAgentSelection(
+        room,
+        result.input?.targetPlayerId,
+        result.text
+      );
       if (
         (result.toolName === "wolfKill" ||
           (!result.toolName && Boolean(targetPlayerId))) &&
@@ -2082,9 +2084,11 @@ export class InMemoryGameService {
     if (result.toolName && result.toolName !== expectedTool) {
       return { actorPlayerId, kind: "passAction" };
     }
-    const targetPlayerId =
-      stringValue(result.input?.targetPlayerId) ??
-      targetPlayerIdFromAgentOutput(room, result.text);
+    const targetPlayerId = targetPlayerIdFromAgentSelection(
+      room,
+      result.input?.targetPlayerId,
+      result.text
+    );
     if (!targetPlayerId) {
       return { actorPlayerId, kind: "passAction" };
     }
@@ -2123,9 +2127,11 @@ export class InMemoryGameService {
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
         prompt: "",
       });
-      const targetPlayerId =
-        stringValue(result.input?.targetPlayerId) ??
-        targetPlayerIdFromAgentOutput(room, result.text);
+      const targetPlayerId = targetPlayerIdFromAgentSelection(
+        room,
+        result.input?.targetPlayerId,
+        result.text
+      );
       if (
         (result.toolName === "submitVote" ||
           (!result.toolName && Boolean(targetPlayerId))) &&
@@ -2656,6 +2662,31 @@ function targetPlayerIdFromAgentOutput(
   const seatNo = seatNoFromAgentOutput(text);
   if (!seatNo) return undefined;
   return room.players.find((player) => player.seatNo === seatNo)?.id;
+}
+
+function targetPlayerIdFromAgentSelection(
+  room: StoredGameRoom,
+  targetPlayerIdInput: unknown,
+  text: string
+): string | undefined {
+  const explicitTargetPlayerId = stringValue(targetPlayerIdInput);
+  if (
+    explicitTargetPlayerId &&
+    room.players.some((player) => player.id === explicitTargetPlayerId)
+  ) {
+    return explicitTargetPlayerId;
+  }
+  if (explicitTargetPlayerId) {
+    const fromSeat = targetPlayerIdFromAgentOutput(room, explicitTargetPlayerId);
+    if (fromSeat) return fromSeat;
+  }
+  if (typeof targetPlayerIdInput === "number") {
+    const fromSeat = room.players.find(
+      (player) => player.seatNo === targetPlayerIdInput
+    )?.id;
+    if (fromSeat) return fromSeat;
+  }
+  return targetPlayerIdFromAgentOutput(room, text);
 }
 
 function seatNoFromAgentOutput(text: string): number | undefined {

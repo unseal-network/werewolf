@@ -1208,6 +1208,45 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("maps agent tool targetPlayerId seat numbers to player ids", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const seer = room.privateStates.find((state) => state.role === "seer")!;
+    const seerPlayer = room.players.find((player) => player.id === seer.playerId)!;
+    const targetPlayer = room.players.find((player) => player.id !== seer.playerId)!;
+
+    seerPlayer.kind = "agent";
+    seerPlayer.agentId = "@seer-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_seer",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "",
+      toolName: "seerInspect",
+      input: { targetPlayerId: String(targetPlayer.seatNo) },
+    }));
+
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: seer.playerId,
+        subjectId: targetPlayer.id,
+        payload: expect.objectContaining({
+          action: expect.objectContaining({
+            kind: "seerInspect",
+            targetPlayerId: targetPlayer.id,
+          }),
+        }),
+      })
+    );
+  });
+
   it("does not derive public voting task targets from hidden wolf identity", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
@@ -1941,5 +1980,42 @@ describe("InMemoryGameService rules", () => {
           event.type === "vote_submitted" && event.actorId === agentVoter!.id
       )
     ).toHaveLength(1);
+  });
+
+  it("maps agent vote tool targetPlayerId seat numbers to player ids", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const [agentVoter, humanVoter, target] = room.players;
+    expect(agentVoter).toBeDefined();
+    expect(humanVoter).toBeDefined();
+    expect(target).toBeDefined();
+    agentVoter!.kind = "agent";
+    agentVoter!.agentId = "@agent-voter:example.com";
+
+    room.privateStates = room.privateStates.map((state) => ({
+      ...state,
+      alive:
+        state.playerId === agentVoter!.id ||
+        state.playerId === humanVoter!.id ||
+        state.playerId === target!.id,
+    }));
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      alivePlayerIds: [agentVoter!.id, humanVoter!.id, target!.id],
+    };
+    room.pendingVotes = [];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "",
+      toolName: "submitVote",
+      input: { targetPlayerId: String(target!.seatNo) },
+    }));
+
+    expect(room.pendingVotes).toEqual([
+      { actorPlayerId: agentVoter!.id, targetPlayerId: target!.id },
+    ]);
   });
 });
