@@ -1897,9 +1897,12 @@ export class InMemoryGameService {
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
         prompt: "",
       });
-      const targetPlayerId = stringValue(result.input?.targetPlayerId);
+      const targetPlayerId =
+        stringValue(result.input?.targetPlayerId) ??
+        targetPlayerIdFromAgentOutput(room, result.text);
       if (
-        result.toolName === "wolfKill" &&
+        (result.toolName === "wolfKill" ||
+          (!result.toolName && Boolean(targetPlayerId))) &&
         targetPlayerId &&
         room.projection.alivePlayerIds.includes(targetPlayerId) &&
         this.requirePrivateState(room, targetPlayerId).team === "good"
@@ -2062,11 +2065,6 @@ export class InMemoryGameService {
     result: RuntimeAgentTurnResult
   ): RuntimeNightAction {
     if (!room.projection) throw new Error("projection is required");
-    const targetPlayerId = stringValue(result.input?.targetPlayerId);
-    if (result.toolName === "passAction" || !result.toolName) {
-      return { actorPlayerId, kind: "passAction" };
-    }
-
     const phaseToTool: Partial<Record<GamePhase, RuntimeNightAction["kind"]>> = {
       night_guard: "guardProtect",
       night_wolf: "wolfKill",
@@ -2075,7 +2073,19 @@ export class InMemoryGameService {
       night_seer: "seerInspect",
     };
     const expectedTool = phaseToTool[room.projection.phase];
-    if (result.toolName !== expectedTool || !targetPlayerId) {
+    if (!expectedTool) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    if (result.toolName === "passAction" || isAgentPassText(result.text)) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    if (result.toolName && result.toolName !== expectedTool) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    const targetPlayerId =
+      stringValue(result.input?.targetPlayerId) ??
+      targetPlayerIdFromAgentOutput(room, result.text);
+    if (!targetPlayerId) {
       return { actorPlayerId, kind: "passAction" };
     }
     if (!room.projection.alivePlayerIds.includes(targetPlayerId)) {
@@ -2113,9 +2123,12 @@ export class InMemoryGameService {
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
         prompt: "",
       });
-      const targetPlayerId = stringValue(result.input?.targetPlayerId);
+      const targetPlayerId =
+        stringValue(result.input?.targetPlayerId) ??
+        targetPlayerIdFromAgentOutput(room, result.text);
       if (
-        result.toolName === "submitVote" &&
+        (result.toolName === "submitVote" ||
+          (!result.toolName && Boolean(targetPlayerId))) &&
         targetPlayerId &&
         targetPlayerId !== playerId &&
         allowedTargets.includes(targetPlayerId)
@@ -2634,6 +2647,42 @@ function speechTextFromAgentOutput(text: string): string | undefined {
     return undefined;
   }
   return undefined;
+}
+
+function targetPlayerIdFromAgentOutput(
+  room: StoredGameRoom,
+  text: string
+): string | undefined {
+  const seatNo = seatNoFromAgentOutput(text);
+  if (!seatNo) return undefined;
+  return room.players.find((player) => player.seatNo === seatNo)?.id;
+}
+
+function seatNoFromAgentOutput(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  let value: unknown = trimmed;
+  try {
+    value = JSON.parse(trimmed) as unknown;
+  } catch {
+    value = trimmed;
+  }
+  if (Array.isArray(value)) {
+    value = value[0];
+  }
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value > 0 ? value : undefined;
+  }
+  if (typeof value !== "string") return undefined;
+  const match = value.trim().match(/^#?\s*(\d+)\s*号?$/);
+  if (!match) return undefined;
+  const seatNo = Number(match[1]);
+  return Number.isInteger(seatNo) && seatNo > 0 ? seatNo : undefined;
+}
+
+function isAgentPassText(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  return normalized === "pass" || normalized === "过" || normalized === "跳过";
 }
 
 function resolvePlayerAgentId(player: StoredPlayer): string {

@@ -1126,6 +1126,88 @@ describe("InMemoryGameService rules", () => {
     expect(promptText).not.toContain("Suggested target");
   });
 
+  it("records agent seer inspection when the wolfcha prompt returns a seat number", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const seer = room.privateStates.find((state) => state.role === "seer")!;
+    const seerPlayer = room.players.find((player) => player.id === seer.playerId)!;
+    const targetPlayer = room.players.find((player) => player.id !== seer.playerId)!;
+
+    seerPlayer.kind = "agent";
+    seerPlayer.agentId = "@seer-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_seer",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: String(targetPlayer.seatNo),
+      input: {},
+    }));
+
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "night_action_submitted",
+        actorId: seer.playerId,
+        subjectId: targetPlayer.id,
+        payload: expect.objectContaining({
+          action: expect.objectContaining({
+            kind: "seerInspect",
+            targetPlayerId: targetPlayer.id,
+          }),
+        }),
+      })
+    );
+  });
+
+  it("records agent wolf kill vote when the wolfcha prompt returns a seat number", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const targetState = room.privateStates.find(
+      (state) => state.team === "good" && state.alive
+    )!;
+    const targetPlayer = room.players.find(
+      (player) => player.id === targetState.playerId
+    )!;
+
+    wolfPlayer.kind = "agent";
+    wolfPlayer.agentId = "@wolf-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      if (input.tools && "saySpeech" in input.tools) {
+        return {
+          text: JSON.stringify(["今晚先统一目标。"]),
+          toolName: "saySpeech",
+          input: { speech: "今晚先统一目标。" },
+        };
+      }
+      return { text: String(targetPlayer.seatNo), input: {} };
+    });
+
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "wolf_vote_submitted",
+        actorId: wolf.playerId,
+        subjectId: targetPlayer.id,
+        payload: expect.objectContaining({ targetPlayerId: targetPlayer.id }),
+      })
+    );
+  });
+
   it("does not derive public voting task targets from hidden wolf identity", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
