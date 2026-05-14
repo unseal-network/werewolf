@@ -1270,7 +1270,49 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
-  it("does not treat raw agent text as a completed saySpeech tool call", async () => {
+  it("uses wolfcha JSON array text as agent speech when saySpeech is absent", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const speak = vi.fn();
+
+    games.setVoiceAgents({
+      get: () => ({ speak }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: JSON.stringify(["我先看2号发言偏保守。", "今天可以先归2号。"]),
+      input: {},
+    }));
+
+    const speechEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      );
+    expect(speak).toHaveBeenCalledWith(
+      "我先看2号发言偏保守。\n今天可以先归2号。",
+      agentSpeaker.id,
+      room.timing.agentSpeechRate
+    );
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(speechEvent?.payload.speech).toBe(
+      "我先看2号发言偏保守。\n今天可以先归2号。"
+    );
+  });
+
+  it("does not treat unstructured raw agent text as completed speech", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const agentSpeaker = room.players[0]!;

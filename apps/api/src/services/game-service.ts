@@ -2297,8 +2297,12 @@ export class InMemoryGameService {
       result.toolName === "saySpeech"
         ? stringValue(result.input?.speech)
         : undefined;
+    const textSpeech =
+      toolSpeech === undefined ? speechTextFromAgentOutput(result.text) : undefined;
     const speech =
-      toolSpeech ?? `${player.displayName} did not provide a valid speech.`;
+      toolSpeech ??
+      textSpeech ??
+      `${player.displayName} did not provide a valid speech.`;
     // Synthesize agent speech via TTS and wait for the TTS WebSocket to finish
     // and for the generated PCM frames to be handed to LiveKit before rotating
     // to the next speaker.
@@ -2309,7 +2313,7 @@ export class InMemoryGameService {
     if (
       this.voiceAgents &&
       player.kind === "agent" &&
-      toolSpeech !== undefined &&
+      (toolSpeech !== undefined || textSpeech !== undefined) &&
       speech.trim() &&
       !result.fallback
     ) {
@@ -2608,6 +2612,28 @@ function normalizeAgentTurnOutput(output: RuntimeAgentTurnOutput): RuntimeAgentT
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function speechTextFromAgentOutput(text: string): string | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      const parts = parsed
+        .filter((part): part is string => typeof part === "string")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      return parts.length > 0 ? parts.join("\n") : undefined;
+    }
+    if (typeof parsed === "string") {
+      const speech = parsed.trim();
+      return speech || undefined;
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function resolvePlayerAgentId(player: StoredPlayer): string {
