@@ -235,13 +235,9 @@ export function createApiClient(options: ApiClientOptions) {
         method: "POST",
       });
     },
-    runRuntimeTick(
-      gameRoomId: string,
-      body: { agentApiKey?: string; agentApiBaseUrl?: string } = {}
-    ) {
+    runRuntimeTick(gameRoomId: string) {
       return request<RuntimeTickDto>(`/games/${gameRoomId}/runtime/tick`, {
         method: "POST",
-        body: JSON.stringify(body),
       });
     },
     listAgentCandidates(gameRoomId: string) {
@@ -260,9 +256,9 @@ export function createApiClient(options: ApiClientOptions) {
         body: JSON.stringify({ agentUserId, displayName, avatarUrl }),
       });
     },
-    removePlayer(gameRoomId: string, playerId: string) {
+    removePlayer(gameRoomId: string, matrixUserId: string) {
       return request<{ player: RoomPlayer }>(
-        `/games/${gameRoomId}/players/${encodeURIComponent(playerId)}`,
+        `/games/${gameRoomId}/players/${encodeURIComponent(matrixUserId)}`,
         { method: "DELETE" }
       );
     },
@@ -270,7 +266,7 @@ export function createApiClient(options: ApiClientOptions) {
       gameRoomId: string,
       body: {
         kind: "speech" | "speechComplete" | "vote" | "nightAction" | "pass";
-        targetPlayerId?: string;
+        targetMatrixUserId?: string;
         speech?: string;
         expectedPhase?: string | null;
         expectedDay?: number;

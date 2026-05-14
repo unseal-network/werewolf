@@ -10,6 +10,7 @@ import type {
   PlayerSubmittedAction,
   RuntimeAgentTurnInput,
   RuntimeAgentTurnOutput,
+  StoredGameRoom,
 } from "../services/game-service";
 
 export interface GamesRouteDeps {
@@ -183,15 +184,19 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       ) {
         throw new AppError("invalid_action", "Invalid action kind", 400);
       }
+      const targetPlayerId =
+        kind === "vote" || kind === "nightAction"
+          ? resolveSubmittedTargetPlayerId(room, body)
+          : "";
       const action: PlayerSubmittedAction =
         kind === "speech"
           ? { kind: "speech", speech: String(body.speech ?? "") }
           : kind === "speechComplete"
             ? { kind: "speechComplete" }
             : kind === "vote"
-              ? { kind: "vote", targetPlayerId: String(body.targetPlayerId ?? "") }
+              ? { kind: "vote", targetPlayerId }
               : kind === "nightAction"
-                ? { kind: "nightAction", targetPlayerId: String(body.targetPlayerId ?? "") }
+                ? { kind: "nightAction", targetPlayerId }
                 : { kind: "pass" };
       const expectedPhaseRaw = stringValue(body.expectedPhase);
       const expectedPhase = expectedPhaseRaw
@@ -426,13 +431,18 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     }
   });
 
-  app.delete("/:gameRoomId/players/:playerId", async (c) => {
+  app.delete("/:gameRoomId/players/:matrixUserId", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const room = deps.games.snapshot(c.req.param("gameRoomId"));
+      const playerId = resolvePlayerIdByMatrixUserId(
+        room,
+        c.req.param("matrixUserId")
+      );
       const player = deps.games.removePlayer(
         c.req.param("gameRoomId"),
         user.id,
-        c.req.param("playerId")
+        playerId
       );
       return c.json({ player });
     } catch (error) {
@@ -456,6 +466,32 @@ async function readOptionalJson(request: Request): Promise<Record<string, unknow
   return parsed && typeof parsed === "object" && !Array.isArray(parsed)
     ? (parsed as Record<string, unknown>)
     : {};
+}
+
+function resolveSubmittedTargetPlayerId(
+  room: StoredGameRoom,
+  body: Record<string, unknown>
+): string {
+  const targetMatrixUserId = stringValue(body.targetMatrixUserId);
+  if (!targetMatrixUserId) {
+    throw new AppError("invalid_action", "targetMatrixUserId is required", 400);
+  }
+  return resolvePlayerIdByMatrixUserId(room, targetMatrixUserId);
+}
+
+function resolvePlayerIdByMatrixUserId(
+  room: StoredGameRoom,
+  matrixUserId: string
+): string {
+  const player = room.players.find(
+    (candidate) =>
+      !candidate.leftAt &&
+      (candidate.userId === matrixUserId || candidate.agentId === matrixUserId)
+  );
+  if (!player) {
+    throw new AppError("invalid_action", "Matrix user is not in this room", 400);
+  }
+  return player.id;
 }
 
 function stringValue(value: unknown): string | undefined {

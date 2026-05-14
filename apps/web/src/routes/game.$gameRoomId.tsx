@@ -1142,9 +1142,14 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
 
   async function removeViewingSeat() {
     if (!viewingSeat?.playerId) return;
+    const matrixUserId = viewingSeat.userId ?? viewingSeat.agentId;
+    if (!matrixUserId) {
+      setErrorMessage("Player is missing Matrix user id");
+      return;
+    }
     setErrorMessage("");
     try {
-      const removed = await client.removePlayer(gameRoomId, viewingSeat.playerId);
+      const removed = await client.removePlayer(gameRoomId, matrixUserId);
       setRoomSnapshot((current) => upsertRoomPlayers(current, [removed.player]));
       setViewingSeatNo(null);
     } catch (error) {
@@ -1325,6 +1330,14 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
   async function onConfirmTarget(explicitTargetId?: string) {
     const targetPlayerId = explicitTargetId ?? selectedTargetId;
     if (!targetPlayerId || !myPlayer) return;
+    const targetPlayer = room?.players.find(
+      (player) => !player.leftAt && player.id === targetPlayerId
+    );
+    const targetMatrixUserId = targetPlayer?.userId ?? targetPlayer?.agentId;
+    if (!targetMatrixUserId) {
+      setErrorMessage("Target is missing Matrix user id");
+      return;
+    }
     setErrorMessage("");
     setActionLoading(true);
     try {
@@ -1333,7 +1346,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         phase === "day_vote" || phase === "tie_vote" ? "vote" : "nightAction";
       const result = await client.submitAction(gameRoomId, {
         kind,
-        targetPlayerId,
+        targetMatrixUserId,
         ...actionExpectation(),
       });
       if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
