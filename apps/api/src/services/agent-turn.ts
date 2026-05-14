@@ -36,7 +36,7 @@ export function buildRunAgentTurn(): (
       agentId: input.agentId,
       timeoutMs: agentTimeoutMs,
       body: {
-        messages: [{ role: "user", content: input.prompt }],
+        messages: input.messages ?? [{ role: "user", content: input.prompt }],
         temperature: 0.2,
         maxOutputTokens: 256,
         // Game-service always builds and passes a tools manifest in

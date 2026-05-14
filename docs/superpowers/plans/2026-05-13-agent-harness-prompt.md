@@ -8,6 +8,8 @@
 
 **Tech Stack:** TypeScript, Vitest, existing `@werewolf/shared`, existing `@werewolf/engine`, existing `@werewolf/agent-client` tool declarations.
 
+**Prompt Content Direction:** Mirror `wolfcha`'s gameplay strategy, sectioning, and table-talk tone as closely as possible while using original wording in this codebase. The harness flow is redesigned for the API runtime; the prompt semantics should feel like `wolfcha`.
+
 ---
 
 ## File Structure

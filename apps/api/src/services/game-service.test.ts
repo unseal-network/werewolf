@@ -1016,6 +1016,161 @@ describe("InMemoryGameService rules", () => {
     expect(turnEvent!.seq).toBeGreaterThan(speechEvent!.seq);
   });
 
+  it("sends phase-aware harness messages to agent turns", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      return {
+        text: "我先给一个明确判断，2号目前偏好。",
+        toolName: "saySpeech",
+        input: { speech: "我先给一个明确判断，2号目前偏好。" },
+      };
+    });
+
+    expect(capturedInputs).toHaveLength(1);
+    expect(capturedInputs[0]!.messages).toEqual([
+      { role: "system", content: expect.stringContaining("白天讨论环节") },
+      { role: "user", content: expect.stringContaining("<speaking_order>") },
+    ]);
+    expect(capturedInputs[0]!.messages![0]!.content).toContain("返回 JSON 字符串数组");
+    expect(capturedInputs[0]!.messages![1]!.content).toContain("轮到你发言，返回JSON数组");
+    expect(capturedInputs[0]!.prompt).toContain("白天讨论环节");
+  });
+
+  it("does not derive the agent seer task target from hidden wolf identity", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const seer = room.privateStates.find((state) => state.role === "seer")!;
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const seerPlayer = room.players.find((player) => player.id === seer.playerId)!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    seerPlayer.kind = "agent";
+    seerPlayer.agentId = "@seer-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_seer",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      return { text: "pass", toolName: "passAction", input: {} };
+    });
+
+    const promptText = capturedInputs
+      .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
+      .join("\n");
+    expect(promptText).toContain(
+      `${wolf.playerId}(座位${wolfPlayer.seatNo} ${wolfPlayer.displayName})`
+    );
+    expect(promptText).not.toContain(`Use seerInspect on ${wolfPlayer.displayName}`);
+    expect(promptText).not.toContain("角色：狼人");
+  });
+
+  it("does not derive agent wolf kill targets from hidden good-team identity", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    wolfPlayer.kind = "agent";
+    wolfPlayer.agentId = "@wolf-agent:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      if (input.tools && "saySpeech" in input.tools) {
+        return {
+          text: "private speech",
+          toolName: "saySpeech",
+          input: { speech: "今晚先看发言和站边。" },
+        };
+      }
+      return { text: "pass", toolName: "passAction", input: {} };
+    });
+
+    const wolfKillPrompt = capturedInputs.find(
+      (input) => input.tools && "wolfKill" in input.tools
+    );
+    const promptText = wolfKillPrompt
+      ? (wolfKillPrompt.messages?.map((message) => message.content).join("\n") ??
+        wolfKillPrompt.prompt)
+      : "";
+    expect(wolfKillPrompt).toBeDefined();
+    expect(promptText).not.toContain("Suggested target");
+  });
+
+  it("does not derive public voting task targets from hidden wolf identity", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf")!;
+    const villager = room.privateStates.find((state) => state.role === "villager")!;
+    const wolfPlayer = room.players.find((player) => player.id === wolf.playerId)!;
+    const villagerPlayer = room.players.find(
+      (player) => player.id === villager.playerId
+    )!;
+    const capturedInputs: RuntimeAgentTurnInput[] = [];
+
+    villagerPlayer.kind = "agent";
+    villagerPlayer.agentId = "@villager-agent:example.com";
+    room.privateStates = room.privateStates.map((state) => ({
+      ...state,
+      alive: state.playerId === villagerPlayer.id || state.playerId === wolfPlayer.id,
+    }));
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+      alivePlayerIds: [villagerPlayer.id, wolfPlayer.id],
+    };
+    room.pendingVotes = [];
+
+    await games.advanceGame(gameRoomId, async (input) => {
+      capturedInputs.push(input);
+      return {
+        text: "vote",
+        toolName: "submitVote",
+        input: { targetPlayerId: wolfPlayer.id },
+      };
+    });
+
+    const promptText = capturedInputs
+      .flatMap((input) => input.messages?.map((message) => message.content) ?? [input.prompt])
+      .join("\n");
+    expect(promptText).toContain(
+      `${wolfPlayer.id}(座位${wolfPlayer.seatNo} ${wolfPlayer.displayName})`
+    );
+    expect(promptText).not.toContain(`Use submitVote on ${wolfPlayer.displayName}`);
+    expect(promptText).not.toContain("角色：狼人");
+  });
+
   it("scheduleAdvance advances an agent speaker immediately before the speech deadline", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
@@ -1113,6 +1268,76 @@ describe("InMemoryGameService rules", () => {
         subjectId: humanSpeaker.id,
       })
     );
+  });
+
+  it("does not treat raw agent text as a completed saySpeech tool call", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const speak = vi.fn();
+
+    games.setVoiceAgents({
+      get: () => ({ speak }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "raw text that did not come from saySpeech",
+      input: {},
+    }));
+
+    const speechEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+      );
+    expect(speak).not.toHaveBeenCalled();
+    expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+    expect(speechEvent?.payload.speech).toBe(
+      `${agentSpeaker.displayName} did not provide a valid speech.`
+    );
+  });
+
+  it("does not assign a deadline to an agent speech turn", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const humanSpeaker = room.players[0]!;
+    const agentSpeaker = room.players[1]!;
+
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: humanSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [humanSpeaker.id, agentSpeaker.id];
+
+    await games.submitAction(gameRoomId, humanSpeaker.id, {
+      kind: "speech",
+      speech: "我先说完，交给下一位。",
+    });
+
+    const turnEvent = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "turn_started" && event.subjectId === agentSpeaker.id
+      );
+    expect(room.projection.currentSpeakerPlayerId).toBe(agentSpeaker.id);
+    expect(room.projection.deadlineAt).toBeNull();
+    expect(turnEvent?.payload.deadlineAt).toBeNull();
   });
 
   it("starts the next human speaker deadline after agent TTS completes", async () => {

@@ -16,7 +16,7 @@ import {
   type RoomProjection,
 } from "@werewolf/engine";
 import { buildAgentTurnTools } from "@werewolf/agent-client";
-import { buildAgentContext } from "./agent-context";
+import { buildAgentPrompt } from "./agent-harness";
 import type { SseBroker } from "./sse-broker";
 import type { VoiceAgentRegistry } from "./voice-agent";
 import type { GameStore } from "./game-store";
@@ -70,6 +70,7 @@ export interface RuntimeAgentTurnInput {
   role: Role;
   phase: GamePhase;
   prompt: string;
+  messages?: Array<{ role: "system" | "user"; content: string }>;
   tools: Record<string, unknown>;
 }
 
@@ -1206,16 +1207,12 @@ export class InMemoryGameService {
             });
           }
         } else {
-          const target = this.findRolePlayer(room, "seer");
-          const targetPlayer = target ? room.players.find((p) => p.id === target.playerId) : undefined;
           await this.runNightAgentAction(
             room,
             guard.playerId,
             runAgentTurn,
             now,
-            targetPlayer
-              ? `Use guardProtect on ${targetPlayer.displayName} (seat ${targetPlayer.seatNo}). You must respond by calling one tool.`
-              : "Use passAction. You must respond by calling one tool."
+            ""
           );
         }
       } else if (!this.advanceAfterAbsentNightActor(room, "night_wolf", now)) {
@@ -1363,16 +1360,12 @@ export class InMemoryGameService {
             });
           }
         } else {
-          const wolf = this.findRolePlayer(room, "werewolf");
-          const wolfPlayer = wolf ? room.players.find((p) => p.id === wolf.playerId) : undefined;
           await this.runNightAgentAction(
             room,
             seer.playerId,
             runAgentTurn,
             now,
-            wolfPlayer
-              ? `Use seerInspect on ${wolfPlayer.displayName} (seat ${wolfPlayer.seatNo}). You must respond by calling one tool.`
-              : "Use passAction. You must respond by calling one tool."
+            ""
           );
         }
       } else if (
@@ -1642,12 +1635,21 @@ export class InMemoryGameService {
     room.projection = {
       ...room.projection,
       currentSpeakerPlayerId,
-      deadlineAt: currentSpeakerPlayerId
-        ? new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString()
-        : null,
+      deadlineAt: this.deadlineForSpeechSpeaker(room, currentSpeakerPlayerId, now),
       version: room.events.length + 1,
     };
     this.emitSpeechTurnStarted(room, previousSpeakerPlayerId, now);
+  }
+
+  private deadlineForSpeechSpeaker(
+    room: StoredGameRoom,
+    playerId: string | null,
+    now: Date
+  ): string | null {
+    if (!playerId) return null;
+    const player = this.requirePlayer(room, playerId);
+    if (player.kind !== "user") return null;
+    return new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString();
   }
 
   private deadlineForPhase(
@@ -1825,7 +1827,7 @@ export class InMemoryGameService {
       const player = this.requirePlayer(room, playerId);
       const state = this.requirePrivateState(room, playerId);
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: `${this.languageInstruction(room)} You are ${player.displayName}, a werewolf. Speak briefly to your wolf teammates about tonight's kill target before the team acts.`,
+        prompt: "",
         tools: {
           saySpeech: {
             description: "Say a private speech to the wolf team.",
@@ -1877,12 +1879,6 @@ export class InMemoryGameService {
     const votes: Array<{ actorPlayerId: string; targetPlayerId: string }> = [
       ...existingVotes,
     ];
-    const fallbackTarget = room.privateStates.find(
-      (state) => state.team === "good" && state.alive
-    );
-    if (!fallbackTarget) throw new AppError("conflict", "No wolf target", 409);
-    const fallbackTargetPlayer = room.players.find((p) => p.id === fallbackTarget.playerId);
-
     for (const playerId of wolfPlayerIds) {
       // Skip wolves that already voted (human wolves who submitted their target)
       const alreadyVoted = votes.some((v) => v.actorPlayerId === playerId);
@@ -1898,11 +1894,8 @@ export class InMemoryGameService {
       }
 
       const state = this.requirePrivateState(room, playerId);
-      const fallbackName = fallbackTargetPlayer
-        ? `${fallbackTargetPlayer.displayName} (seat ${fallbackTargetPlayer.seatNo})`
-        : fallbackTarget.playerId;
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: `${this.languageInstruction(room)} Wolf team voting phase. Use wolfKill on the player you vote to kill tonight. Suggested target: ${fallbackName}.`,
+        prompt: "",
       });
       const targetPlayerId = stringValue(result.input?.targetPlayerId);
       if (
@@ -2015,18 +2008,13 @@ export class InMemoryGameService {
     playerId: string,
     runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
     now: Date,
-    instruction: string
+    _instruction: string
   ): Promise<void> {
     if (!room.projection) throw new Error("projection is required");
     const player = this.requirePlayer(room, playerId);
     const state = this.requirePrivateState(room, playerId);
     const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-      prompt: [
-        this.languageInstruction(room),
-        `You are ${player.displayName} in a Werewolf game.`,
-        `Your role is ${state.role}. Current phase is ${room.projection.phase}.`,
-        instruction,
-      ].join(" "),
+      prompt: "",
     });
     const action = this.nightActionFromTool(room, playerId, result);
     this.recordNightAction(room, action);
@@ -2108,10 +2096,6 @@ export class InMemoryGameService {
   ): Promise<Array<{ actorPlayerId: string; targetPlayerId: string }> | null> {
     if (!room.projection) throw new Error("projection is required");
     const allowedTargets = allowedTargetPlayerIds ?? room.projection.alivePlayerIds;
-    const wolf = room.privateStates.find(
-      (state) => state.role === "werewolf" && state.alive
-    );
-
     for (const playerId of room.projection.alivePlayerIds) {
       const alreadyVoted = room.pendingVotes.some((v) => v.actorPlayerId === playerId);
       if (alreadyVoted) continue;
@@ -2126,31 +2110,8 @@ export class InMemoryGameService {
       }
 
       const state = this.requirePrivateState(room, playerId);
-      const suggestedTargetId =
-        wolf && state.role !== "werewolf" && allowedTargets.includes(wolf.playerId)
-          ? wolf.playerId
-          : allowedTargets.find((candidate) => candidate !== playerId) ??
-            allowedTargets[0];
-      if (!suggestedTargetId) continue;
-      const suggestedTargetPlayer = room.players.find((p) => p.id === suggestedTargetId);
-      const suggestedTargetName = suggestedTargetPlayer
-        ? `${suggestedTargetPlayer.displayName} (seat ${suggestedTargetPlayer.seatNo})`
-        : suggestedTargetId;
-      const allowedTargetNames = allowedTargets
-        .map((id) => {
-          const p = room.players.find((pl) => pl.id === id);
-          return p ? `${p.displayName} (seat ${p.seatNo})` : id;
-        })
-        .join(", ");
       const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-        prompt: [
-          `You are ${player.displayName} in a Werewolf game. Your role is ${state.role}.`,
-          this.languageInstruction(room),
-          room.projection.phase === "tie_vote"
-            ? `This is a tie revote. Allowed exile targets are: ${allowedTargetNames}.`
-            : `This is the public exile vote.`,
-          `Use submitVote on ${suggestedTargetName}. You must respond by calling one tool.`,
-        ].join(" "),
+        prompt: "",
       });
       const targetPlayerId = stringValue(result.input?.targetPlayerId);
       if (
@@ -2224,11 +2185,23 @@ export class InMemoryGameService {
         createdAt: now.toISOString(),
       },
     ]);
-    const context = buildAgentContext(room, player.id, state, {
-      maxSpeechHistory: 10,
-      includeVotes: true,
+    const tools =
+      "tools" in input && input.tools
+        ? input.tools
+        : buildAgentTurnTools({
+            phase: room.projection.phase,
+            role: state.role,
+            alivePlayerIds: room.projection.alivePlayerIds,
+            selfPlayerId: player.id,
+          });
+    const prompt = buildAgentPrompt({
+      room,
+      player,
+      state,
+      taskPrompt: input.prompt,
+      tools,
+      languageInstruction: this.languageInstruction(room),
     });
-    const fullPrompt = `${context}\n---\n${input.prompt}`;
 
     let output: RuntimeAgentTurnOutput;
     try {
@@ -2238,16 +2211,9 @@ export class InMemoryGameService {
         displayName: player.displayName,
         role: state.role,
         phase: room.projection.phase,
-        prompt: fullPrompt,
-        tools:
-          "tools" in input && input.tools
-            ? input.tools
-            : buildAgentTurnTools({
-                phase: room.projection.phase,
-                role: state.role,
-                alivePlayerIds: room.projection.alivePlayerIds,
-                selfPlayerId: player.id,
-              }),
+        prompt: prompt.textPrompt,
+        messages: prompt.messages,
+        tools,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -2325,9 +2291,14 @@ export class InMemoryGameService {
     }
 
     const result = await this.runAgentToolTurn(room, player, state, runAgentTurn, now, {
-      prompt: `${this.languageInstruction(room)} You are ${player.displayName} in a Werewolf game. Speak briefly for ${room.projection.phase}. Your role is ${state.role}.`,
+      prompt: "",
     });
-    const speech = stringValue(result.input?.speech) ?? result.text;
+    const toolSpeech =
+      result.toolName === "saySpeech"
+        ? stringValue(result.input?.speech)
+        : undefined;
+    const speech =
+      toolSpeech ?? `${player.displayName} did not provide a valid speech.`;
     // Synthesize agent speech via TTS and wait for the TTS WebSocket to finish
     // and for the generated PCM frames to be handed to LiveKit before rotating
     // to the next speaker.
@@ -2338,6 +2309,7 @@ export class InMemoryGameService {
     if (
       this.voiceAgents &&
       player.kind === "agent" &&
+      toolSpeech !== undefined &&
       speech.trim() &&
       !result.fallback
     ) {
@@ -2453,9 +2425,11 @@ export class InMemoryGameService {
       (candidate) => candidate !== completedPlayerId
     );
     const nextSpeakerPlayerId = room.speechQueue[0] ?? null;
-    const nextDeadlineAt = nextSpeakerPlayerId
-      ? new Date(now.getTime() + room.timing.speechSeconds * 1000).toISOString()
-      : room.projection.deadlineAt;
+    const nextDeadlineAt = this.deadlineForSpeechSpeaker(
+      room,
+      nextSpeakerPlayerId,
+      now
+    );
     room.projection = {
       ...room.projection,
       currentSpeakerPlayerId: nextSpeakerPlayerId,
