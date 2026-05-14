@@ -1628,10 +1628,16 @@ describe("InMemoryGameService rules", () => {
       (event) =>
         event.type === "speech_submitted" && event.actorId === agentSpeaker.id
     );
-    const lastDeltaIndex = room.events.findLastIndex(
-      (event) =>
-        event.type === "speech_transcript_delta" && event.actorId === agentSpeaker.id
-    );
+    const lastDeltaIndex =
+      room.events.length -
+      1 -
+      [...room.events]
+        .reverse()
+        .findIndex(
+          (event) =>
+            event.type === "speech_transcript_delta" &&
+            event.actorId === agentSpeaker.id
+        );
 
     expect(deltaEvents.length).toBeGreaterThanOrEqual(2);
     expect(deltaEvents[0]).toMatchObject({
