@@ -1,5 +1,5 @@
 import { serve } from "@hono/node-server";
-import { createDbClient } from "@werewolf/db";
+import { createDbClient, ensureDatabase } from "@werewolf/db";
 import { createApp } from "./app";
 import { InMemoryGameService } from "./services/game-service";
 import { GameStore } from "./services/game-store";
@@ -41,40 +41,44 @@ let tickWorker: TickWorker | null = null;
 let store: GameStore | null = null;
 let profileCache: DbMatrixProfileCache | null = null;
 if (databaseUrl) {
-  const { db, sql } = createDbClient(databaseUrl);
-  store = new GameStore(db);
-  profileCache = new DbMatrixProfileCache(db);
-  games.setStore(store);
-  pgSql = sql;
+  // 确保数据库存在并应用所有 pending migrations，再启动业务逻辑
+  void ensureDatabase(databaseUrl)
+    .then(() => {
+      const { db, sql } = createDbClient(databaseUrl);
+      store = new GameStore(db);
+      profileCache = new DbMatrixProfileCache(db);
+      games.setStore(store);
+      pgSql = sql;
 
-  // Hydrate any active games from DB into the in-memory cache, then start
-  // the tick worker. This is what makes "kill API, restart, game continues"
-  // actually work: rooms whose `next_tick_at` has passed get picked up by
-  // the very first tick after startup.
-  const activeStore = store;
-  void games
-    .hydrateFromStore()
-    .then((roomIds) => {
-      if (roomIds.length > 0) {
-        console.log(
-          `[Startup] hydrated ${roomIds.length} rooms from store: ${roomIds.join(", ")}`
-        );
-      }
-      tickWorker = new TickWorker(activeStore, games);
-      tickWorker.start();
-      for (const roomId of roomIds) {
-        const room = games.snapshot(roomId);
-        if (room.status === "active") {
-          void games
-            .scheduleAdvance(roomId)
-            .catch((err) =>
-              console.error(`[Startup] scheduleAdvance(${roomId}) failed:`, err)
+      // Hydrate any active games from DB into the in-memory cache, then start
+      // the tick worker. This is what makes "kill API, restart, game continues"
+      // actually work: rooms whose `next_tick_at` has passed get picked up by
+      // the very first tick after startup.
+      const activeStore = store;
+      return games
+        .hydrateFromStore()
+        .then((roomIds) => {
+          if (roomIds.length > 0) {
+            console.log(
+              `[Startup] hydrated ${roomIds.length} rooms from store: ${roomIds.join(", ")}`
             );
-        }
-      }
+          }
+          tickWorker = new TickWorker(activeStore, games);
+          tickWorker.start();
+          for (const roomId of roomIds) {
+            const room = games.snapshot(roomId);
+            if (room.status === "active") {
+              void games
+                .scheduleAdvance(roomId)
+                .catch((err) =>
+                  console.error(`[Startup] scheduleAdvance(${roomId}) failed:`, err)
+                );
+            }
+          }
+        });
     })
     .catch((err) => {
-      console.error("[Startup] hydrateFromStore failed — running in-memory only:", err);
+      console.error("[Startup] DB init failed — running in-memory only:", err);
     });
 } else {
   console.warn("[Startup] DATABASE_URL not set — running in-memory only, state will be lost on restart");
