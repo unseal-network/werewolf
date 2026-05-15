@@ -1,0 +1,139 @@
+/* Component: realtime center information for speeches, votes, and notices. */
+.game-layout-root .center-live-block {
+  min-height: 0;
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(226, 210, 164, 0.22);
+  overflow: hidden;
+}
+
+.game-layout-root .center-vote-block,
+.game-layout-root .center-speech-block {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-layout-root .center-live-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(246, 240, 220, 0.72);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.game-layout-root .center-live-heading b {
+  color: #f6d783;
+  font-size: 12px;
+}
+
+.game-layout-root .center-vote-groups {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+  padding-right: 2px;
+  max-height: min(25dvh, 290px);
+  overflow: auto;
+}
+
+.game-layout-root .center-vote-group {
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid rgba(226, 210, 164, 0.20);
+  border-radius: 10px;
+  background: rgba(3, 9, 11, 0.34);
+  text-align: left;
+}
+
+.game-layout-root .center-vote-target {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+}
+
+.game-layout-root .center-vote-target span,
+.game-layout-root .center-vote-target em {
+  color: rgba(246, 240, 220, 0.66);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.game-layout-root .center-vote-target strong {
+  min-width: 0;
+  overflow: hidden;
+  color: #fff6d6;
+  font-size: 12px;
+  font-weight: 950;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-layout-root .center-voter-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.game-layout-root .center-mini-avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid rgba(226, 210, 164, 0.42);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(255, 255, 255, 0.12), transparent 34%),
+    var(--center-avatar-bg, rgba(18, 31, 34, 0.94));
+  color: var(--center-avatar-fg, #f6f0dc);
+  font-size: 10px;
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.36);
+}
+
+.game-layout-root .center-speaker-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  margin-top: 7px;
+  color: #fff6d6;
+  font-size: 12px;
+  font-weight: 900;
+  text-align: left;
+}
+
+.game-layout-root .center-speaker-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-layout-root .center-speech-text {
+  flex: 0 1 auto;
+  margin: 7px 0 0;
+  max-height: min(25dvh, 290px);
+  overflow: auto;
+  color: rgba(246, 240, 220, 0.84);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.game-layout-root .center-info-empty {
+  margin-top: 7px;
+  color: rgba(246, 240, 220, 0.52);
+  font-size: 11px;
+  font-weight: 750;
+}

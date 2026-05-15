@@ -1,0 +1,203 @@
+/* Component: player rail seats and avatar frames. */
+.game-layout-root .player-rail .seat {
+  box-sizing: border-box;
+  width: var(--layout-seat);
+  height: var(--layout-seat-slot);
+  min-width: 0;
+  aspect-ratio: auto !important;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  grid-template-rows: calc(var(--layout-avatar) * 1.4);
+  justify-items: center;
+  align-content: start;
+  gap: 2px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  outline: 0 !important;
+  filter: none;
+  opacity: 1;
+  transform: none !important;
+  transition: none;
+  pointer-events: auto;
+}
+
+.game-layout-root .player-rail .seat:hover,
+.game-layout-root .player-rail .seat:focus-visible,
+.game-layout-root .player-rail .seat-state-ready,
+.game-layout-root .player-rail .seat-state-ready:hover,
+.game-layout-root .player-rail .seat-state-ready:focus-visible,
+.game-layout-root .player-rail .seat-state-dead {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  outline: 0 !important;
+  opacity: 1;
+  transform: none !important;
+}
+
+.game-layout-root .player-rail .rail-seat-spacer {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.game-layout-root .player-rail .avatar {
+  position: relative;
+  width: var(--layout-avatar) !important;
+  height: var(--layout-avatar) !important;
+  margin-top: calc(var(--layout-avatar) * 0.2);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--seat-avatar-bg, #132426) 76%, white 16%),
+      color-mix(in srgb, var(--seat-avatar-bg, #132426) 88%, black 28%) 74%
+    ),
+    var(--seat-avatar-bg, rgba(18, 31, 34, 0.94));
+  color: var(--seat-avatar-fg, #f6f0dc);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.36);
+  overflow: visible;
+}
+
+.game-layout-root .player-rail .avatar::before {
+  content: "";
+  position: absolute;
+  inset: -20%;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--art-ring-normal) center / contain no-repeat;
+}
+
+.game-layout-root .player-rail .seat-avatar-img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-fit: cover;
+  object-position: 50% 30%;
+  clip-path: none;
+}
+
+.game-layout-root .player-rail .player-avatar-img {
+  object-position: center;
+}
+
+.game-layout-root .player-rail .role-avatar-img {
+  object-position: 50% 28%;
+}
+
+.game-layout-root .player-rail .avatar > span:first-child {
+  position: relative;
+  z-index: 2;
+  color: var(--seat-avatar-fg, #f6f0dc);
+  font-size: calc(var(--layout-avatar) * 0.46);
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+}
+
+.game-layout-root .player-rail .seat-state-ready .avatar::before,
+.game-layout-root .player-rail .seat-state-alive .avatar::before {
+  background-image: var(--art-ring-normal);
+  opacity: 1;
+}
+
+.game-layout-root .player-rail .seat-state-dead .seat-avatar-img,
+.game-layout-root .player-rail .seat-state-dead .avatar > span:first-child {
+  filter: grayscale(1) saturate(0) brightness(0.62) contrast(1.08) !important;
+}
+
+.game-layout-root .player-rail .seat-state-dead .avatar::before {
+  background-image: var(--art-ring-dead);
+  filter: none !important;
+  opacity: 1;
+}
+
+.game-layout-root .player-rail .seat-number-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  z-index: 5;
+  min-width: 18px !important;
+  height: 18px !important;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 244, 189, 0.32);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(74, 61, 43, 0.98), rgba(13, 12, 10, 0.96) 72%),
+    rgba(14, 12, 10, 0.96);
+  color: #fff4bd;
+  font-size: 10px !important;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.game-layout-root .player-rail .seat-name {
+  width: 22px;
+  height: 18px;
+  margin: 0;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  text-align: center;
+  white-space: nowrap;
+  color: #fff4bd;
+  font-size: 11px !important;
+  font-weight: 800;
+  line-height: 1 !important;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.72);
+}
+
+.game-layout-root .player-rail .seat-tooltip {
+  display: none !important;
+}
+/* Final rail transparency guard: no seat card or avatar glow may mask the
+   scene. Only the portrait circle, seat number, and text remain visible. */
+.game-layout-root .player-rail .seat,
+.game-layout-root .player-rail .seat:hover,
+.game-layout-root .player-rail .seat:focus-visible,
+.game-layout-root .player-rail .seat-state-ready,
+.game-layout-root .player-rail .seat-state-dead {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  outline: 0 !important;
+  filter: none !important;
+}
+
+.game-layout-root .player-rail .avatar {
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.game-layout-root .player-rail .avatar::after {
+  display: none !important;
+  content: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+.game-layout-root .player-rail .seat-state-dead .avatar {
+  box-shadow: none !important;
+}

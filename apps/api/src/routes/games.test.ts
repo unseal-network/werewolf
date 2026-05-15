@@ -179,6 +179,38 @@ describe("games API", () => {
     expect(body.card.targetPlayerCount).toBe(6);
   });
 
+  it("issues LiveKit tokens with Matrix user id as participant identity", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    const player = deps.games.join(
+      room.id,
+      "@alice:example.com",
+      "Alice",
+      undefined,
+      1
+    );
+
+    const response = await app.request(`/games/${room.id}/livekit-token`, {
+      method: "POST",
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.identity).toBe("@alice:example.com");
+    expect(body.identity).not.toBe(player.id);
+    expect(body.canPublish).toBe(true);
+  });
+
   it("downloads a visible transcript event by id", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);
@@ -274,6 +306,153 @@ describe("games API", () => {
         error: "expectedDay must be a positive integer",
       })
     );
+  });
+
+  it("accepts Matrix user id as the action target at the API boundary", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    const alice = deps.games.join(
+      room.id,
+      "@alice:example.com",
+      "Alice",
+      undefined,
+      1
+    );
+    const bob = deps.games.join(room.id, "@bob:example.com", "Bob", undefined, 2);
+    for (const [userId, name] of [
+      ["@cara:example.com", "Cara"],
+      ["@dan:example.com", "Dan"],
+      ["@erin:example.com", "Erin"],
+      ["@finn:example.com", "Finn"],
+    ] as const) {
+      deps.games.join(room.id, userId, name);
+    }
+    deps.games.start(room.id, "@alice:example.com");
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+    };
+    room.pendingVotes = [];
+
+    const response = await app.request(`/games/${room.id}/actions`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        kind: "vote",
+        targetMatrixUserId: "@bob:example.com",
+        expectedPhase: "day_vote",
+        expectedDay: room.projection.day,
+        expectedVersion: room.projection.version,
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.event).toMatchObject({
+      actorId: alice.id,
+      subjectId: bob.id,
+      payload: expect.objectContaining({ targetPlayerId: bob.id }),
+    });
+  });
+
+  it("rejects internal player id as an action target at the API boundary", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+    const bob = deps.games.join(room.id, "@bob:example.com", "Bob", undefined, 2);
+    for (const [userId, name] of [
+      ["@cara:example.com", "Cara"],
+      ["@dan:example.com", "Dan"],
+      ["@erin:example.com", "Erin"],
+      ["@finn:example.com", "Finn"],
+    ] as const) {
+      deps.games.join(room.id, userId, name);
+    }
+    deps.games.start(room.id, "@alice:example.com");
+    room.projection = {
+      ...room.projection!,
+      phase: "day_vote",
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 30_000).toISOString(),
+    };
+
+    const response = await app.request(`/games/${room.id}/actions`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        kind: "vote",
+        targetPlayerId: bob.id,
+        expectedPhase: "day_vote",
+        expectedDay: room.projection.day,
+        expectedVersion: room.projection.version,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual(
+      expect.objectContaining({
+        code: "invalid_action",
+        error: "targetMatrixUserId is required",
+      })
+    );
+  });
+
+  it("removes players by Matrix user id at the API boundary", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+    const bob = deps.games.join(room.id, "@bob:example.com", "Bob", undefined, 2);
+
+    const response = await app.request(
+      `/games/${room.id}/players/${encodeURIComponent("@bob:example.com")}`,
+      {
+        method: "DELETE",
+        headers: { authorization: "Bearer matrix-token-alice" },
+      }
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.player).toMatchObject({
+      id: bob.id,
+      userId: "@bob:example.com",
+      leftAt: expect.any(String),
+    });
   });
 
   it("lets non-creators add agents to the waiting room with Matrix avatar data", async () => {

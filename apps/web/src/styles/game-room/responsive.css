@@ -1,0 +1,160 @@
+/* Responsive rules for the region-based game room layout. */
+@media (max-width: 720px) {
+  html:has(.game-layout-root),
+  body:has(.game-layout-root),
+  html:has(.game-layout-root) #root {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  body:has(.game-layout-root) {
+    position: fixed;
+    inset: 0;
+  }
+
+  .game-layout-root {
+    --layout-edge: clamp(8px, 2.8vw, 14px);
+    --layout-seat: clamp(48px, 13vw, 56px);
+    --layout-avatar: calc(var(--layout-seat) * 0.72);
+    --layout-seat-slot: calc(var(--layout-avatar) * 1.55 + 10px);
+    --layout-rail-height: min(72dvh, calc(100dvh - 190px));
+    --layout-action-width: min(300px, calc(100vw - 96px));
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .game-layout-root .game-ui-layout {
+    height: 100dvh;
+    overflow: hidden;
+    grid-template-areas:
+      "hud"
+      "table"
+      "utility";
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 7px;
+    padding-bottom: calc(var(--layout-safe-bottom) + 10px);
+  }
+
+  .game-layout-root .hud-region {
+    grid-template-columns: 40px 38px minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+
+  .game-layout-root .hud-back-button,
+  .game-layout-root .hud-phase-token,
+  .game-layout-root .hud-countdown,
+  .game-layout-root .hud-alive-count {
+    height: 34px;
+  }
+
+  .game-layout-root .hud-back-button {
+    width: 40px;
+  }
+
+  .game-layout-root .hud-phase-token {
+    width: 38px;
+  }
+
+  .game-layout-root .hud-phase-line {
+    font-size: 17px;
+  }
+
+  .game-layout-root .hud-room-title,
+  .game-layout-root .hud-room-source {
+    font-size: 11px;
+  }
+
+  .game-layout-root .hud-metrics {
+    grid-auto-flow: row;
+    gap: 4px;
+  }
+
+  .game-layout-root .hud-countdown,
+  .game-layout-root .hud-alive-count {
+    min-width: 42px;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .game-layout-root .table-region {
+    grid-template-columns: var(--layout-seat) minmax(0, 1fr) var(--layout-seat);
+    column-gap: 6px;
+  }
+
+  .game-layout-root .player-rail {
+    grid-auto-rows: var(--layout-seat-slot);
+    height: var(--layout-rail-height);
+    max-height: none;
+  }
+
+  .game-layout-root .player-rail .seat {
+    height: var(--layout-seat-slot);
+  }
+
+  .game-layout-root .player-rail .seat-number-badge {
+    min-width: 16px !important;
+    height: 16px !important;
+    font-size: 8px !important;
+  }
+
+  .game-layout-root .center-info-region {
+    width: min(220px, 100%);
+    margin-top: clamp(18px, 7vh, 56px);
+  }
+
+  .game-layout-root .center-info-panel {
+    max-height: min(38dvh, 360px);
+    padding: 7px 9px;
+  }
+
+  .game-layout-root .center-info-title {
+    font-size: 15px;
+  }
+
+  .game-layout-root .center-info-meta {
+    font-size: 11px;
+  }
+
+  .game-layout-root .action-region .phase-card:not(.action-bubble) {
+    max-height: 28dvh;
+    overflow: auto;
+  }
+
+  .game-layout-root .action-region {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--layout-safe-bottom) + 82px);
+    z-index: 20;
+    width: var(--layout-action-width);
+    min-height: 0;
+    transform: translateX(-50%);
+  }
+
+  .game-layout-root .action-region .phase-card,
+  .game-layout-root .action-region .phase-card.action-bubble {
+    background: transparent;
+  }
+
+  .game-layout-root .action-region .stage-start,
+  .game-layout-root .action-region .stage-confirm,
+  .game-layout-root .action-region .stage-skip,
+  .game-layout-root .action-region .player-picker-action {
+    max-width: 100%;
+  }
+
+  .game-layout-root .utility-region {
+    min-height: 64px;
+  }
+
+  .game-layout-root .utility-region .role-card-entry {
+    width: 48px !important;
+    height: 68px !important;
+  }
+}

@@ -1,0 +1,93 @@
+/* Component: central action region. */
+.game-layout-root .action-region {
+  grid-area: action;
+  z-index: 6;
+  width: var(--layout-action-width);
+  min-height: 42px;
+  justify-self: center;
+  display: grid;
+  place-items: center;
+  justify-items: center;
+}
+
+.game-layout-root .action-region .phase-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(4, 10, 12, 0.24);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.game-layout-root .action-region .action-bubble-panel,
+.game-layout-root .action-region .target-row,
+.game-layout-root .action-region .action-control-stack,
+.game-layout-root .action-region .player-picker,
+.game-layout-root .action-region .player-picker-control-slot,
+.game-layout-root .action-region .player-picker-action-slot,
+.game-layout-root .action-region .binary-action {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  justify-self: center;
+  margin-inline: auto;
+}
+
+.game-layout-root .action-region .target-row,
+.game-layout-root .action-region .action-control-stack,
+.game-layout-root .action-region .binary-action {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+}
+
+.game-layout-root .action-region .action-mode-switch {
+  width: min(100%, 360px);
+  justify-self: center;
+  margin-inline: auto;
+}
+
+.game-layout-root .action-region .player-picker {
+  width: min(100%, 320px);
+}
+
+.game-layout-root .action-region .player-picker-control-slot {
+  display: grid;
+  place-items: center;
+}
+
+.game-layout-root .action-region .stage-action-button,
+.game-layout-root .action-region .player-picker-action {
+  justify-self: center;
+}
+
+.game-layout-root .action-region .phase-card::before,
+.game-layout-root .action-region .phase-card::after {
+  display: none !important;
+}
+
+.game-layout-root .action-region .phase-card.action-bubble {
+  width: 100%;
+  min-width: 0;
+  background: rgba(4, 10, 12, 0.22);
+}
+
+.game-layout-root .action-region .phase-card.action-bubble.is-collapsed {
+  display: none !important;
+  min-height: 0;
+}
+
+.game-layout-root .action-region .action-bubble-trigger,
+.game-layout-root .action-region .action-bubble-grip,
+.game-layout-root .action-region .action-bubble-label {
+  display: none !important;
+}
+
+.game-layout-root .action-region .stage-start,
+.game-layout-root .action-region .stage-confirm,
+.game-layout-root .action-region .stage-skip,
+.game-layout-root .action-region .target-chip {
+  border-radius: 999px;
+}

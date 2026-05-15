@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { Buffer } from "node:buffer";
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
 import { AppError } from "@werewolf/shared";
 import {
@@ -47,9 +46,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         (p) => p.userId === user.id && !p.leftAt
       );
       const isPlayer = Boolean(player);
-      const identity =
-        player?.id ??
-        `spectator_${Buffer.from(user.id).toString("base64url")}`;
+      const identity = user.id;
 
       const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
         identity,
