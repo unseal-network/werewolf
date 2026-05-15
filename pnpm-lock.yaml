@@ -122,6 +122,12 @@ importers:
       '@tanstack/react-router':
         specifier: ^1.140.0
         version: 1.169.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@unseal-network/game-sdk':
+        specifier: ^0.0.10
+        version: 0.0.10(@unseal-network/mobile-sdk@0.0.1)
+      '@unseal-network/mobile-sdk':
+        specifier: ^0.0.1
+        version: 0.0.1
       '@vitejs/plugin-react':
         specifier: ^5.0.0
         version: 5.2.0(vite@7.3.3(@types/node@22.19.18)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0))
@@ -1132,6 +1138,14 @@ packages:
 
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
+  '@unseal-network/game-sdk@0.0.10':
+    resolution: {integrity: sha512-7aRsHl4xYugPTPfKZpw/QouxnWvEnaHtqDHL/zK3fGV5xxIRi+FF1uIJG1utgqX9a4pZnqHxOXyN+GqRSb/kuQ==, tarball: https://npm.pkg.github.com/download/@unseal-network/game-sdk/0.0.10/824d3dbbeb65f198338ac4ac6b77f5d8a2d71c0d}
+    peerDependencies:
+      '@unseal-network/mobile-sdk': '>=0.0.1'
+
+  '@unseal-network/mobile-sdk@0.0.1':
+    resolution: {integrity: sha512-HlMO2BrF7oZpfobpmNuLuJiBQKwZYSVa5ynS+BBPCn7YOLba0zuSSsTeYVX8jDFfCXq3AQfhJmdBCxWYoFt8ug==, tarball: https://npm.pkg.github.com/download/@unseal-network/mobile-sdk/0.0.1/e2d181e77d55d1c9a788bc4340db69c37a1a2f1f}
 
   '@vitejs/plugin-react@5.2.0':
     resolution: {integrity: sha512-YmKkfhOAi3wsB1PhJq5Scj3GXMn3WvtQ/JC0xoopuHoXSdmtdStOpFrYaT1kie2YgFBcIe64ROzMYRjCrYOdYw==}
@@ -2542,6 +2556,12 @@ snapshots:
   '@types/ws@8.18.1':
     dependencies:
       '@types/node': 22.19.18
+
+  '@unseal-network/game-sdk@0.0.10(@unseal-network/mobile-sdk@0.0.1)':
+    dependencies:
+      '@unseal-network/mobile-sdk': 0.0.1
+
+  '@unseal-network/mobile-sdk@0.0.1': {}
 
   '@vitejs/plugin-react@5.2.0(vite@7.3.3(@types/node@22.19.18)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.21.0))':
     dependencies:

@@ -5,6 +5,7 @@ import { CreateGamePage } from "./routes/create";
 import { GameRoomPage } from "./routes/game.$gameRoomId";
 import { AnimationDemoPage } from "./routes/animation-demo";
 import { UserSelectPage } from "./routes/user-select";
+import { LoadingPage } from "./components/LoadingPage";
 import { I18nProvider } from "./i18n/I18nProvider";
 import {
   SOURCE_ROOM_STORAGE_KEY,
@@ -48,6 +49,7 @@ function App() {
   const [hostBootstrap, setHostBootstrap] = useState<HostBootstrapState>(
     () => (hostRuntime ? { status: "checking" } : { status: "idle" })
   );
+  const [isAdmin, setIsAdmin] = useState(false);
   const hostSessionRef = useRef<HostSession | undefined>(undefined);
 
   useEffect(() => {
@@ -120,6 +122,10 @@ function App() {
           localStorage.setItem(SOURCE_ROOM_STORAGE_KEY, hostRoomId);
         }
 
+        // Persist admin status for LoadingPage
+        const admin = (info.powerLevel ?? 0) >= 100;
+        setIsAdmin(admin);
+
         let linkRoomId = info.linkRoomId ?? null;
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
@@ -152,7 +158,7 @@ function App() {
           hostRoomId,
           hostLinkRoomId: linkRoomId,
           isHostRuntime: true,
-          isAdmin: (info.powerLevel ?? 0) >= 100,
+          isAdmin: admin,
         });
 
         if (decision.kind === "resume") {
@@ -188,35 +194,48 @@ function App() {
     };
   }, [hostRuntime]);
 
+  // ── Loading states (host runtime only) ──────────────────────────────────
+
   if (hostRuntime && hostBootstrap.status === "checking") {
-    return <div className="fixed inset-x-0 top-0 h-0.5 bg-[#7c3aed] animate-pulse" aria-live="polite" />;
+    return <LoadingPage isAdmin={isAdmin} />;
   }
 
   if (hostRuntime && hostBootstrap.status === "waiting") {
     return (
-      <section className="min-h-screen bg-[#07041a] flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white/[0.04] border border-white/[0.08] rounded-2xl p-8">
-          <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 text-center">
-            等待房主创建并绑定游戏房间...
-          </p>
-        </div>
-      </section>
+      <LoadingPage
+        isAdmin={isAdmin}
+        error="等待房主创建并绑定游戏房间..."
+      />
     );
   }
 
   if (hostRuntime && hostBootstrap.status === "error") {
-    return <CreateGamePage initialError={hostBootstrap.message} />;
+    return (
+      <LoadingPage
+        isAdmin={isAdmin}
+        error={hostBootstrap.message}
+        onRetry={() => window.location.reload()}
+      />
+    );
   }
+
+  // ── Non-host runtime: user selection ────────────────────────────────────
 
   if (!hostRuntime && (forceChooseUser || !hasStoredMatrixSession())) {
     return <UserSelectPage />;
   }
 
+  // ── Game room ────────────────────────────────────────────────────────────
+
   if (gameRoomId) {
     return <GameRoomPage gameRoomId={gameRoomId} />;
   }
+
+  // ── Create game ──────────────────────────────────────────────────────────
+
   const hostSession =
     hostBootstrap.status === "ready" ? hostBootstrap.session : undefined;
+
   return (
     <CreateGamePage
       onGameCreated={async (createdGameRoomId) => {
@@ -232,6 +251,7 @@ function App() {
           );
         }
       }}
+      onLeave={() => hostSession?.bridge.hideApp?.()}
     />
   );
 }
