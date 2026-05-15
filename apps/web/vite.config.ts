@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 function normalizeBasePath(value: string | undefined): string {
   const raw = value?.trim() || "/";
@@ -9,7 +10,7 @@ function normalizeBasePath(value: string | undefined): string {
 
 export default defineConfig({
   base: normalizeBasePath(process.env.VITE_APP_BASE_PATH ?? process.env.BASE_PATH),
-  plugins: [react()],
+  plugins: [tailwindcss(), react()],
   server: {
     allowedHosts: ["keepsecret.io"],
     hmr: process.env.VITE_HMR_HOST

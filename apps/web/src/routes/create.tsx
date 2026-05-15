@@ -53,21 +53,32 @@ function FormSelect({
   }, [open]);
 
   return (
-    <div
-      ref={rootRef}
-      className={`form-select ${open ? "open" : ""}`}
-      data-open={open ? "true" : "false"}
-    >
+    <div ref={rootRef} className="relative w-full min-w-0">
       <button
         type="button"
-        className="form-select-trigger"
+        className="flex items-center justify-between w-full min-h-[50px] px-3.5 rounded-[9px] text-[#141722] text-base transition-colors"
+        style={{
+          border: `1px solid ${open ? "rgba(212,177,92,0.55)" : "rgba(223,189,103,0.28)"}`,
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,242,247,0.98))",
+          boxShadow: open
+            ? "0 0 0 4px rgba(212,177,92,0.13)"
+            : undefined,
+        }}
         onClick={() => setOpen((current) => !current)}
         aria-haspopup="listbox"
         aria-expanded={open}
       >
-        <span className="form-select-value">{selected?.label ?? ""}</span>
-        <span className="form-select-chevron" aria-hidden>
-          <svg viewBox="0 0 16 16" focusable="false">
+        <span className="truncate text-left">{selected?.label ?? ""}</span>
+        <span
+          className="ml-3 flex-none w-4.5 h-4.5 transition-transform duration-180"
+          style={{
+            color: open ? "#d4b15c" : "#4d556a",
+            transform: open ? "rotate(180deg)" : undefined,
+          }}
+          aria-hidden
+        >
+          <svg viewBox="0 0 16 16" focusable="false" style={{ display: "block", width: "100%", height: "100%" }}>
             <path
               d="M3.5 5.75 8 10.25l4.5-4.5"
               fill="none"
@@ -79,7 +90,25 @@ function FormSelect({
           </svg>
         </span>
       </button>
-      <div className="form-select-menu" role="listbox" aria-hidden={!open}>
+      {/* Dropdown menu — animate with opacity+transform */}
+      <div
+        className="absolute z-50 top-full left-0 right-0 mt-2 rounded-xl overflow-auto p-2 flex flex-col gap-1 transition-all duration-150 origin-top"
+        role="listbox"
+        aria-hidden={!open}
+        style={{
+          maxHeight: "min(310px, 45vh)",
+          border: "1px solid rgba(212,177,92,0.22)",
+          background:
+            "linear-gradient(180deg, rgba(36,38,51,0.96), rgba(22,24,35,0.98))",
+          boxShadow:
+            "0 20px 42px rgba(0,0,0,0.28), inset 0 0 0 1px rgba(255,255,255,0.04)",
+          backdropFilter: "blur(18px) saturate(1.08)",
+          WebkitBackdropFilter: "blur(18px) saturate(1.08)",
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? "auto" : "none",
+          transform: open ? "translateY(0) scale(1)" : "translateY(-4px) scale(0.98)",
+        }}
+      >
         {options.map((option) => {
           const active = option.value === value;
           return (
@@ -88,16 +117,29 @@ function FormSelect({
               type="button"
               role="option"
               aria-selected={active}
-              className={`form-select-option ${active ? "selected" : ""}`}
+              className="flex items-center gap-2.5 w-full min-h-[40px] rounded-[9px] px-3 text-left text-sm transition-colors hover:bg-white/[0.08]"
+              style={
+                active
+                  ? {
+                      background:
+                        "linear-gradient(180deg, rgba(223,189,103,0.2), rgba(223,189,103,0.12))",
+                      color: "#fff7dd",
+                    }
+                  : { color: "#eef2fb" }
+              }
               onClick={() => {
                 onChange(option.value);
                 setOpen(false);
               }}
             >
-              <span className="form-select-option-check" aria-hidden>
+              <span
+                className="flex-none w-4 text-base font-black"
+                style={{ color: "#f0c95a" }}
+                aria-hidden
+              >
                 {active ? "✓" : ""}
               </span>
-              <span className="form-select-option-label">{option.label}</span>
+              <span className="truncate">{option.label}</span>
             </button>
           );
         })}
@@ -105,6 +147,16 @@ function FormSelect({
     </div>
   );
 }
+
+// Shared input/textarea style for light inputs on dark card
+const inputStyle: React.CSSProperties = {
+  border: "1px solid rgba(223,189,103,0.28)",
+  background:
+    "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(240,242,247,0.98))",
+};
+
+const inputClass =
+  "w-full min-h-[50px] rounded-[9px] px-3.5 py-3 text-[#141722] text-base outline-none transition-all focus:shadow-[0_0_0_4px_rgba(212,177,92,0.13)]";
 
 export function CreateGamePage({
   initialError,
@@ -304,33 +356,88 @@ export function CreateGamePage({
   }
 
   return (
-    <section className="create-page">
-      <div className="create-card">
-        <header className="create-header">
-          <div className="create-heading">
-            <h1>{t("create.title")}</h1>
+    <section
+      className="min-h-screen overflow-y-auto flex items-center justify-center p-5 sm:p-8 md:p-12"
+      style={{
+        background:
+          "radial-gradient(760px 520px at 50% 2%, rgba(212,177,92,0.14), transparent 70%), " +
+          "radial-gradient(820px 620px at 12% 92%, rgba(110,134,255,0.14), transparent 68%), " +
+          "linear-gradient(180deg, #0b0d15 0%, #151825 58%, #080a10 100%)",
+      }}
+    >
+      <div
+        className="w-full max-w-[760px] rounded-[14px] p-6 sm:p-8 md:p-11"
+        style={{
+          border: "1px solid rgba(207,176,91,0.28)",
+          background:
+            "linear-gradient(180deg, rgba(27,30,44,0.96), rgba(12,14,23,0.94))",
+          boxShadow:
+            "0 34px 100px rgba(0,0,0,0.46), inset 0 1px 0 rgba(255,255,255,0.08)",
+        }}
+      >
+        {/* Header */}
+        <header className="flex items-start justify-between gap-4 mb-6 flex-wrap sm:flex-nowrap">
+          <div className="min-w-0 flex flex-col gap-2.5">
+            <h1 className="m-0 text-[26px] tracking-[0.12em] font-black text-[#eef2fb]">
+              {t("create.title")}
+            </h1>
             {selectedUserId ? (
-              <div className="create-session-chip">
-                <strong>{selectedDisplayName || selectedUserId}</strong>
-                <span>{selectedUserId}</span>
+              <div
+                className="flex flex-col gap-1 px-3.5 py-2.5 rounded-xl min-w-0 max-w-[360px]"
+                style={{
+                  border: "1px solid rgba(212,177,92,0.22)",
+                  background: "rgba(255,255,255,0.05)",
+                }}
+              >
+                <strong className="text-sm font-semibold text-[#eef2fb] truncate">
+                  {selectedDisplayName || selectedUserId}
+                </strong>
+                <span className="text-xs text-[#a6afc3] truncate">{selectedUserId}</span>
               </div>
             ) : null}
           </div>
-          <div className="create-header-actions">
-            <button type="button" className="action secondary" onClick={logout}>
+          <div className="flex items-center gap-2.5 shrink-0 flex-wrap justify-end">
+            <button
+              type="button"
+              className="min-h-[42px] px-4 rounded-[9px] text-sm text-[#eef2fb] whitespace-nowrap transition-colors hover:bg-white/[0.12]"
+              style={{
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.075)",
+              }}
+              onClick={logout}
+            >
               {t("create.logout")}
             </button>
-            <div className="locale-switcher inline" role="group" aria-label={t("common.languageLabel")}>
+            {/* Locale switcher — gold active state on dark wolf theme */}
+            <div
+              className="inline-flex rounded-full p-0.5"
+              role="group"
+              aria-label={t("common.languageLabel")}
+              style={{
+                background: "rgba(255,255,255,0.07)",
+                border: "1px solid rgba(255,255,255,0.14)",
+              }}
+            >
               <button
                 type="button"
-                className={locale === "zh-CN" ? "active" : ""}
+                className="px-2.5 py-1 rounded-full text-[11px] font-black tracking-[0.06em] transition-colors"
+                style={
+                  locale === "zh-CN"
+                    ? { background: "#d4b15c", color: "#11131b" }
+                    : { color: "#dbe2f0" }
+                }
                 onClick={() => setLocale("zh-CN")}
               >
                 中
               </button>
               <button
                 type="button"
-                className={locale === "en" ? "active" : ""}
+                className="px-2.5 py-1 rounded-full text-[11px] font-black tracking-[0.06em] transition-colors"
+                style={
+                  locale === "en"
+                    ? { background: "#d4b15c", color: "#11131b" }
+                    : { color: "#dbe2f0" }
+                }
                 onClick={() => setLocale("en")}
               >
                 EN
@@ -338,31 +445,56 @@ export function CreateGamePage({
             </div>
           </div>
         </header>
-        <form onSubmit={submit} className="create-form">
-          <label className="create-field create-field-token">
+
+        {/* Form */}
+        <form onSubmit={submit} className="flex flex-col gap-3.5">
+          {/* Matrix token */}
+          <label className="flex flex-col gap-1.5 min-w-0 text-xs tracking-[0.14em] text-[rgba(190,198,220,0.92)]">
             {t("create.matrixToken")}
             <textarea
+              className={`${inputClass} min-h-[76px] max-h-[124px] resize-y overflow-auto font-mono leading-relaxed`}
+              style={{
+                ...inputStyle,
+                whiteSpace: "nowrap",
+                overflowWrap: "normal",
+                wordBreak: "normal",
+              }}
               value={matrixToken}
               onChange={(event) => setMatrixToken(event.target.value)}
               placeholder={t("create.matrixTokenPlaceholder")}
               spellCheck={false}
             />
           </label>
-          <div className="create-room-tools">
+
+          {/* Refresh rooms */}
+          <div className="flex justify-end -mt-1">
             <button
               type="button"
-              className="action secondary"
+              className="min-h-[42px] px-4 rounded-[9px] text-sm text-[#eef2fb] whitespace-nowrap transition-colors hover:bg-white/[0.12] disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.075)",
+              }}
               onClick={() => void loadJoinedRooms()}
               disabled={roomsLoading}
             >
               {roomsLoading ? "..." : t("create.refreshRooms")}
             </button>
           </div>
-          <label className="create-field">
+
+          {/* Game title */}
+          <label className="flex flex-col gap-1.5 min-w-0 text-xs tracking-[0.14em] text-[rgba(190,198,220,0.92)]">
             {t("create.gameTitle")}
-            <input value={title} onChange={(event) => setTitle(event.target.value)} />
+            <input
+              className={inputClass}
+              style={inputStyle}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
           </label>
-          <label className="create-field">
+
+          {/* Source room */}
+          <label className="flex flex-col gap-1.5 min-w-0 text-xs tracking-[0.14em] text-[rgba(190,198,220,0.92)]">
             {t("create.sourceRoom")}
             <FormSelect
               value={roomOptions.includes(roomSelectValue) ? roomSelectValue : "__custom__"}
@@ -370,18 +502,24 @@ export function CreateGamePage({
               onChange={onRoomSelect}
             />
           </label>
+
+          {/* Custom room input */}
           {roomSelectValue === "__custom__" ? (
-            <label className="create-field">
+            <label className="flex flex-col gap-1.5 min-w-0 text-xs tracking-[0.14em] text-[rgba(190,198,220,0.92)]">
               {t("create.customRoom")}
               <input
+                className={inputClass}
+                style={inputStyle}
                 value={sourceMatrixRoomId}
                 onChange={(event) => setSourceMatrixRoomId(event.target.value)}
                 placeholder="!room:example.com"
               />
             </label>
           ) : null}
-          <div className="create-form-grid">
-            <label className="create-field">
+
+          {/* Language + speech rate grid */}
+          <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+            <label className="flex flex-col gap-1.5 min-w-0 text-xs tracking-[0.14em] text-[rgba(190,198,220,0.92)]">
               {t("create.language")}
               <FormSelect
                 value={language}
@@ -389,7 +527,7 @@ export function CreateGamePage({
                 onChange={(value) => setLanguage(value as "zh-CN" | "en")}
               />
             </label>
-            <label className="create-field">
+            <label className="flex flex-col gap-1.5 min-w-0 text-xs tracking-[0.14em] text-[rgba(190,198,220,0.92)]">
               {t("create.agentSpeechRate")}
               <FormSelect
                 value={String(agentSpeechRate)}
@@ -398,10 +536,31 @@ export function CreateGamePage({
               />
             </label>
           </div>
-          <button type="submit" className="action-primary">
+
+          {/* Submit — gold gradient */}
+          <button
+            type="submit"
+            className="w-full min-h-[54px] mt-2 rounded-[9px] text-[#141009] font-black text-lg transition-all hover:-translate-y-px active:translate-y-0"
+            style={{
+              background: "linear-gradient(180deg, #f1d58a, #d4b15c)",
+              boxShadow: "0 14px 34px rgba(212,177,92,0.24)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 18px 42px rgba(212,177,92,0.34)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 14px 34px rgba(212,177,92,0.24)";
+            }}
+          >
             {t("create.submit")}
           </button>
-          {error ? <p className="create-error">{error}</p> : null}
+
+          {/* Error */}
+          {error ? (
+            <p className="m-0 text-[13px] text-[#ff9aa5]">{error}</p>
+          ) : null}
         </form>
       </div>
     </section>

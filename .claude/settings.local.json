@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx --prefix \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf\" tsc --noEmit -p \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/tsconfig.json\")"
+      "Bash(npx --prefix \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf\" tsc --noEmit -p \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/tsconfig.json\")",
+      "Bash(pnpm install *)",
+      "Bash(xargs grep -hE \"className=\\\\{|className=\\\\`\")",
+      "Bash(grep -oh '\\\\.[a-zA-Z_][a-zA-Z0-9_-]*' /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/styles/game-room.css /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/styles/game-room/*.css /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/styles/game-room/components/*.css 2>/dev/null | sed 's/\\\\.//' | sort -u > /tmp/defined_classes.txt *)",
+      "Bash(grep -n \"className=\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -30)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "Bash(git ls-tree *)"
     ]
   }
 }

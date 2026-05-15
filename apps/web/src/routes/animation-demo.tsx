@@ -520,20 +520,26 @@ export function AnimationDemoPage() {
   }, [phase, phaseMeta.time, playerCount]);
 
   return (
-    <main className="animation-demo-page">
-      <div ref={hostRef} className="animation-demo-canvas" />
-      <aside className="animation-demo-panel">
+    <main className="flex h-screen bg-[#07041a] text-[#f7f1e7] overflow-hidden">
+      <div ref={hostRef} className="flex-1 min-w-0" />
+      <aside className="w-72 shrink-0 flex flex-col gap-5 p-6 bg-white/[0.04] border-l border-white/[0.08] overflow-y-auto">
         <div>
-          <p className="animation-demo-kicker">Werewolf Animation Lab</p>
-          <h1>哥特火堆阶段动画</h1>
-          <p>
+          <p className="text-xs font-semibold tracking-widest uppercase text-[#8b5cf6] mb-2">
+            Werewolf Animation Lab
+          </p>
+          <h1 className="text-lg font-bold mb-2">哥特火堆阶段动画</h1>
+          <p className="text-sm text-[#e2e8f0]/60 leading-relaxed">
             火堆与村落是氛围层，玩家头像由 UI 动态排布。这里先验证动画语言，不接入游戏流程。
           </p>
         </div>
 
-        <label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-[#e2e8f0]/70">
           阶段
-          <select value={phase} onChange={(event) => setPhase(event.target.value as DemoPhase)}>
+          <select
+            value={phase}
+            onChange={(event) => setPhase(event.target.value as DemoPhase)}
+            className="bg-white/[0.06] border border-white/[0.12] rounded-lg px-3 py-2 text-[#f7f1e7] text-sm"
+          >
             {phaseOptions.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -542,12 +548,16 @@ export function AnimationDemoPage() {
           </select>
         </label>
 
-        <div className="animation-demo-counts">
+        <div className="flex flex-wrap gap-2">
           {[6, 8, 10, 12].map((count) => (
             <button
               key={count}
               type="button"
-              className={count === playerCount ? "active" : ""}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                count === playerCount
+                  ? "bg-[#7c3aed] text-white"
+                  : "bg-white/[0.06] text-[#e2e8f0]/60 hover:bg-white/[0.1]"
+              }`}
               onClick={() => setPlayerCount(count)}
             >
               {count} 人
@@ -555,9 +565,9 @@ export function AnimationDemoPage() {
           ))}
         </div>
 
-        <div className="animation-demo-note">
+        <p className="text-xs text-[#e2e8f0]/40 leading-relaxed border-t border-white/[0.06] pt-4">
           当前方案：圆形头像降低密度，哥特感放在外圈、光环、角标和阶段特效中。
-        </div>
+        </p>
       </aside>
     </main>
   );

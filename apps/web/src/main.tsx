@@ -19,6 +19,7 @@ import {
 } from "./runtime/bootstrap";
 import { createHostBridge, isHostRuntime, type HostBridge } from "./runtime/hostBridge";
 import { createUnsealClient, UnsealApiError, type UnsealClient } from "./runtime/unsealClient";
+import "./index.css";
 import "./styles/game-room.css";
 
 interface HostSession {
@@ -188,14 +189,16 @@ function App() {
   }, [hostRuntime]);
 
   if (hostRuntime && hostBootstrap.status === "checking") {
-    return <div className="runtime-loading-bar" aria-live="polite" />;
+    return <div className="fixed inset-x-0 top-0 h-0.5 bg-[#7c3aed] animate-pulse" aria-live="polite" />;
   }
 
   if (hostRuntime && hostBootstrap.status === "waiting") {
     return (
-      <section className="create-page">
-        <div className="create-card">
-          <p className="create-error">等待房主创建并绑定游戏房间...</p>
+      <section className="min-h-screen bg-[#07041a] flex items-center justify-center px-4">
+        <div className="w-full max-w-md bg-white/[0.04] border border-white/[0.08] rounded-2xl p-8">
+          <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 text-center">
+            等待房主创建并绑定游戏房间...
+          </p>
         </div>
       </section>
     );

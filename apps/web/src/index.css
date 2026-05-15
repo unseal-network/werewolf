@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/* ── Safe area CSS variables ─────────────────────────────────────── */
+:root {
+  --web-safe-area-top: 0px;
+  --web-safe-area-bottom: 0px;
+  --navbar-height: 44px;
+}
+
+@supports (padding-top: constant(safe-area-inset-top)) {
+  :root {
+    --web-safe-area-top: constant(safe-area-inset-top);
+    --web-safe-area-bottom: constant(safe-area-inset-bottom);
+  }
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  :root {
+    --web-safe-area-top: env(safe-area-inset-top);
+    --web-safe-area-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* ── Base reset ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', 'PingFang SC', 'Helvetica Neue', sans-serif;
+  background: #07041a;
+  color: #e2e8f0;
+  overflow: hidden;
+}
