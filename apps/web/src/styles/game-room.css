@@ -13,3 +13,30 @@ body {
   color: #e2e8f0;
   overflow: hidden;
 }
+
+
+:root {
+  --web-safe-area-top: 0px;
+  --web-safe-area-bottom: 0px;
+  --navbar-height: 44px;
+}
+
+/* 兼容旧版 iOS（< 11.2）的 constant() 写法，需在 env() 前声明 */
+@supports (padding-top: constant(safe-area-inset-top)) {
+  :root {
+    --web-safe-area-top: constant(safe-area-inset-top);
+    --web-safe-area-bottom: constant(safe-area-inset-bottom);
+  }
+}
+
+/* 标准写法，覆盖上面的 constant() */
+@supports (padding-top: env(safe-area-inset-top)) {
+  :root {
+    --web-safe-area-top: env(safe-area-inset-top);
+    --web-safe-area-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+.moblie-safet-top {
+  padding-top: var(--web-safe-area-top) !important;
+}

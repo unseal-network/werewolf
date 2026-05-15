@@ -3,6 +3,8 @@ import logoImg from '../assets/logo.jpeg'
 import { BottomSheet } from '../components/BottomSheet'
 import { AdminModal } from '../components/AdminModal'
 import { ReadyButton } from '../components/ReadyButton'
+import { co } from '@unseal-network/mobile-sdk'
+import { MobileHeader } from '../components/MobileHeader'
 import type { GameRoom, AgentCandidate } from '../api/client'
 
 const LORE_RULES = [
@@ -171,7 +173,8 @@ export function LobbyPage({
       background: 'linear-gradient(160deg, #07041a 0%, #0d0825 40%, #120930 70%, #0a0618 100%)',
       display: 'flex', flexDirection: 'column',
       position: 'relative',
-    }}>
+    }} className='moblie-safet-top'>
+      
       {/* Ambient glows */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
         <div style={{ position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)', width: 320, height: 320, background: 'radial-gradient(circle, rgba(109,40,217,0.28) 0%, transparent 70%)', borderRadius: '50%' }} />
@@ -184,18 +187,13 @@ export function LobbyPage({
         ))}
       </div>
 
-      {/* Top bar */}
-      <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '52px 20px 12px', position: 'relative', zIndex: 10 }}>
-        <button onClick={onLeave} style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>←</button>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: '#e2e8f0' }}>Hero Zone</div>
-          {isAdmin && <div style={{ fontSize: 10, color: 'rgba(139,92,246,0.8)', marginTop: 1, letterSpacing: '0.1em' }}>AUTHORITY</div>}
-        </div>
-        <button onClick={isAdmin ? () => setShowAdminModal(true) : undefined} style={{ width: 36, height: 36, borderRadius: 12, background: isAdmin ? 'rgba(239,68,68,0.12)' : 'rgba(109,40,217,0.18)', border: `1px solid ${isAdmin ? 'rgba(239,68,68,0.3)' : 'rgba(139,92,246,0.35)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, cursor: isAdmin ? 'pointer' : 'default', color: isAdmin ? 'rgba(252,165,165,0.9)' : 'inherit' }}>
-          {isAdmin ? '⚙︎' : '🐺'}
-        </button>
-      </div>
-
+      {/* Header（仅移动端显示） */}
+      {co.isMobile && (
+        <MobileHeader
+          onClose={() => iframeMessage.hideApp()}
+          onMore={() => {}}
+        />
+      )}
       {isAdmin ? (
         <div style={{ flex: 1, position: 'relative', zIndex: 10, padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }}>
           {/* Config cards */}
