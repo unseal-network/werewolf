@@ -41,7 +41,7 @@ export function UserInfoPanel({
         onClick={onClose}
         aria-hidden
       />
-      <section className="profile-dialog open" role="dialog" aria-modal="true">
+      <section className="profile-dialog open ui-panel" role="dialog" aria-modal="true">
         {seat ? (
           <>
             <div className="profile-head">

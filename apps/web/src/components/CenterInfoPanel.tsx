@@ -4,12 +4,9 @@ import { avatarPalette, firstReadableInitial } from "./SeatAvatar";
 import type { SceneId } from "./GameRoomShell";
 
 interface CenterInfoPanelProps {
-  phaseLabel: string;
   rawPhase: string | null | undefined;
   scene: SceneId;
   day: number | undefined;
-  living: number;
-  total: number;
   players: RoomPlayer[];
   events: GameEventDto[];
   currentSpeakerPlayerId?: string | null | undefined;
@@ -35,6 +32,10 @@ function playerLabel(player: RoomPlayer | undefined, fallbackId?: string): strin
   return player.displayName || `${player.seatNo} 号`;
 }
 
+function seatNoLabel(seatNo: number | undefined, suffix: string): string {
+  return `${seatNo ?? "?"}${suffix}`;
+}
+
 function playerInitial(player: RoomPlayer | undefined): string {
   if (!player) return "?";
   return (
@@ -46,13 +47,42 @@ function playerInitial(player: RoomPlayer | undefined): string {
   );
 }
 
-function latestSpeechEvent(events: GameEventDto[]): GameEventDto | undefined {
+function stringPayload(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function latestSpeechEvent(
+  events: GameEventDto[],
+  day: number | undefined,
+  rawPhase: string | null | undefined,
+  currentSpeakerPlayerId: string | null | undefined
+): GameEventDto | undefined {
   return [...events]
     .reverse()
     .find(
-      (event) =>
-        event.type === "speech_transcript_delta" ||
-        event.type === "speech_submitted"
+      (event) => {
+        if (
+          event.type !== "speech_transcript_delta" &&
+          event.type !== "speech_submitted"
+        ) {
+          return false;
+        }
+        if (
+          currentSpeakerPlayerId &&
+          event.actorId !== currentSpeakerPlayerId
+        ) {
+          return false;
+        }
+        const eventDay = numberPayload(event.payload.day);
+        if (day !== undefined && eventDay !== null && eventDay !== day) {
+          return false;
+        }
+        const eventPhase = stringPayload(event.payload.phase);
+        if (rawPhase && eventPhase && eventPhase !== rawPhase) {
+          return false;
+        }
+        return true;
+      }
     );
 }
 
@@ -128,12 +158,9 @@ function MiniAvatar({ player }: { player: RoomPlayer | undefined }) {
 }
 
 export function CenterInfoPanel({
-  phaseLabel,
   rawPhase,
   scene,
   day,
-  living,
-  total,
   players,
   events,
   currentSpeakerPlayerId,
@@ -147,36 +174,51 @@ export function CenterInfoPanel({
     scene === "tie";
   const isSpeechPhase = rawPhase === "day_speak" || rawPhase === "tie_speech";
   const voteGroups = voteGroupsForDay(events, players, day, rawPhase);
-  const latestSpeech = latestSpeechEvent(events);
+  const latestSpeech = latestSpeechEvent(
+    events,
+    day,
+    rawPhase,
+    currentSpeakerPlayerId
+  );
   const latestSpeechPlayer = playersById.get(latestSpeech?.actorId ?? "");
   const currentSpeaker = playersById.get(currentSpeakerPlayerId ?? "");
+  const speechPlayer = currentSpeaker ?? latestSpeechPlayer;
+  const speechHeading =
+    speechPlayer?.kind === "agent"
+      ? t("centerInfo.agentStream")
+      : t("centerInfo.liveCaptions");
   const text = speechText(latestSpeech);
 
-  return (
-    <section className="center-info-panel" aria-live="polite">
-      <div className="center-info-kicker">{rawPhase ?? scene}</div>
-      <div className="center-info-title">{phaseLabel}</div>
-      <div className="center-info-meta">{living}/{total} {t("centerInfo.alive")}</div>
+  if (!isVotePhase && !isSpeechPhase) {
+    return null;
+  }
 
+  return (
+    <section className="center-info-panel ui-panel" aria-live="polite">
       {isVotePhase ? (
         <div className="center-live-block center-vote-block">
           <div className="center-live-heading">
             <span>{t("centerInfo.voteLive")}</span>
-            <b>{voteGroups.reduce((count, group) => count + group.voters.length, 0)}</b>
           </div>
           {voteGroups.length ? (
             <div className="center-vote-groups">
               {voteGroups.map((group) => (
                 <article className="center-vote-group" key={group.targetId}>
                   <div className="center-vote-target">
-                    <span>{group.target?.seatNo ?? "?"} {t("centerInfo.seatSuffix")}</span>
-                    <strong>{playerLabel(group.target, group.targetId)}</strong>
-                    <em>{group.voters.length} {t("centerInfo.voteCount")}</em>
+                    <span>{t("centerInfo.voteTarget")}</span>
+                    <strong>
+                      {seatNoLabel(
+                        group.target?.seatNo,
+                        t("centerInfo.seatSuffix")
+                      )}
+                    </strong>
                   </div>
-                  <div className="center-voter-list">
-                    {group.voters.map((voter) => (
-                      <MiniAvatar key={voter.id} player={voter} />
-                    ))}
+                  <div className="center-voter-list center-voter-seat-list">
+                    {group.voters
+                      .map((voter) =>
+                        seatNoLabel(voter.seatNo, t("centerInfo.seatSuffix"))
+                      )
+                      .join("，")}
                   </div>
                 </article>
               ))}
@@ -190,10 +232,10 @@ export function CenterInfoPanel({
       {isSpeechPhase ? (
         <div className="center-live-block center-speech-block">
           <div className="center-live-heading">
-            <span>{t("centerInfo.speechLive")}</span>
+            <span>{speechHeading}</span>
           </div>
           <div className="center-speaker-row">
-            <MiniAvatar player={currentSpeaker ?? latestSpeechPlayer} />
+            <MiniAvatar player={speechPlayer} />
             <span>
               {currentSpeaker
                 ? t("centerInfo.currentSpeaker", {

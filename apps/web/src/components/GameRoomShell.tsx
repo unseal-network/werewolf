@@ -56,6 +56,84 @@ function useCountdown(deadlineAt: string | null | undefined) {
   return seconds;
 }
 
+function clampValue(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function useResponsiveGameLayoutVars(railSlotCount: number) {
+  const [vars, setVars] = useState<React.CSSProperties>({});
+
+  useEffect(() => {
+    const update = () => {
+      const viewport = window.visualViewport;
+      const width = viewport?.width ?? window.innerWidth;
+      const height = viewport?.height ?? window.innerHeight;
+      const compact = width <= 560;
+      const narrow = width <= 760;
+      const railRows = Math.max(1, railSlotCount);
+      const railHeight = clampValue(
+        compact ? height * 0.59 : narrow ? height * 0.62 : height * 0.64,
+        compact ? 380 : 480,
+        compact ? height - 250 : narrow ? height - 260 : height - 300
+      );
+      const seatFromHeight = (railHeight / railRows - (compact ? 16 : 20)) / (compact ? 1.04 : 0.98);
+      const seatFromWidth = compact ? width * 0.164 : narrow ? width * 0.115 : width * 0.058;
+      const seat = clampValue(
+        Math.min(seatFromHeight, seatFromWidth),
+        compact ? 48 : narrow ? 58 : 64,
+        compact ? 64 : narrow ? 78 : 90
+      );
+      const avatar = seat * (compact ? 0.72 : 0.7);
+      const naturalSlot = avatar * (compact ? 1.45 : 1.4) + (compact ? 16 : 20);
+      const seatSlot = Math.min(naturalSlot, railHeight / railRows);
+      const actionWidth = clampValue(
+        width - seat * 2 - width * (compact ? 0.34 : narrow ? 0.4 : 0.22),
+        compact ? 220 : narrow ? 260 : 260,
+        compact ? 300 : narrow ? 360 : 380
+      );
+      const actionBottom = clampValue(
+        height * (compact ? 0.022 : narrow ? 0.028 : 0.04),
+        compact ? 14 : 18,
+        compact ? 32 : narrow ? 38 : 52
+      );
+      const uiScale = clampValue(
+        Math.min(
+          seat / (compact ? 64 : narrow ? 78 : 90),
+          actionWidth / (compact ? 300 : narrow ? 360 : 380),
+          railHeight / (compact ? 500 : narrow ? 620 : 706)
+        ),
+        compact ? 0.72 : narrow ? 0.82 : 0.78,
+        1
+      );
+      const hudScale = clampValue(uiScale * (compact ? 1.34 : 1.1), compact ? 0.96 : 0.9, 1);
+      const actionScale = clampValue(uiScale * 1.2, compact ? 0.88 : 0.86, 1);
+      setVars({
+        ["--layout-ui-scale" as string]: uiScale.toFixed(4),
+        ["--layout-hud-scale" as string]: hudScale.toFixed(4),
+        ["--layout-action-scale" as string]: actionScale.toFixed(4),
+        ["--layout-seat" as string]: `${seat.toFixed(2)}px`,
+        ["--layout-avatar" as string]: `${avatar.toFixed(2)}px`,
+        ["--layout-seat-slot" as string]: `${seatSlot.toFixed(2)}px`,
+        ["--layout-rail-height" as string]: `${railHeight.toFixed(2)}px`,
+        ["--layout-action-width" as string]: `${actionWidth.toFixed(2)}px`,
+        ["--layout-action-bottom" as string]: `${actionBottom.toFixed(2)}px`,
+      });
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
+  }, [railSlotCount]);
+
+  return vars;
+}
+
 function phaseIcon(scene: SceneId) {
   switch (scene) {
     case "night":
@@ -157,7 +235,7 @@ export function GameRoomShell({
   centerInfo,
 }: GameRoomShellProps) {
   const { t } = useI18n();
-  const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
+  const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/werewolf-ui/final`;
   const countdown = useCountdown(deadlineAt);
   const danger = countdown > 0 && countdown <= 10;
   const living = aliveCount ?? playerCount;
@@ -173,10 +251,12 @@ export function GameRoomShell({
   const boardSeats = activeSeats.slice(0, visibleSeatCount);
   const rails = splitSeatsIntoRails(boardSeats);
   const railSlotCount = Math.max(rails.left.length, rails.right.length);
+  const responsiveLayoutVars = useResponsiveGameLayoutVars(railSlotCount);
   const centerBelongsToModal = scene === "end";
   const rootStyle = {
     ["--accent" as string]: accent,
-    ["--role-card-back-url" as string]: `url("${assetBase}/card-back.png")`,
+    ["--role-card-back-url" as string]: `url("${assetBase}/card/role-card-back.png")`,
+    ...responsiveLayoutVars,
   } as React.CSSProperties;
   return (
     <main
@@ -251,13 +331,7 @@ export function GameRoomShell({
             onSeatClick={onSeatClick}
           />
           <div className="center-info-region">
-            {centerInfo ?? (
-              <section className="center-info-panel" aria-live="polite">
-                <div className="center-info-kicker">{rawPhase ?? scene}</div>
-                <div className="center-info-title">{phaseLabel}</div>
-                <div className="center-info-meta">{living}/{targetPlayerCount || playerCount} 存活</div>
-              </section>
-            )}
+            {centerInfo}
           </div>
           <PlayerRail
             className="player-rail player-rail-right"

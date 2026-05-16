@@ -293,7 +293,7 @@ export function CenterStage({
   // End
   if (actionMode === "end") {
     return (
-      <article className="phase-card endgame-phase-card" role="dialog" aria-live="polite">
+      <article className="phase-card endgame-phase-card ui-panel" role="dialog" aria-live="polite">
         {identity}
         <div className="endgame-kicker">GAME OVER</div>
         <div className="endgame-title">{title}</div>

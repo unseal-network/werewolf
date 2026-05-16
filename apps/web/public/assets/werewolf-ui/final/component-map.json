@@ -1,0 +1,221 @@
+{
+  "version": "werewolf-ui-component-map-v1",
+  "components": {
+    "visual-topbar": {
+      "assets": [
+        "hud/rail-fill",
+        "hud/rail-top-line",
+        "hud/rail-bottom-line",
+        "hud/socket-left",
+        "hud/socket-right",
+        "hud/moon-medallion",
+        "hud/icon-moon",
+        "hud/icon-people"
+      ],
+      "layout1080x1920": {
+        "x": 42,
+        "y": 34,
+        "w": 996,
+        "h": 132
+      }
+    },
+    "UIPanel": {
+      "assets": [
+        "panel-9slice/fill",
+        "panel-9slice/corner-tl",
+        "panel-9slice/corner-tr",
+        "panel-9slice/corner-bl",
+        "panel-9slice/corner-br",
+        "panel-9slice/edge-top",
+        "panel-9slice/edge-bottom",
+        "panel-9slice/edge-left",
+        "panel-9slice/edge-right",
+        "panel-9slice/ornament-top",
+        "panel-9slice/ornament-bottom"
+      ],
+      "cssClass": "ui-panel",
+      "sizeRange": {
+        "minWidth": 420,
+        "minHeight": 420,
+        "testedWidth": [
+          420,
+          620,
+          760
+        ],
+        "testedHeight": [
+          420,
+          460,
+          560
+        ]
+      },
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "styleSource": "panel-9slice-regenerated/source-full-frame-alpha"
+      }
+    },
+    "CenterStage": {
+      "assets": [
+        "panel-9slice/fill",
+        "panel-9slice/corner-tl",
+        "panel-9slice/corner-tr",
+        "panel-9slice/corner-bl",
+        "panel-9slice/corner-br",
+        "panel-9slice/edge-top",
+        "panel-9slice/edge-bottom",
+        "panel-9slice/edge-left",
+        "panel-9slice/edge-right",
+        "panel-9slice/ornament-top",
+        "panel-9slice/ornament-bottom",
+        "panel-9slice/arrow-point-up",
+        "panel-9slice/arrow-point-down",
+        "panel-9slice/arrow-point-left",
+        "panel-9slice/arrow-point-right",
+        "panel-9slice/divider"
+      ],
+      "layout1080x1920": {
+        "x": 278,
+        "y": 692,
+        "w": 524,
+        "h": 548
+      },
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "styleSource": "panel-9slice-regenerated/source-full-frame-alpha"
+      }
+    },
+    "SeatAvatar": {
+      "assets": [
+        "avatar/portrait-hooded",
+        "avatar/frame-default",
+        "avatar/frame-selected",
+        "avatar/frame-speaking",
+        "avatar/frame-dead",
+        "avatar/glow-selected",
+        "avatar/dead-overlay",
+        "avatar/name-line",
+        "avatar/status-dot",
+        "badge/moon",
+        "badge/star",
+        "badge/shield",
+        "badge/eye",
+        "badge/blade",
+        "badge/people",
+        "effect/vote-target-ring"
+      ],
+      "display": {
+        "w": 148,
+        "h": 184,
+        "portraitCircle": 76,
+        "badge": 44
+      }
+    },
+    "RoleCardEntry": {
+      "assets": [
+        "card/role-card-back"
+      ],
+      "layout1080x1920": {
+        "x": 58,
+        "y": 1688,
+        "w": 136,
+        "h": 218
+      }
+    },
+    "TimelineCapsule": {
+      "assets": [
+        "button/log-fill",
+        "button/log-corner-tl",
+        "button/log-corner-tr",
+        "button/log-corner-bl",
+        "button/log-corner-br",
+        "button/log-edge-horizontal",
+        "button/log-edge-vertical",
+        "icon/book"
+      ],
+      "layout1080x1920": {
+        "x": 744,
+        "y": 1770,
+        "w": 286,
+        "h": 98
+      }
+    },
+    "PlayerRadialPicker": {
+      "assets": [
+        "effect/radial-picker-ring",
+        "effect/vote-target-ring"
+      ],
+      "display": {
+        "ring": 184
+      }
+    },
+    "DecisionButtons": {
+      "assets": [
+        "button/decision/submit-button-9slice",
+        "button/decision/confirm-button-9slice",
+        "button/decision/cancel-button-9slice"
+      ],
+      "display": {
+        "default": {
+          "w": 512,
+          "h": 96
+        },
+        "min": {
+          "w": 380,
+          "h": 96
+        },
+        "max": {
+          "w": 1280,
+          "h": 240
+        }
+      },
+      "nineSlice": {
+        "left": 168,
+        "right": 168,
+        "top": 76,
+        "bottom": 76,
+        "repeat": "stretch",
+        "fillCenter": true
+      },
+      "styleSource": "generated concept sheet + user reference sheet"
+    }
+  }
+}

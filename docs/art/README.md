@@ -1,10 +1,15 @@
 # Werewolf Art Documentation
 
-Date: 2026-05-13
+Date: 2026-05-16
 
 ## Current Direction
 
-The current renderer direction is PixiJS for the game visual layer, with React/DOM retaining real text, stateful controls, accessibility, routing, SSE state, and LiveKit state.
+The production game-room UI now uses React/DOM with CSS-backed art assets copied from the werewolf demo pipeline. The runtime asset source of truth is:
+
+- `apps/web/public/assets/werewolf-ui/final/asset-manifest.json`
+- `apps/web/public/assets/werewolf-ui/final/component-map.json`
+
+Legacy Pixi atlas packs under `apps/web/public/assets/ui/`, `selector/`, `cards/`, `effects/`, and `world/{alpha,overlays,source}/` were removed after runtime reference checks.
 
 ## Documents
 
@@ -13,18 +18,18 @@ The current renderer direction is PixiJS for the game visual layer, with React/D
   - Use this to judge whether an asset belongs in the system and whether it preserves readability.
 
 - `docs/art/werewolf-pixi-art-pack.md`
-  - Concrete PixiJS art-pack specification.
-  - Use this for asset categories, sizes, prompts, component coverage, and generation order.
+  - Historical PixiJS art-pack specification.
+  - Use this for prompt language and visual intent only; do not use its old runtime path recommendations over the current `werewolf-ui/final` manifest.
 
-- `apps/web/public/assets/ui/manifest.json`
+- `apps/web/public/assets/werewolf-ui/final/asset-manifest.json`
   - Runtime-facing asset manifest.
-  - Use this for stable Pixi asset keys, file paths, sizes, alpha requirements, NineSlice metadata, blend modes, and implementation lookup.
+  - Use this for stable asset keys, file paths, sizes, alpha requirements, NineSlice metadata, and implementation lookup.
 
 ## Conflict Rules
 
-- For concrete asset keys, paths, sizes, Pixi usage, alpha, blend mode, and NineSlice metadata, `manifest.json` wins.
-- For component coverage and generation prompts, `werewolf-pixi-art-pack.md` wins.
-- For visual priority, readability, UI/DOM ownership, and non-goals, the high-level asset-system spec wins.
+- For concrete asset keys, paths, sizes, alpha, and NineSlice metadata, `asset-manifest.json` wins.
+- For generation prompts and visual intent, the historical Pixi docs can still provide context.
+- For visual priority, readability, UI/DOM ownership, and non-goals, the high-level asset-system spec remains useful background.
 
 ## Generation Workflow
 

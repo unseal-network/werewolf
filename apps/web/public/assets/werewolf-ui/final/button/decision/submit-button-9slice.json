@@ -1,0 +1,57 @@
+{
+  "id": "button-submit-gold",
+  "type": "button-9slice",
+  "status": "verified",
+  "version": "v002",
+  "source": "concept-sheet-extraction",
+  "source_file": "/Users/Ruihan/.codex/generated_images/019e2820-15bf-7421-8229-62a2e04d587c/ig_00d87bb1a6665947016a0753152b888191977d4a72ce96e0ed.png",
+  "license": "project-owned-generated",
+  "target_runtime": "web-css",
+  "purpose": "Submit action button background",
+  "visual_notes": "gold submit button extracted from approved concept sheet",
+  "output": {
+    "path": "public/assets/werewolf-ui/final/button/decision/submit-button-9slice.png",
+    "format": "png",
+    "transparent": true,
+    "source_size": "1024x192",
+    "scale": "2x",
+    "premultiplied_alpha": false
+  },
+  "nine_slice": {
+    "left": 168,
+    "right": 168,
+    "top": 76,
+    "bottom": 76,
+    "repeat": "stretch",
+    "fill_center": true
+  },
+  "padding": {
+    "left": 220,
+    "right": 220,
+    "top": 56,
+    "bottom": 56
+  },
+  "render_limits": {
+    "min_size": "380x96",
+    "max_size": "1280x240"
+  },
+  "label": {
+    "live_text": true,
+    "contrast_minimum": 4.5
+  },
+  "generation_control": {
+    "strategy": "concept-sheet-first + extraction + production cleanup",
+    "control_source": "approved generated concept sheet",
+    "hard_reject": [
+      "baked readable text",
+      "dirty alpha",
+      "style mismatch with concept sheet",
+      "ornaments in stretch zone",
+      "unsafe label area"
+    ]
+  },
+  "validation_artifacts": [
+    "public/assets/werewolf-ui/final/button/decision/submit-button-9slice.png"
+  ],
+  "handoff_notes": "Use as CSS border-image/NineSlice with declared slice values. Keep labels as live text."
+}

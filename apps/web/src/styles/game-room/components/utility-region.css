@@ -44,10 +44,31 @@
   min-width: 92px !important;
   height: 40px !important;
   min-height: 40px !important;
-  padding: 0 14px !important;
-  border: 1px solid rgba(224, 216, 185, 0.28) !important;
-  border-radius: 12px !important;
-  background: rgba(2, 8, 10, 0.34) !important;
+  padding: 0 16px 0 40px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background:
+    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 36px) 12px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 12px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-vertical.png") left center / 12px calc(100% - 36px) repeat-y,
+    url("/assets/werewolf-ui/final/button/log-edge-vertical.png") right center / 12px calc(100% - 36px) repeat-y,
+    url("/assets/werewolf-ui/final/button/log-fill.png") center / calc(100% - 18px) calc(100% - 18px) repeat !important;
   color: #fff7d8 !important;
   box-shadow: none !important;
+}
+
+.game-layout-root .utility-region .log-peek::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  background: url("/assets/werewolf-ui/final/icon/book.png") center / contain no-repeat;
+  transform: translateY(-50%);
+  opacity: 0.88;
 }

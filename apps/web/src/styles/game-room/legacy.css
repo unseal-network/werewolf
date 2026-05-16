@@ -3519,6 +3519,7 @@ body {
   z-index: 1;
   border: 1px solid rgba(216, 183, 107, 0.34);
   background:
+    url("/assets/werewolf-ui/final/effect/radial-picker-ring.png") center / contain no-repeat,
     radial-gradient(circle at 50% 50%, transparent 0 30%, rgba(3, 2, 8, 0.92) 31% 43%, transparent 44%),
     radial-gradient(circle at 50% 37%, rgba(242, 228, 196, 0.14), transparent 20%),
     radial-gradient(circle at 50% 50%, transparent 0 54%, rgba(216, 183, 107, 0.17) 55% 56%, transparent 58%),
@@ -3922,6 +3923,7 @@ body {
 
   .player-picker-wheel.open::before {
     background:
+      url("/assets/werewolf-ui/final/effect/radial-picker-ring.png") center / contain no-repeat,
       radial-gradient(circle at 50% 50%, transparent 0 30%, rgba(3, 2, 8, 0.90) 31% 43%, transparent 44%),
       radial-gradient(circle at 50% 50%, transparent 0 54%, rgba(216, 183, 107, 0.15) 55% 56%, transparent 58%),
       repeating-conic-gradient(from calc(var(--player-picker-slice-deg) / -2), rgba(242, 228, 196, 0.13) 0deg 0.45deg, transparent 0.45deg var(--player-picker-slice-deg)),
@@ -4382,6 +4384,7 @@ body {
 .player-picker-wheel.open::before {
   border-color: rgba(216, 185, 93, 0.28);
   background:
+    url("/assets/werewolf-ui/final/effect/radial-picker-ring.png") center / contain no-repeat,
     repeating-conic-gradient(from calc(var(--player-picker-slice-deg) / -2), rgba(236, 215, 154, 0.16) 0deg 0.6deg, transparent 0.6deg var(--player-picker-slice-deg)),
     radial-gradient(circle, rgba(112, 201, 189, 0.13), transparent 66%);
 }

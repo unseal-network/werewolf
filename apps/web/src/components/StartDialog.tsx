@@ -19,7 +19,7 @@ export function StartDialog({ open, filled, target, onFillAi, onWait }: StartDia
         onClick={onWait}
         aria-hidden
       />
-      <section className="start-dialog open" role="dialog" aria-modal="true">
+      <section className="start-dialog open ui-panel" role="dialog" aria-modal="true">
         <div className="start-title">{t("startDialog.title")}</div>
         <div className="start-copy">
           {t("startDialog.copy", { now: filled })}

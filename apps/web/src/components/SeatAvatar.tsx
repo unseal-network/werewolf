@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { normalizeDisplayRole, ROLE_COLOR, ROLE_IMG } from "../constants/roles";
+import { type DisplayRole, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
 
 export interface SeatData {
@@ -39,6 +39,17 @@ const AVATAR_COLORS = [
   { bg: "#134e4a", fg: "#5eead4" },
 ];
 
+type SeatBadgeId = "blade" | "eye" | "moon" | "people" | "shield" | "star";
+
+const ROLE_BADGE: Record<DisplayRole, SeatBadgeId> = {
+  villager: "people",
+  guard: "shield",
+  hunter: "star",
+  seer: "eye",
+  werewolf: "blade",
+  witch: "moon",
+};
+
 function stableHash(value: string): number {
   let hash = 5381;
   for (let i = 0; i < value.length; i += 1) {
@@ -75,6 +86,15 @@ export function avatarInitial(seat: SeatData, fullName: string): string {
   );
 }
 
+function seatBadgeId(seat: SeatData, roleId: DisplayRole | undefined): SeatBadgeId | undefined {
+  if (seat.isEmpty) return undefined;
+  if (seat.isActionTarget) return "blade";
+  if (roleId) return ROLE_BADGE[roleId];
+  if (seat.isCurrentUser) return "star";
+  if (seat.isWolfTeammate) return "moon";
+  return seat.kind === "agent" ? "people" : undefined;
+}
+
 export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatarProps) {
   const t = useT();
   const fallbackName = t("seat.fallbackName", { n: seat.seatNo });
@@ -84,6 +104,7 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
   const roleColor = roleId ? ROLE_COLOR[roleId] : undefined;
   const hasImageAvatar = Boolean(seat.avatarUrl && !seat.isEmpty && !roleImg);
   const hasLetterAvatar = Boolean(!seat.isEmpty && !roleImg && !hasImageAvatar);
+  const badgeId = seatBadgeId(seat, roleId);
   const identitySeed = avatarIdentitySeed(seat, fullName);
   const palette = hasLetterAvatar
     ? avatarPalette(identitySeed)
@@ -100,6 +121,9 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
   const classes = [
     "seat",
     seat.isDead ? "seat-state-dead" : seat.isEmpty ? "seat-state-ready" : "seat-state-alive",
+    seat.isSelected ? "seat-state-selected" : "",
+    seat.isActionTarget ? "seat-state-target" : "",
+    seat.isCurrentSpeaker ? "seat-state-speaking" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -114,7 +138,12 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
       aria-label={fullName}
     >
       <div
-        className="avatar"
+        className={[
+          "avatar",
+          hasLetterAvatar ? "has-hooded-portrait" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
         aria-hidden
         style={avatarStyle}
       >
@@ -133,10 +162,23 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
             draggable={false}
           />
         ) : (
-          <span>{seat.isEmpty ? "+" : avatarInitial(seat, fullName)}</span>
+          <>
+            {hasLetterAvatar ? <span className="seat-hooded-portrait" /> : null}
+            <span className="seat-avatar-initial">{seat.isEmpty ? "+" : avatarInitial(seat, fullName)}</span>
+          </>
         )}
+        {badgeId ? (
+          <span
+            className={`seat-role-badge seat-role-badge-${badgeId}`}
+          />
+        ) : null}
         {!seat.isEmpty ? <span className="seat-number-badge">{seat.seatNo}</span> : null}
       </div>
+      {!seat.isEmpty ? (
+        <span className="seat-name" aria-hidden>
+          {fullName}
+        </span>
+      ) : null}
     </button>
   );
 });

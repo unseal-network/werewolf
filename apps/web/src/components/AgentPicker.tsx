@@ -58,7 +58,7 @@ export function AgentPicker({
         aria-hidden
       />
       <section
-        className="agent-picker open"
+        className="agent-picker open ui-panel"
         role="dialog"
         aria-modal="true"
       >

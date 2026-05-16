@@ -1507,12 +1507,9 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         errorMessage={errorMessage || undefined}
         centerInfo={
           <CenterInfoPanel
-            phaseLabel={uiProjection.label}
             rawPhase={projection?.phase ?? null}
             scene={dressing.scene}
             day={projection?.day}
-            living={projection?.alivePlayerIds.length ?? activeSeatCount}
-            total={participantCount || activeSeatCount}
             players={room?.players ?? []}
             events={events}
             currentSpeakerPlayerId={projection?.currentSpeakerPlayerId}

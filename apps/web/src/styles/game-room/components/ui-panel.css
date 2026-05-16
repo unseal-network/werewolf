@@ -1,0 +1,124 @@
+/* Component primitive: reusable 9-slice panel from werewolf-ui/final. */
+.game-layout-root .ui-panel {
+  --ui-panel-scale: 1;
+  --ui-panel-corner: calc(192px * var(--ui-panel-scale));
+  --ui-panel-edge: calc(32px * var(--ui-panel-scale));
+  --ui-panel-fill-inset: calc(32px * var(--ui-panel-scale));
+  --ui-panel-edge-overlap: calc(12px * var(--ui-panel-scale));
+  --ui-panel-edge-top-y: calc(33px * var(--ui-panel-scale));
+  --ui-panel-edge-bottom-y: calc(29px * var(--ui-panel-scale));
+  --ui-panel-edge-left-x: calc(12px * var(--ui-panel-scale));
+  --ui-panel-edge-right-x: calc(15px * var(--ui-panel-scale));
+  --ui-panel-content-top: calc(96px * var(--ui-panel-scale));
+  --ui-panel-content-right: calc(78px * var(--ui-panel-scale));
+  --ui-panel-content-bottom: calc(96px * var(--ui-panel-scale));
+  --ui-panel-content-left: calc(78px * var(--ui-panel-scale));
+  position: relative;
+  box-sizing: border-box;
+  padding:
+    var(--ui-panel-content-top)
+    var(--ui-panel-content-right)
+    var(--ui-panel-content-bottom)
+    var(--ui-panel-content-left);
+  border: 0;
+  border-radius: 0;
+  --ui-panel-skin:
+    url("/assets/werewolf-ui/final/panel-9slice/ornament-top.png")
+      center top calc(-17px * var(--ui-panel-scale)) /
+      calc(128px * var(--ui-panel-scale))
+      calc(128px * var(--ui-panel-scale))
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/ornament-bottom.png")
+      center bottom calc(-16px * var(--ui-panel-scale)) /
+      calc(128px * var(--ui-panel-scale))
+      calc(128px * var(--ui-panel-scale))
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-tl.png")
+      left top /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-tr.png")
+      right top /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-bl.png")
+      left bottom /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-br.png")
+      right bottom /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-top.png")
+      center var(--ui-panel-edge-top-y) /
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      var(--ui-panel-edge)
+      repeat-x,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-bottom.png")
+      center bottom var(--ui-panel-edge-bottom-y) /
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      var(--ui-panel-edge)
+      repeat-x,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-left.png")
+      var(--ui-panel-edge-left-x) center /
+      var(--ui-panel-edge)
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      repeat-y,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-right.png")
+      right var(--ui-panel-edge-right-x) center /
+      var(--ui-panel-edge)
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      repeat-y,
+    url("/assets/werewolf-ui/final/panel-9slice/fill.png")
+      center /
+      calc(100% - var(--ui-panel-fill-inset) * 2)
+      calc(100% - var(--ui-panel-fill-inset) * 2)
+      repeat;
+  background: var(--ui-panel-skin);
+}
+
+.game-layout-root .log-sheet.ui-panel {
+  --ui-panel-scale: 0.38;
+  --ui-panel-content-top: 58px;
+  --ui-panel-content-right: 42px;
+  --ui-panel-content-bottom: 58px;
+  --ui-panel-content-left: 42px;
+}
+
+.game-layout-root .start-dialog.ui-panel {
+  --ui-panel-scale: 0.38;
+  --ui-panel-content-top: 54px;
+  --ui-panel-content-right: 40px;
+  --ui-panel-content-bottom: 54px;
+  --ui-panel-content-left: 40px;
+  border-radius: 0;
+}
+
+.game-layout-root .agent-picker.ui-panel {
+  --ui-panel-scale: 0.34;
+  --ui-panel-content-top: 54px;
+  --ui-panel-content-right: 42px;
+  --ui-panel-content-bottom: 48px;
+  --ui-panel-content-left: 42px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-panel-skin) !important;
+  color: #f6f0dc !important;
+}
+
+.game-layout-root .profile-dialog.ui-panel,
+.game-layout-root .seer-result-dialog.ui-panel {
+  --ui-panel-scale: 0.34;
+  --ui-panel-content-top: 50px;
+  --ui-panel-content-right: 38px;
+  --ui-panel-content-bottom: 46px;
+  --ui-panel-content-left: 38px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--ui-panel-skin) !important;
+  color: #f6f0dc !important;
+}

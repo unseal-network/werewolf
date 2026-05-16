@@ -1,9 +1,26 @@
 /* Region layout: root shell, scene layer, table rails, and center info. */
 .game-layout-root {
-  --art-ring-normal: url("/assets/ui/generated/slices/avatar-rings-atlas/avatar-rings-atlas-02.png");
-  --art-ring-dead: url("/assets/ui/generated/slices/avatar-rings-atlas/avatar-rings-atlas-18.png");
-  --art-seat-badge: url("/assets/ui/generated/slices/radial-base-hub-parts/radial-base-hub-parts-14.png");
-  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-mobile.png");
+  --ww-ui-base: "/assets/werewolf-ui/final";
+  --art-ring-normal: url("/assets/werewolf-ui/final/avatar/frame-default.png");
+  --art-ring-selected: url("/assets/werewolf-ui/final/avatar/frame-selected.png");
+  --art-ring-speaking: url("/assets/werewolf-ui/final/avatar/frame-speaking.png");
+  --art-ring-dead: url("/assets/werewolf-ui/final/avatar/frame-dead.png");
+  --art-avatar-glow-selected: url("/assets/werewolf-ui/final/avatar/glow-selected.png");
+  --art-avatar-selected-glow-effect: url("/assets/werewolf-ui/final/effect/avatar-selected-glow.png");
+  --art-avatar-portrait-hooded: url("/assets/werewolf-ui/final/avatar/portrait-hooded.png");
+  --art-avatar-speaking-pulse: url("/assets/werewolf-ui/final/effect/avatar-speaking-pulse.png");
+  --art-avatar-vote-target: url("/assets/werewolf-ui/final/effect/vote-target-ring.png");
+  --art-avatar-dead-overlay: url("/assets/werewolf-ui/final/avatar/dead-overlay.png");
+  --art-avatar-name-line: url("/assets/werewolf-ui/final/avatar/name-line.png");
+  --art-avatar-status-dot: url("/assets/werewolf-ui/final/avatar/status-dot.png");
+  --art-badge-blade: url("/assets/werewolf-ui/final/badge/blade.png");
+  --art-badge-eye: url("/assets/werewolf-ui/final/badge/eye.png");
+  --art-badge-moon: url("/assets/werewolf-ui/final/badge/moon.png");
+  --art-badge-people: url("/assets/werewolf-ui/final/badge/people.png");
+  --art-badge-shield: url("/assets/werewolf-ui/final/badge/shield.png");
+  --art-badge-star: url("/assets/werewolf-ui/final/badge/star.png");
+  --layout-bg-image: url("/assets/werewolf-ui/final/background/night-village.png");
+  --layout-vignette-image: url("/assets/werewolf-ui/final/background/vignette-overlay.png");
   --layout-bg-position: center top;
   --layout-bg-overlay:
     linear-gradient(180deg, rgba(1, 6, 9, 0.10), rgba(0, 0, 0, 0.58)),
@@ -47,6 +64,7 @@
   z-index: 0;
   background:
     var(--layout-bg-overlay),
+    var(--layout-vignette-image) center / cover no-repeat,
     var(--layout-bg-image) var(--layout-bg-position) / cover no-repeat;
 }
 
@@ -103,9 +121,8 @@
   grid-template-areas:
     "hud"
     "table"
-    "action"
     "utility";
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: clamp(8px, 1.4vh, 14px);
 }
 
@@ -169,36 +186,15 @@
 .game-layout-root .center-info-panel {
   box-sizing: border-box;
   max-height: min(42dvh, 460px);
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(2, 8, 10, 0.28);
+  --ui-panel-scale: 0.42;
+  --ui-panel-content-top: 34px;
+  --ui-panel-content-right: 28px;
+  --ui-panel-content-bottom: 34px;
+  --ui-panel-content-left: 28px;
   color: #f6f0dc;
   text-align: center;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.84);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.game-layout-root .center-info-kicker {
-  color: rgba(246, 240, 220, 0.62);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.game-layout-root .center-info-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: clamp(16px, 3vw, 24px);
-  font-weight: 950;
-  line-height: 1.12;
-}
-
-.game-layout-root .center-info-meta {
-  color: rgba(246, 240, 220, 0.72);
-  font-size: 12px;
-  font-weight: 850;
 }

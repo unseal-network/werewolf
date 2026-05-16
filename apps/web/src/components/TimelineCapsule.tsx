@@ -309,7 +309,7 @@ export function TimelineCapsule({
         className={`sheet-backdrop timeline-backdrop ${open ? "show" : ""}`}
         onClick={() => setOpen(false)}
       />
-      <section className={`log-sheet ${open ? "open" : ""}`}>
+      <section className={`log-sheet ui-panel ${open ? "open" : ""}`}>
         <div className="sheet-head">
           <div>
             <div className="sheet-title">{t("timeline.title")}</div>

@@ -1,6 +1,7 @@
 @import "./game-room/legacy.css";
 @import "./game-room/layout.css";
 @import "./game-room/components/hud.css";
+@import "./game-room/components/ui-panel.css";
 @import "./game-room/components/center-info.css";
 @import "./game-room/components/seat-avatar.css";
 @import "./game-room/components/action-region.css";

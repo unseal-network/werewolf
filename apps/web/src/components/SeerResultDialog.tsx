@@ -20,7 +20,7 @@ export function SeerResultDialog({
   return (
     <>
       <div className="sheet-backdrop show" onClick={onClose} aria-hidden />
-      <section className="seer-result-dialog open" role="dialog" aria-modal="true">
+      <section className="seer-result-dialog open ui-panel" role="dialog" aria-modal="true">
         <button
           type="button"
           className="seer-result-close"

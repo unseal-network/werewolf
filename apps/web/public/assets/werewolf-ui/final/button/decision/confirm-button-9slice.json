@@ -1,0 +1,72 @@
+{
+  "id": "button-confirm-moonlit",
+  "type": "button-9slice",
+  "status": "verified",
+  "version": "v001",
+  "source": "deterministic-rebuild-from-existing-project-assets",
+  "source_assets": [
+    "button/log-fill",
+    "button/log-corner-bl",
+    "button/log-corner-br",
+    "button/log-corner-tl",
+    "button/log-corner-tr",
+    "button/log-edge-horizontal",
+    "button/log-edge-vertical",
+    "card/role-card-back",
+    "hud/moon-medallion"
+  ],
+  "license": "project-owned-derived",
+  "target_runtime": "web-css",
+  "purpose": "Confirm action button background",
+  "visual_notes": "moonlit green-black stone with warm gold trim",
+  "output": {
+    "path": "public/assets/werewolf-ui/final/button/decision/confirm-button-9slice.png",
+    "format": "png",
+    "transparent": true,
+    "source_size": "384x128",
+    "scale": "2x",
+    "premultiplied_alpha": false
+  },
+  "nine_slice": {
+    "left": 64,
+    "right": 64,
+    "top": 40,
+    "bottom": 40,
+    "repeat": "stretch",
+    "fill_center": true,
+    "css": {
+      "border_image_width": 42,
+      "border_image_outset": 0
+    }
+  },
+  "padding": {
+    "left": 74,
+    "right": 74,
+    "top": 28,
+    "bottom": 28
+  },
+  "render_limits": {
+    "min_size": "180x72",
+    "max_size": "760x180"
+  },
+  "label": {
+    "live_text": true,
+    "contrast_minimum": 4.5
+  },
+  "generation_control": {
+    "strategy": "reference-first + deterministic-rebuild",
+    "control_source": "existing werewolf-ui log button 9-slice pieces",
+    "candidate_count": 1,
+    "hard_reject": [
+      "state size mismatch",
+      "baked text",
+      "dirty alpha",
+      "unsafe label area",
+      "geometry mismatch"
+    ]
+  },
+  "validation_artifacts": [
+    "public/assets/werewolf-ui/final/button/decision/confirm-button-9slice.png"
+  ],
+  "handoff_notes": "Use as CSS border-image with the declared slice values. Keep button label as live text."
+}
