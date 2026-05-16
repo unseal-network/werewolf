@@ -1,11 +1,20 @@
 /* Component: bottom utility region, role card entry, and timeline trigger. */
 .game-layout-root .utility-region {
-  grid-area: utility;
+  grid-area: auto;
   z-index: 7;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--layout-safe-bottom);
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: end;
   min-height: 70px;
+  pointer-events: none;
+}
+
+.game-layout-root .utility-slot {
+  pointer-events: auto;
 }
 
 .game-layout-root .utility-role-card {
@@ -71,4 +80,26 @@
   background: url("/assets/werewolf-ui/final/icon/book.png") center / contain no-repeat;
   transform: translateY(-50%);
   opacity: 0.88;
+}
+
+.game-layout-root .utility-region .log-sheet {
+  position: fixed !important;
+  left: auto !important;
+  right: max(14px, env(safe-area-inset-right)) !important;
+  top: calc(var(--layout-safe-top) + 86px) !important;
+  bottom: calc(var(--layout-safe-bottom) + 86px) !important;
+  z-index: 130 !important;
+  width: min(380px, calc(100vw - 28px)) !important;
+  height: auto !important;
+  transform: translateX(24px) scale(0.98) !important;
+  transform-origin: right bottom !important;
+  pointer-events: auto;
+}
+
+.game-layout-root .utility-region .log-sheet.open {
+  transform: translateX(0) scale(1) !important;
+}
+
+.game-layout-root .utility-region .timeline-backdrop {
+  position: fixed !important;
 }

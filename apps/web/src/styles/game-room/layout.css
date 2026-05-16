@@ -11,8 +11,6 @@
   --art-avatar-speaking-pulse: url("/assets/werewolf-ui/final/effect/avatar-speaking-pulse.png");
   --art-avatar-vote-target: url("/assets/werewolf-ui/final/effect/vote-target-ring.png");
   --art-avatar-dead-overlay: url("/assets/werewolf-ui/final/avatar/dead-overlay.png");
-  --art-avatar-name-line: url("/assets/werewolf-ui/final/avatar/name-line.png");
-  --art-avatar-status-dot: url("/assets/werewolf-ui/final/avatar/status-dot.png");
   --art-badge-blade: url("/assets/werewolf-ui/final/badge/blade.png");
   --art-badge-eye: url("/assets/werewolf-ui/final/badge/eye.png");
   --art-badge-moon: url("/assets/werewolf-ui/final/badge/moon.png");
@@ -34,8 +32,10 @@
   --layout-edge: clamp(10px, 3vw, 28px);
   --layout-seat: clamp(64px, 8vw, 90px);
   --layout-avatar: calc(var(--layout-seat) * 0.7);
-  --layout-seat-slot: calc(var(--layout-avatar) * 1.4 + 20px);
+  --layout-rail-width: calc(var(--layout-avatar) * 1.66);
+  --layout-seat-slot: calc(var(--layout-avatar) * 1.24 + 14px);
   --layout-rail-height: min(64dvh, calc(100dvh - 230px));
+  --layout-table-top-gap: clamp(18px, 3vh, 36px);
   --layout-action-width: min(380px, calc(100vw - 142px));
   position: relative;
   width: 100%;
@@ -120,9 +120,8 @@
   display: grid;
   grid-template-areas:
     "hud"
-    "table"
-    "utility";
-  grid-template-rows: auto minmax(0, 1fr) auto;
+    "table";
+  grid-template-rows: auto minmax(0, 1fr);
   gap: clamp(8px, 1.4vh, 14px);
 }
 
@@ -145,16 +144,18 @@
 .game-layout-root .table-region {
   grid-area: table;
   position: relative;
+  box-sizing: border-box;
   min-height: 0;
+  padding-top: var(--layout-table-top-gap);
   display: grid;
-  grid-template-columns: var(--layout-seat) minmax(0, 1fr) var(--layout-seat);
+  grid-template-columns: var(--layout-rail-width) minmax(0, 1fr) var(--layout-rail-width);
   grid-template-areas: "left center right";
   align-items: start;
   column-gap: clamp(10px, 4vw, 48px);
 }
 
 .game-layout-root .player-rail {
-  width: var(--layout-seat);
+  width: var(--layout-rail-width);
   height: var(--layout-rail-height);
   max-height: 66dvh;
   display: grid;
@@ -179,18 +180,18 @@
   grid-area: center;
   align-self: start;
   justify-self: center;
-  width: min(360px, 100%);
+  width: min(380px, 100%);
   margin-top: clamp(22px, 7vh, 76px);
 }
 
 .game-layout-root .center-info-panel {
   box-sizing: border-box;
-  max-height: min(42dvh, 460px);
-  --ui-panel-scale: 0.42;
+  max-height: min(31dvh, 220px);
+  --ui-panel-scale: 0.24;
   --ui-panel-content-top: 34px;
-  --ui-panel-content-right: 28px;
+  --ui-panel-content-right: 34px;
   --ui-panel-content-bottom: 34px;
-  --ui-panel-content-left: 28px;
+  --ui-panel-content-left: 34px;
   color: #f6f0dc;
   text-align: center;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.84);

@@ -1,20 +1,22 @@
 /* Component: central action region. */
 .game-layout-root .action-region {
-  grid-area: table;
+  grid-area: auto;
   z-index: 6;
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--layout-safe-bottom) + clamp(82px, 13dvh, 104px));
   width: min(
     var(--layout-action-width),
-    calc(100% - (var(--layout-seat) * 2) - clamp(28px, 8vw, 96px))
+    calc(100% - (var(--layout-rail-width) * 2) - clamp(28px, 8vw, 96px))
   );
   min-width: 0;
   min-height: 0;
-  justify-self: center;
-  align-self: end;
-  margin-bottom: var(--layout-action-bottom, clamp(18px, 4dvh, 52px));
+  margin-bottom: 0;
   display: grid;
   place-items: center;
   justify-items: center;
   pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .game-layout-root .action-region .phase-card {
@@ -64,6 +66,66 @@
 
 .game-layout-root .action-region .player-picker {
   width: min(100%, 320px);
+}
+
+.game-layout-root .action-region .voice-panel {
+  box-sizing: border-box;
+  width: min(100%, 360px);
+  max-width: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: calc(8px * var(--layout-action-scale, 1));
+  justify-self: center;
+  align-self: end;
+  pointer-events: auto;
+}
+
+.game-layout-root .action-region .voice-bubble-row {
+  position: relative;
+  width: 100%;
+  height: calc(48px * var(--layout-action-scale, 1));
+  --voice-square-size: calc(48px * var(--layout-action-scale, 1));
+}
+
+.game-layout-root .action-region .voice-bubble {
+  height: calc(48px * var(--layout-action-scale, 1));
+  min-height: calc(48px * var(--layout-action-scale, 1));
+  border-radius: calc(13px * var(--layout-action-scale, 1));
+}
+
+.game-layout-root .action-region .voice-bubble-large {
+  width: calc(100% - var(--voice-square-size) - calc(10px * var(--layout-action-scale, 1)));
+}
+
+.game-layout-root .action-region .voice-text-bubble .speech-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: calc(48px * var(--layout-action-scale, 1));
+  min-height: calc(48px * var(--layout-action-scale, 1));
+  padding: calc(12px * var(--layout-action-scale, 1)) calc(14px * var(--layout-action-scale, 1)) 0;
+  font-size: calc(15px * var(--layout-action-scale, 1));
+  line-height: calc(21px * var(--layout-action-scale, 1));
+}
+
+.game-layout-root .action-region .voice-actions {
+  width: 100%;
+}
+
+.game-layout-root .action-region .voice-state,
+.game-layout-root .action-region .voice-error {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: rgba(246, 240, 220, 0.72);
+  font-size: calc(11px * var(--layout-action-scale, 1));
+  font-weight: 780;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.86);
+}
+
+.game-layout-root .action-region .voice-error {
+  color: #ff9aa5;
 }
 
 .game-layout-root .action-region .player-picker-control-slot {

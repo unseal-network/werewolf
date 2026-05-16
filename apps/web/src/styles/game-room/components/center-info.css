@@ -1,35 +1,4 @@
 /* Component: realtime center information for speeches, votes, and notices. */
-.game-layout-root .center-info-panel {
-  isolation: isolate;
-}
-
-.game-layout-root .center-info-panel > * {
-  position: relative;
-  z-index: 1;
-}
-
-.game-layout-root .center-info-panel::before,
-.game-layout-root .center-info-panel::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  opacity: 0.46;
-}
-
-.game-layout-root .center-info-panel::before {
-  background:
-    url("/assets/werewolf-ui/final/panel-9slice/arrow-point-left.png") left 9px center / 22px 30px no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/arrow-point-right.png") right 9px center / 22px 30px no-repeat;
-}
-
-.game-layout-root .center-info-panel::after {
-  background:
-    url("/assets/werewolf-ui/final/panel-9slice/arrow-point-up.png") center top 7px / 30px 22px no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/arrow-point-down.png") center bottom 7px / 30px 22px no-repeat;
-}
-
 .game-layout-root .center-live-block {
   min-height: 0;
   margin-top: 0;

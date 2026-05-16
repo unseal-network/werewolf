@@ -29,9 +29,8 @@
     overflow: hidden;
     grid-template-areas:
       "hud"
-      "table"
-      "utility";
-    grid-template-rows: auto minmax(0, 1fr) auto;
+      "table";
+    grid-template-rows: auto minmax(0, 1fr);
     gap: 7px;
     padding-bottom: calc(var(--layout-safe-bottom) + 10px);
   }
@@ -83,7 +82,7 @@
   }
 
   .game-layout-root .table-region {
-    grid-template-columns: var(--layout-seat) minmax(0, 1fr) var(--layout-seat);
+    grid-template-columns: var(--layout-rail-width) minmax(0, 1fr) var(--layout-rail-width);
     column-gap: 6px;
   }
 
@@ -104,17 +103,17 @@
   }
 
   .game-layout-root .center-info-region {
-    width: min(220px, 100%);
+    width: min(300px, 100%);
     margin-top: clamp(18px, 7vh, 56px);
   }
 
   .game-layout-root .center-info-panel {
-    max-height: min(38dvh, 360px);
-    --ui-panel-scale: 0.32;
-    --ui-panel-content-top: 24px;
-    --ui-panel-content-right: 20px;
-    --ui-panel-content-bottom: 24px;
-    --ui-panel-content-left: 20px;
+    max-height: min(29dvh, 190px);
+    --ui-panel-scale: 0.2;
+    --ui-panel-content-top: 28px;
+    --ui-panel-content-right: 26px;
+    --ui-panel-content-bottom: 28px;
+    --ui-panel-content-left: 26px;
   }
 
   .game-layout-root .action-region .phase-card,

@@ -235,7 +235,6 @@ export function VoicePanel({
                   handleVoiceMode();
                 }
               }}
-              autoFocus
             />
           )}
         </div>

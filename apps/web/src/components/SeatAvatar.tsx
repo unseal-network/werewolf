@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { type DisplayRole, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG } from "../constants/roles";
+import { type DisplayRole, normalizeDisplayRole, ROLE_COLOR } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
 
 export interface SeatData {
@@ -23,6 +23,7 @@ export interface SeatData {
 
 interface SeatAvatarProps {
   seat: SeatData;
+  avatarMode: "identity" | "hooded";
   onClick: () => void;
 }
 
@@ -95,18 +96,19 @@ function seatBadgeId(seat: SeatData, roleId: DisplayRole | undefined): SeatBadge
   return seat.kind === "agent" ? "people" : undefined;
 }
 
-export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatarProps) {
+export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }: SeatAvatarProps) {
   const t = useT();
   const fallbackName = t("seat.fallbackName", { n: seat.seatNo });
   const fullName = seat.displayName?.trim() ? seat.displayName : fallbackName;
   const roleId = seat.visibleRole ? normalizeDisplayRole(seat.visibleRole) : undefined;
-  const roleImg = roleId ? ROLE_IMG[roleId] : undefined;
   const roleColor = roleId ? ROLE_COLOR[roleId] : undefined;
-  const hasImageAvatar = Boolean(seat.avatarUrl && !seat.isEmpty && !roleImg);
-  const hasLetterAvatar = Boolean(!seat.isEmpty && !roleImg && !hasImageAvatar);
+  const showIdentityAvatar = avatarMode === "identity";
+  const hasImageAvatar = Boolean(showIdentityAvatar && seat.avatarUrl && !seat.isEmpty);
+  const hasLetterAvatar = Boolean(showIdentityAvatar && !seat.isEmpty && !hasImageAvatar);
+  const hasHoodedAvatar = Boolean(!showIdentityAvatar && !seat.isEmpty);
   const badgeId = seatBadgeId(seat, roleId);
   const identitySeed = avatarIdentitySeed(seat, fullName);
-  const palette = hasLetterAvatar
+  const palette = hasLetterAvatar || hasHoodedAvatar
     ? avatarPalette(identitySeed)
     : undefined;
   const avatarStyle = {
@@ -140,21 +142,16 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
       <div
         className={[
           "avatar",
-          hasLetterAvatar ? "has-hooded-portrait" : "",
+          hasImageAvatar ? "avatar-mode-image" : "",
+          hasLetterAvatar ? "avatar-mode-letter" : "",
+          hasHoodedAvatar ? "avatar-mode-hooded" : "",
         ]
           .filter(Boolean)
           .join(" ")}
         aria-hidden
         style={avatarStyle}
       >
-        {roleImg ? (
-          <img
-            className="seat-avatar-img role-avatar-img"
-            src={roleImg}
-            alt=""
-            draggable={false}
-          />
-        ) : seat.avatarUrl && !seat.isEmpty ? (
+        {hasImageAvatar ? (
           <img
             className="seat-avatar-img player-avatar-img"
             src={seat.avatarUrl}
@@ -163,8 +160,12 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
           />
         ) : (
           <>
-            {hasLetterAvatar ? <span className="seat-hooded-portrait" /> : null}
-            <span className="seat-avatar-initial">{seat.isEmpty ? "+" : avatarInitial(seat, fullName)}</span>
+            {hasHoodedAvatar ? <span className="seat-hooded-portrait" /> : null}
+            {seat.isEmpty || hasLetterAvatar ? (
+              <span className="seat-avatar-initial">
+                {seat.isEmpty ? "+" : avatarInitial(seat, fullName)}
+              </span>
+            ) : null}
           </>
         )}
         {badgeId ? (
@@ -174,11 +175,6 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, onClick }: SeatAvatar
         ) : null}
         {!seat.isEmpty ? <span className="seat-number-badge">{seat.seatNo}</span> : null}
       </div>
-      {!seat.isEmpty ? (
-        <span className="seat-name" aria-hidden>
-          {fullName}
-        </span>
-      ) : null}
     </button>
   );
 });

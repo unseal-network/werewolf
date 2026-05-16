@@ -37,11 +37,8 @@
 }
 
 .game-layout-root .hud-region::after {
-  background:
-    url("/assets/werewolf-ui/final/hud/socket-left.png") left center / auto 100% no-repeat,
-    url("/assets/werewolf-ui/final/hud/socket-right.png") right center / auto 100% no-repeat,
-    url("/assets/werewolf-ui/final/hud/moon-medallion.png") center / auto 120% no-repeat;
-  opacity: 0.72;
+  background: url("/assets/werewolf-ui/final/hud/moon-medallion.png") center / auto 112% no-repeat;
+  opacity: 0.5;
 }
 
 .game-layout-root .hud-back-button,
