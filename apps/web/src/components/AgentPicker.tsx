@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n/I18nProvider";
 import type { AgentCandidate } from "../api/client";
+import { GameButton } from "./GameButton";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface AgentPickerProps {
   open: boolean;
@@ -57,10 +59,15 @@ export function AgentPicker({
         onClick={onClose}
         aria-hidden
       />
-      <section
-        className="agent-picker open ui-panel"
+      <UiPanelFrame
+        as="section"
+        className="agent-picker open"
+        contentClassName="agent-picker-content"
         role="dialog"
         aria-modal="true"
+        tone="filled"
+        size="medium"
+        ornament
       >
         <div className="agent-picker-head">
           <div>
@@ -106,43 +113,45 @@ export function AgentPicker({
                   <div className="agent-name">{agent.displayName}</div>
                   <div className="agent-id">{agent.userId}</div>
                 </div>
-                <button
-                  type="button"
-                  className={`stage-skip ${agent.alreadyJoined ? "added" : ""}`}
+                <GameButton
+                  variant="secondary"
+                  size="sm"
+                  className={`agent-add-button ${agent.alreadyJoined ? "added" : ""}`}
                   disabled={
                     agent.alreadyJoined ||
                     pendingId === agent.userId ||
                     remainingSeats <= 0
                   }
                   onClick={() => handleAdd(agent)}
-                >
-                  {agent.alreadyJoined
+                  label={agent.alreadyJoined
                     ? t("agentPicker.added")
                     : pendingId === agent.userId
                       ? "..."
                       : t("agentPicker.add")}
-                </button>
+                />
               </div>
             ))
           )}
         </div>
 
         <div className="agent-picker-actions">
-          <button type="button" className="action secondary" onClick={onRefresh}>
-            {t("agentPicker.refresh")}
-          </button>
+          <GameButton
+            variant="secondary"
+            size="sm"
+            label={t("agentPicker.refresh")}
+            onClick={onRefresh}
+          />
           {onStartNow ? (
-            <button
-              type="button"
-              className="action primary"
+            <GameButton
+              variant="primary"
+              size="sm"
+              label={t("agentPicker.startNow")}
               onClick={onStartNow}
               disabled={!canStartNow}
-            >
-              {t("agentPicker.startNow")}
-            </button>
+            />
           ) : null}
         </div>
-      </section>
+      </UiPanelFrame>
     </>
   );
 }

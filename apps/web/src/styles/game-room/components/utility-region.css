@@ -1,11 +1,8 @@
 /* Component: bottom utility region, role card entry, and timeline trigger. */
 .game-layout-root .utility-region {
-  grid-area: auto;
+  grid-area: utility;
   z-index: 7;
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: var(--layout-safe-bottom);
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: end;
@@ -54,7 +51,7 @@
   height: 40px !important;
   min-height: 40px !important;
   padding: 0 16px 0 40px !important;
-  border: 0 !important;
+  border: 1px solid rgba(226, 202, 139, 0.26) !important;
   border-radius: 0 !important;
   background:
     url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 24px 24px no-repeat,
@@ -65,9 +62,12 @@
     url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 12px repeat-x,
     url("/assets/werewolf-ui/final/button/log-edge-vertical.png") left center / 12px calc(100% - 36px) repeat-y,
     url("/assets/werewolf-ui/final/button/log-edge-vertical.png") right center / 12px calc(100% - 36px) repeat-y,
-    url("/assets/werewolf-ui/final/button/log-fill.png") center / calc(100% - 18px) calc(100% - 18px) repeat !important;
+    linear-gradient(180deg, rgba(7, 13, 15, 0.22), rgba(3, 8, 10, 0.12)) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   color: #fff7d8 !important;
-  box-shadow: none !important;
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18) !important;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.82);
 }
 
 .game-layout-root .utility-region .log-peek::before {
@@ -83,23 +83,51 @@
 }
 
 .game-layout-root .utility-region .log-sheet {
+  --ww-panel-scale: 0.38;
+  --ww-panel-content-top: 58px;
+  --ww-panel-content-right: 42px;
+  --ww-panel-content-bottom: 58px;
+  --ww-panel-content-left: 42px;
   position: fixed !important;
   left: auto !important;
   right: max(14px, env(safe-area-inset-right)) !important;
   top: calc(var(--layout-safe-top) + 86px) !important;
   bottom: calc(var(--layout-safe-bottom) + 86px) !important;
-  z-index: 130 !important;
+  z-index: 120 !important;
   width: min(380px, calc(100vw - 28px)) !important;
   height: auto !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
   transform: translateX(24px) scale(0.98) !important;
   transform-origin: right bottom !important;
-  pointer-events: auto;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.game-layout-root .utility-region .log-sheet .ww-ui-panel__content {
+  box-sizing: border-box;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 18px;
+  overflow: hidden;
 }
 
 .game-layout-root .utility-region .log-sheet.open {
+  opacity: 1 !important;
+  visibility: visible !important;
   transform: translateX(0) scale(1) !important;
+  pointer-events: auto !important;
 }
 
 .game-layout-root .utility-region .timeline-backdrop {
   position: fixed !important;
+  pointer-events: none !important;
+}
+
+.game-layout-root .utility-region .timeline-backdrop.show {
+  pointer-events: auto !important;
 }

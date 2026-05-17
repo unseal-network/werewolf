@@ -1,0 +1,373 @@
+/* New UI primitives. These do not participate in room layout until wired in. */
+.game-layout-root .ww-ui-panel {
+  --ww-panel-scale: 1;
+  --ww-panel-corner: calc(192px * var(--ww-panel-scale));
+  --ww-panel-edge: calc(32px * var(--ww-panel-scale));
+  --ww-panel-fill-inset: calc(32px * var(--ww-panel-scale));
+  --ww-panel-edge-overlap: 0px;
+  --ww-panel-edge-top-y: calc(33px * var(--ww-panel-scale));
+  --ww-panel-edge-bottom-y: calc(29px * var(--ww-panel-scale));
+  --ww-panel-edge-left-x: calc(12px * var(--ww-panel-scale));
+  --ww-panel-edge-right-x: calc(15px * var(--ww-panel-scale));
+  --ww-panel-content-top: calc(96px * var(--ww-panel-scale));
+  --ww-panel-content-right: calc(78px * var(--ww-panel-scale));
+  --ww-panel-content-bottom: calc(96px * var(--ww-panel-scale));
+  --ww-panel-content-left: calc(78px * var(--ww-panel-scale));
+  position: relative;
+  box-sizing: border-box;
+  min-width: calc((var(--ww-panel-corner) - var(--ww-panel-edge-overlap)) * 2 + 24px);
+  min-height: calc((var(--ww-panel-corner) - var(--ww-panel-edge-overlap)) * 2 + 24px);
+  padding:
+    var(--ww-panel-content-top)
+    var(--ww-panel-content-right)
+    var(--ww-panel-content-bottom)
+    var(--ww-panel-content-left);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  isolation: isolate;
+}
+
+.game-layout-root .ww-ui-panel--compact {
+  --ww-panel-scale: 0.24;
+}
+
+.game-layout-root .ww-ui-panel--medium {
+  --ww-panel-scale: 0.34;
+}
+
+.game-layout-root .ww-ui-panel--large {
+  --ww-panel-scale: 0.5;
+}
+
+.game-layout-root .ww-ui-panel__fill,
+.game-layout-root .ww-ui-panel__edge,
+.game-layout-root .ww-ui-panel__corner,
+.game-layout-root .ww-ui-panel__ornament {
+  position: absolute;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+.game-layout-root .ww-ui-panel__fill {
+  inset: var(--ww-panel-fill-inset);
+  z-index: 0;
+  background: transparent;
+}
+
+.game-layout-root .ww-ui-panel--filled .ww-ui-panel__fill {
+  background:
+    url("/assets/werewolf-ui/final/panel-9slice/fill.png")
+      center / calc(128px * var(--ww-panel-scale)) calc(128px * var(--ww-panel-scale))
+      repeat;
+}
+
+.game-layout-root .ww-ui-panel__edge {
+  z-index: 1;
+  overflow: hidden;
+  background-repeat: stretch;
+  background-size: 100% 100%;
+}
+
+.game-layout-root .ww-ui-panel__edge--top,
+.game-layout-root .ww-ui-panel__edge--bottom {
+  left: calc(var(--ww-panel-corner) - var(--ww-panel-edge-overlap));
+  right: calc(var(--ww-panel-corner) - var(--ww-panel-edge-overlap));
+  height: var(--ww-panel-edge);
+}
+
+.game-layout-root .ww-ui-panel__edge--top {
+  top: var(--ww-panel-edge-top-y);
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/edge-top.png");
+}
+
+.game-layout-root .ww-ui-panel__edge--bottom {
+  bottom: var(--ww-panel-edge-bottom-y);
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/edge-bottom.png");
+}
+
+.game-layout-root .ww-ui-panel__edge--left,
+.game-layout-root .ww-ui-panel__edge--right {
+  top: calc(var(--ww-panel-corner) - var(--ww-panel-edge-overlap));
+  bottom: calc(var(--ww-panel-corner) - var(--ww-panel-edge-overlap));
+  width: var(--ww-panel-edge);
+}
+
+.game-layout-root .ww-ui-panel__edge--left {
+  left: var(--ww-panel-edge-left-x);
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/edge-left.png");
+}
+
+.game-layout-root .ww-ui-panel__edge--right {
+  right: var(--ww-panel-edge-right-x);
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/edge-right.png");
+}
+
+.game-layout-root .ww-ui-panel__corner {
+  z-index: 2;
+  width: var(--ww-panel-corner);
+  height: var(--ww-panel-corner);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.game-layout-root .ww-ui-panel__corner--tl {
+  left: 0;
+  top: 0;
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/corner-tl.png");
+}
+
+.game-layout-root .ww-ui-panel__corner--tr {
+  right: 0;
+  top: 0;
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/corner-tr.png");
+}
+
+.game-layout-root .ww-ui-panel__corner--bl {
+  left: 0;
+  bottom: 0;
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/corner-bl.png");
+}
+
+.game-layout-root .ww-ui-panel__corner--br {
+  right: 0;
+  bottom: 0;
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/corner-br.png");
+}
+
+.game-layout-root .ww-ui-panel__ornament {
+  left: 50%;
+  z-index: 3;
+  width: calc(96px * var(--ww-panel-scale));
+  height: calc(128px * var(--ww-panel-scale));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  transform: translateX(-50%);
+}
+
+.game-layout-root .ww-ui-panel__ornament--top {
+  top: calc(-17px * var(--ww-panel-scale));
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/ornament-top.png");
+}
+
+.game-layout-root .ww-ui-panel__ornament--bottom {
+  bottom: calc(-16px * var(--ww-panel-scale));
+  background-image: url("/assets/werewolf-ui/final/panel-9slice/ornament-bottom.png");
+}
+
+.game-layout-root .ww-ui-panel__content {
+  position: relative;
+  z-index: 4;
+  min-width: 0;
+  min-height: 0;
+}
+
+.game-layout-root .profile-dialog.ww-ui-panel {
+  --ww-panel-scale: 0.34;
+  --ww-panel-content-top: 50px;
+  --ww-panel-content-right: 38px;
+  --ww-panel-content-bottom: 46px;
+  --ww-panel-content-left: 38px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f6f0dc !important;
+}
+
+.game-layout-root .profile-dialog.ww-ui-panel .ww-ui-panel__content {
+  display: grid;
+  gap: 18px;
+}
+
+.game-layout-root .seer-result-dialog.ww-ui-panel {
+  --ww-panel-scale: 0.34;
+  --ww-panel-content-top: 52px;
+  --ww-panel-content-right: 42px;
+  --ww-panel-content-bottom: 48px;
+  --ww-panel-content-left: 42px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f6f0dc !important;
+}
+
+.game-layout-root .seer-result-dialog.ww-ui-panel .ww-ui-panel__content {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.game-layout-root .start-dialog.ww-ui-panel,
+.game-layout-root .agent-picker.ww-ui-panel {
+  --ww-panel-scale: 0.34;
+  --ww-panel-content-top: 54px;
+  --ww-panel-content-right: 42px;
+  --ww-panel-content-bottom: 50px;
+  --ww-panel-content-left: 42px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #f6f0dc !important;
+}
+
+.game-layout-root .start-dialog.ww-ui-panel .ww-ui-panel__content,
+.game-layout-root .agent-picker.ww-ui-panel .ww-ui-panel__content {
+  display: grid;
+  min-height: 0;
+}
+
+.game-layout-root .start-dialog.ww-ui-panel .ww-ui-panel__content {
+  justify-items: center;
+  gap: 16px;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.game-layout-root .start-dialog.ww-ui-panel .start-title,
+.game-layout-root .start-dialog.ww-ui-panel .start-copy {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.game-layout-root .start-dialog.ww-ui-panel .start-actions {
+  width: min(100%, 300px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: 10px;
+}
+
+.game-layout-root .start-dialog.ww-ui-panel .start-actions .ww-game-button {
+  --ww-button-width: 100%;
+  width: 100%;
+}
+
+.game-layout-root .agent-picker.ww-ui-panel {
+  width: min(560px, calc(100vw - 28px));
+  max-height: min(78dvh, 680px);
+}
+
+.game-layout-root .agent-picker.ww-ui-panel .ww-ui-panel__content {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  gap: 16px;
+}
+
+.game-layout-root .agent-picker-list {
+  min-height: 0;
+  overflow: auto;
+}
+
+.game-layout-root .agent-add-button {
+  --ww-button-scale: 0.72;
+  width: calc(168px * var(--ww-button-scale));
+}
+
+.game-layout-root .ww-game-button {
+  --ww-button-scale: 1;
+  --ww-button-width: calc(260px * var(--ww-button-scale));
+  --ww-button-height: calc(72px * var(--ww-button-scale));
+  position: relative;
+  box-sizing: border-box;
+  width: var(--ww-button-width);
+  height: var(--ww-button-height);
+  min-width: 0;
+  border-style: solid;
+  border-color: transparent;
+  border-image-repeat: stretch;
+  background: transparent;
+  color: #fff7d8;
+  font-size: calc(18px * var(--ww-button-scale));
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-align: center;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.82),
+    0 0 12px rgba(0, 0, 0, 0.48);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game-layout-root .ww-game-button--sm {
+  --ww-button-scale: 0.86;
+}
+
+.game-layout-root .ww-game-button--lg {
+  --ww-button-scale: 1.18;
+}
+
+.game-layout-root .ww-game-button--primary {
+  --ww-button-width: calc(300px * var(--ww-button-scale));
+  --ww-button-height: calc(96px * var(--ww-button-scale));
+  border-width: calc(38px * var(--ww-button-scale)) calc(84px * var(--ww-button-scale));
+  border-image-source: url("/assets/werewolf-ui/final/button/decision/submit-button-9slice.png");
+  border-image-slice: 76 168 fill;
+  border-image-width: calc(38px * var(--ww-button-scale)) calc(84px * var(--ww-button-scale));
+  color: #191207;
+  text-shadow: 0 1px 0 rgba(255, 245, 186, 0.28);
+}
+
+.game-layout-root .ww-game-button--confirm {
+  border-width: calc(22px * var(--ww-button-scale)) calc(32px * var(--ww-button-scale));
+  border-image-source: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.png");
+  border-image-slice: 40 64 fill;
+  border-image-width: calc(22px * var(--ww-button-scale)) calc(32px * var(--ww-button-scale));
+}
+
+.game-layout-root .ww-game-button--secondary {
+  --ww-button-width: calc(250px * var(--ww-button-scale));
+  border-width: calc(28px * var(--ww-button-scale)) calc(70px * var(--ww-button-scale));
+  border-image-source: url("/assets/werewolf-ui/final/button/decision/cancel-button-9slice.png");
+  border-image-slice: 76 168 fill;
+  border-image-width: calc(28px * var(--ww-button-scale)) calc(70px * var(--ww-button-scale));
+}
+
+.game-layout-root .ww-game-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  filter: grayscale(0.32) brightness(0.84);
+}
+
+.game-layout-root .ww-game-button:not(:disabled):active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.game-layout-root .ww-game-button:focus-visible {
+  outline: 2px solid rgba(255, 235, 160, 0.78);
+  outline-offset: 3px;
+}
+
+.game-layout-root .ww-game-button__content {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding-inline: calc(28px * var(--ww-button-scale));
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.game-layout-root .ww-game-button__spinner {
+  width: calc(14px * var(--ww-button-scale));
+  height: calc(14px * var(--ww-button-scale));
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 999px;
+  animation: ww-game-button-spin 700ms linear infinite;
+}
+
+@keyframes ww-game-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

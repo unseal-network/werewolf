@@ -143,25 +143,6 @@ function useResponsiveGameLayoutVars(railSlotCount: number) {
   return vars;
 }
 
-function phaseIcon(scene: SceneId) {
-  switch (scene) {
-    case "night":
-      return "夜";
-    case "day":
-      return "昼";
-    case "vote":
-      return "票";
-    case "tie":
-      return "决";
-    case "deal":
-      return "牌";
-    case "end":
-      return "终";
-    default:
-      return "局";
-  }
-}
-
 function shouldSuppressGameContextMenu(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
   if (target.closest("textarea, input, [contenteditable='true']")) return false;
@@ -309,9 +290,6 @@ export function GameRoomShell({
           >
             ←
           </button>
-          <div className="hud-phase-token" aria-hidden>
-            {phaseIcon(scene)}
-          </div>
           <div className="hud-status">
             <div className="hud-phase-line">
               {phaseLabel}

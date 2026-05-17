@@ -3,14 +3,16 @@
   grid-area: hud;
   z-index: 5;
   position: relative;
-  width: min(100%, 720px);
+  width: calc(100% + var(--layout-edge) * 2);
   min-height: calc(58px * var(--layout-hud-scale, 1));
-  padding: calc(10px * var(--layout-hud-scale, 1)) calc(12px * var(--layout-hud-scale, 1));
+  margin-inline: calc(var(--layout-edge) * -1);
+  padding:
+    calc(10px * var(--layout-hud-scale, 1))
+    calc(var(--layout-edge) + 12px * var(--layout-hud-scale, 1));
   justify-self: center;
   display: grid;
   grid-template-columns:
     calc(44px * var(--layout-hud-scale, 1))
-    calc(42px * var(--layout-hud-scale, 1))
     minmax(0, 1fr)
     auto;
   align-items: center;
@@ -30,21 +32,17 @@
 
 .game-layout-root .hud-region::before {
   background:
-    url("/assets/werewolf-ui/final/hud/socket-left.png") left center / auto 100% no-repeat,
-    url("/assets/werewolf-ui/final/hud/socket-right.png") right center / auto 100% no-repeat,
-    url("/assets/werewolf-ui/final/hud/rail-top-line.png") top center / calc(100% - 104px) 16px repeat-x,
-    url("/assets/werewolf-ui/final/hud/rail-bottom-line.png") bottom center / calc(100% - 104px) 16px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-top-line.png") top center / 100% 16px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-bottom-line.png") bottom center / 100% 16px repeat-x,
     url("/assets/werewolf-ui/final/hud/rail-fill.png") center / 100% 100% no-repeat;
   opacity: 0.92;
 }
 
 .game-layout-root .hud-region::after {
-  background: url("/assets/werewolf-ui/final/hud/moon-medallion.png") center / auto 112% no-repeat;
-  opacity: 0.5;
+  display: none;
 }
 
 .game-layout-root .hud-back-button,
-.game-layout-root .hud-phase-token,
 .game-layout-root .hud-countdown,
 .game-layout-root .hud-alive-count {
   min-width: 0;
@@ -61,27 +59,6 @@
   width: calc(44px * var(--layout-hud-scale, 1));
   font-size: calc(22px * var(--layout-hud-scale, 1));
   cursor: pointer;
-}
-
-.game-layout-root .hud-phase-token {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: calc(42px * var(--layout-hud-scale, 1));
-  color: #ffe58c;
-  font-weight: 900;
-}
-
-.game-layout-root .hud-phase-token::before {
-  content: "";
-  position: absolute;
-  inset: 15%;
-  background: url("/assets/werewolf-ui/final/hud/icon-moon.png") center / contain no-repeat;
-  opacity: 0.76;
-}
-
-.game-layout-root .hud-phase-token {
-  color: #fff0a8;
 }
 
 .game-layout-root .hud-status {

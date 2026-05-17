@@ -1,5 +1,6 @@
 import type { SeatData } from "./SeatAvatar";
 import { useT } from "../i18n/I18nProvider";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface UserInfoPanelProps {
   seat: SeatData | null;
@@ -41,7 +42,16 @@ export function UserInfoPanel({
         onClick={onClose}
         aria-hidden
       />
-      <section className="profile-dialog open ui-panel" role="dialog" aria-modal="true">
+      <UiPanelFrame
+        as="section"
+        className="profile-dialog open"
+        contentClassName="profile-dialog-content"
+        tone="filled"
+        size="medium"
+        ornament
+        role="dialog"
+        aria-modal="true"
+      >
         {seat ? (
           <>
             <div className="profile-head">
@@ -98,7 +108,7 @@ export function UserInfoPanel({
             ) : null}
           </>
         ) : null}
-      </section>
+      </UiPanelFrame>
     </>
   );
 }

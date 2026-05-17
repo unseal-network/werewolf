@@ -72,12 +72,12 @@
       var(--ui-panel-edge)
       repeat-x,
     url("/assets/werewolf-ui/final/panel-9slice/edge-left.png")
-      var(--ui-panel-edge-left-x) center /
+      left var(--ui-panel-edge-left-x) top calc(var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) /
       var(--ui-panel-edge)
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
       repeat-y,
     url("/assets/werewolf-ui/final/panel-9slice/edge-right.png")
-      right var(--ui-panel-edge-right-x) center /
+      right var(--ui-panel-edge-right-x) top calc(var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) /
       var(--ui-panel-edge)
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
       repeat-y;

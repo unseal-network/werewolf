@@ -1,4 +1,5 @@
 import { useT } from "../i18n/I18nProvider";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface SeerResultDialogProps {
   open: boolean;
@@ -20,7 +21,16 @@ export function SeerResultDialog({
   return (
     <>
       <div className="sheet-backdrop show" onClick={onClose} aria-hidden />
-      <section className="seer-result-dialog open ui-panel" role="dialog" aria-modal="true">
+      <UiPanelFrame
+        as="section"
+        className="seer-result-dialog open"
+        contentClassName="seer-result-dialog-content"
+        tone="filled"
+        size="medium"
+        ornament
+        role="dialog"
+        aria-modal="true"
+      >
         <button
           type="button"
           className="seer-result-close"
@@ -40,7 +50,7 @@ export function SeerResultDialog({
             alignment: t(`alignment.${alignment}`),
           })}
         </div>
-      </section>
+      </UiPanelFrame>
     </>
   );
 }

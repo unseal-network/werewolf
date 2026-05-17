@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import { useT } from "../i18n/I18nProvider";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface GameEventLike {
   id: string;
@@ -309,7 +310,14 @@ export function TimelineCapsule({
         className={`sheet-backdrop timeline-backdrop ${open ? "show" : ""}`}
         onClick={() => setOpen(false)}
       />
-      <section className={`log-sheet ui-panel ${open ? "open" : ""}`}>
+      <UiPanelFrame
+        as="section"
+        className={`log-sheet ${open ? "open" : ""}`}
+        contentClassName="log-sheet-content"
+        tone="filled"
+        size="large"
+        ornament
+      >
         <div className="sheet-head">
           <div>
             <div className="sheet-title">{t("timeline.title")}</div>
@@ -362,7 +370,7 @@ export function TimelineCapsule({
             ))
           )}
         </div>
-      </section>
+      </UiPanelFrame>
     </>
   );
 }

@@ -172,7 +172,7 @@ describe("game room seat layout", () => {
         '@import "./game-room/legacy.css";',
         '@import "./game-room/layout.css";',
         '@import "./game-room/components/hud.css";',
-        '@import "./game-room/components/ui-panel.css";',
+        '@import "./game-room/components/ui-primitives.css";',
         '@import "./game-room/components/center-info.css";',
         '@import "./game-room/components/seat-avatar.css";',
         '@import "./game-room/components/action-region.css";',
@@ -188,8 +188,8 @@ describe("game room seat layout", () => {
       resolve(process.cwd(), "apps/web/src/styles/game-room.css"),
       "utf8"
     );
-    const panelCss = readFileSync(
-      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-panel.css"),
+    const primitiveCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
       "utf8"
     );
     const layoutCss = readFileSync(
@@ -209,28 +209,35 @@ describe("game room seat layout", () => {
       "utf8"
     );
 
-    expect(entry).toContain('components/ui-panel.css');
-    expect(panelCss).toContain(".game-layout-root .ui-panel");
-    expect(panelCss).toContain("--ui-panel-corner: calc(192px * var(--ui-panel-scale))");
-    expect(panelCss).toContain("panel-9slice/fill.png");
+    expect(entry).not.toContain('components/ui-panel.css');
+    expect(entry).toContain('components/ui-primitives.css');
+    expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel");
+    expect(primitiveCss).toContain("--ww-panel-corner: calc(192px * var(--ww-panel-scale))");
+    expect(primitiveCss).toContain("panel-9slice/fill.png");
     expect(shell).toContain("center-info-region");
     expect(shell).toContain("{centerInfo}");
     expect(shell).not.toContain("{rawPhase ?? scene}");
     expect(shell).not.toContain("{living}/{targetPlayerCount || playerCount} 存活");
-    expect(centerInfo).toContain("center-info-panel ui-panel");
+    expect(centerInfo).toContain("UiPanelFrame");
+    expect(centerInfo).toContain("center-info-panel");
     expect(centerInfo).toContain("center-info-surface");
-    expect(timeline).toContain("log-sheet ui-panel");
+    expect(timeline).toContain("UiPanelFrame");
+    expect(timeline).toContain("log-sheet");
+    expect(shell).toContain("modal-layer");
     expect(layoutCss).not.toContain("panel-9slice/corner-tl.png");
   });
 
-  it("uses HUD side sockets so the top rail has closed end caps", () => {
+  it("keeps HUD sockets out of the simplified top rail", () => {
     const hudCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/hud.css"),
       "utf8"
     );
 
-    expect(hudCss).toContain("socket-left.png");
-    expect(hudCss).toContain("socket-right.png");
+    expect(hudCss).not.toContain("socket-left.png");
+    expect(hudCss).not.toContain("socket-right.png");
+    expect(hudCss).not.toContain("moon-medallion.png");
+    expect(hudCss).toContain("rail-top-line.png");
+    expect(hudCss).toContain("rail-bottom-line.png");
   });
 
   it("wires the remaining usable werewolf-ui final assets into runtime surfaces", () => {
@@ -250,8 +257,8 @@ describe("game room seat layout", () => {
       resolve(process.cwd(), "apps/web/src/styles/game-room/legacy.css"),
       "utf8"
     );
-    const panelCss = readFileSync(
-      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-panel.css"),
+    const primitiveCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
       "utf8"
     );
     const seatAvatar = readFileSync(
@@ -294,24 +301,27 @@ describe("game room seat layout", () => {
 
     expect(centerInfoCss).not.toContain("panel-9slice/arrow-point");
     expect(centerInfoCss).not.toContain("panel-9slice/ornament");
-    expect(centerInfoCss).toContain("panel-9slice/edge-left.png");
-    expect(centerInfoCss).toContain("panel-9slice/edge-right.png");
     expect(centerInfoCss).toContain(".center-info-surface");
-    expect(centerInfoCss).toContain("--ui-panel-frame-layer");
+    expect(centerInfoCss).toContain(".center-info-panel.ww-ui-panel");
+    expect(centerInfoCss).toContain("--ww-panel-scale");
     expect(centerInfoCss).not.toMatch(/center-info-panel\.ui-panel[\s\S]*panel-9slice\/fill\.png[\s\S]*repeat !important/);
 
-    expect(legacyCss).toContain("werewolf-ui/final/effect/radial-picker-ring.png");
-    expect(panelCss).toContain("--ui-panel-skin");
-    expect(panelCss).toContain(".game-layout-root .ui-panel::before");
-    expect(panelCss).toContain("inset: var(--ui-panel-fill-inset)");
-    expect(panelCss).toContain(".game-layout-root .ui-panel::after");
+    expect(legacyCss).not.toContain("werewolf-ui/final/effect/radial-picker-ring.png");
+    expect(legacyCss).toContain("var(--player-picker-slice-deg)");
+    expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel__edge--top");
+    expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel__corner--tl");
+    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
     expect(seatAvatar).toContain("seatBadgeId");
     expect(seatAvatar).toContain("seat-hooded-portrait");
     expect(seatAvatar).toContain("hasHoodedAvatar");
     expect(seatAvatar).toContain("seat-role-badge");
-    expect(agentPicker).toContain("agent-picker open ui-panel");
-    expect(userInfoPanel).toContain("profile-dialog open ui-panel");
-    expect(seerResultDialog).toContain("seer-result-dialog open ui-panel");
+    expect(agentPicker).toContain("UiPanelFrame");
+    expect(agentPicker).toContain("agent-picker open");
+    expect(agentPicker).toContain("GameButton");
+    expect(userInfoPanel).toContain("UiPanelFrame");
+    expect(userInfoPanel).toContain("profile-dialog open");
+    expect(seerResultDialog).toContain("UiPanelFrame");
+    expect(seerResultDialog).toContain("seer-result-dialog open");
     expect(manifest).toContain('"id": "button/decision/confirm-button-9slice"');
     expect(componentMap).toContain('"button/decision/confirm-button-9slice"');
   });
@@ -328,13 +338,41 @@ describe("game room seat layout", () => {
 
     expect(actionCss).toContain(".game-layout-root .action-region .voice-panel");
     expect(actionCss).toContain(".game-layout-root .action-region .voice-text-bubble .speech-textarea");
+    expect(actionCss).toContain(".game-layout-root .action-region .voice-bubble");
     expect(actionCss).toContain("calc(100% - (var(--layout-rail-width) * 2)");
     expect(actionCss).toContain("button/log-corner-tl.png");
     expect(actionCss).toContain("button/log-edge-horizontal.png");
-    expect(actionCss).toContain(".stage-confirm.use-confirm-asset");
-    expect(actionCss).toContain("border-image-slice: 76 168 fill");
+    expect(actionCss).toContain("box-shadow: none !important");
+    expect(actionCss).toContain("grid-area: action");
+    expect(actionCss).not.toContain(".stage-confirm.use-confirm-asset");
+    expect(actionCss).toContain("--ww-button-scale: var(--layout-action-scale, 1)");
     expect(actionCss).not.toContain("background-size: 100% 100%");
     expect(voicePanel).not.toContain("autoFocus");
+  });
+
+  it("keeps the closed timeline sheet from blocking action controls", () => {
+    const utilityCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/utility-region.css"),
+      "utf8"
+    );
+    const modalCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/modal-layer.css"),
+      "utf8"
+    );
+
+    const closedSheetRule = utilityCss.match(
+      /\.game-layout-root \.utility-region \.log-sheet \{[\s\S]*?\n\}/
+    )?.[0] ?? "";
+    const openSheetRule = utilityCss.match(
+      /\.game-layout-root \.utility-region \.log-sheet\.open \{[\s\S]*?\n\}/
+    )?.[0] ?? "";
+
+    expect(closedSheetRule).toContain("visibility: hidden !important");
+    expect(closedSheetRule).toContain("pointer-events: none !important");
+    expect(closedSheetRule).toContain("z-index: 120 !important");
+    expect(openSheetRule).toContain("visibility: visible !important");
+    expect(openSheetRule).toContain("pointer-events: auto !important");
+    expect(modalCss.match(/\.game-layout-root \.modal-layer \{[\s\S]*?\n\}/)?.[0] ?? "").toContain("z-index: 150");
   });
 
   it("keeps mobile center voting readable without bleeding over the scene", () => {
@@ -347,22 +385,30 @@ describe("game room seat layout", () => {
       "utf8"
     );
 
-    expect(responsiveCss).toContain("max-height: min(36dvh, 260px)");
-    expect(centerInfoCss).toContain(".center-info-panel::before");
-    expect(centerInfoCss).toContain("inset: var(--ui-panel-fill-inset)");
+    expect(centerInfoCss).toContain("max-height: min(52dvh");
+    expect(centerInfoCss).toContain("var(--layout-action-bottom");
+    expect(centerInfoCss).not.toContain("--ui-panel-edge-overlap: 0px");
     expect(centerInfoCss).toContain(".center-vote-groups");
     expect(centerInfoCss).toContain("max-height: min(30dvh, 220px)");
   });
 
-  it("keeps player rail overflow visible for avatar rings and glow effects", () => {
+  it("keeps current actor highlight static and rail overflow visible", () => {
     const layoutCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/layout.css"),
+      "utf8"
+    );
+    const seatCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/seat-avatar.css"),
       "utf8"
     );
     const railBlock = layoutCss.match(/\.game-layout-root \.player-rail \{[^}]+\}/)?.[0] ?? "";
 
     expect(railBlock).toContain("overflow: visible");
     expect(railBlock).not.toContain("overflow: hidden");
+    expect(seatCss).toContain(".seat-state-speaking .avatar");
+    expect(seatCss).toContain("outline:");
+    expect(seatCss).not.toContain("seat-speaking-pulse");
+    expect(seatCss).not.toContain("art-avatar-speaking-pulse");
   });
 
   it("keeps role reveal backdrop from intercepting action controls", () => {

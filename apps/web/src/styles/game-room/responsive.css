@@ -29,8 +29,10 @@
     overflow: hidden;
     grid-template-areas:
       "hud"
-      "table";
-    grid-template-rows: auto minmax(0, 1fr);
+      "table"
+      "action"
+      "utility";
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
     gap: 7px;
     padding-bottom: calc(var(--layout-safe-bottom) + 10px);
   }
@@ -38,14 +40,12 @@
   .game-layout-root .hud-region {
     grid-template-columns:
       calc(44px * var(--layout-hud-scale, 1))
-      calc(42px * var(--layout-hud-scale, 1))
       minmax(0, 1fr)
       auto;
     gap: calc(7px * var(--layout-hud-scale, 1));
   }
 
   .game-layout-root .hud-back-button,
-  .game-layout-root .hud-phase-token,
   .game-layout-root .hud-countdown,
   .game-layout-root .hud-alive-count {
     height: calc(38px * var(--layout-hud-scale, 1));
@@ -53,10 +53,6 @@
 
   .game-layout-root .hud-back-button {
     width: calc(44px * var(--layout-hud-scale, 1));
-  }
-
-  .game-layout-root .hud-phase-token {
-    width: calc(42px * var(--layout-hud-scale, 1));
   }
 
   .game-layout-root .hud-phase-line {
@@ -103,25 +99,17 @@
   }
 
   .game-layout-root .center-info-region {
-    width: min(300px, 100%);
+    width: min(340px, 100%);
     margin-top: clamp(18px, 7vh, 56px);
   }
 
-  .game-layout-root .center-info-panel {
-    max-height: min(36dvh, 260px);
-    --ui-panel-scale: 0.2;
-    --ui-panel-content-top: 18px;
-    --ui-panel-content-right: 18px;
-    --ui-panel-content-bottom: 18px;
-    --ui-panel-content-left: 18px;
-  }
-
-  .game-layout-root .center-info-panel.ui-panel {
-    --ui-panel-scale: 0.24;
-    --ui-panel-content-top: 24px;
-    --ui-panel-content-right: 26px;
-    --ui-panel-content-bottom: 24px;
-    --ui-panel-content-left: 26px;
+  .game-layout-root .center-info-panel.ww-ui-panel {
+    max-height: min(50dvh, calc(100dvh - var(--layout-safe-top) - var(--layout-safe-bottom) - var(--layout-action-bottom, 24px) - 232px));
+    --ww-panel-scale: 0.22;
+    --ww-panel-content-top: 24px;
+    --ww-panel-content-right: 26px;
+    --ww-panel-content-bottom: 24px;
+    --ww-panel-content-left: 26px;
   }
 
   .game-layout-root .center-info-surface {

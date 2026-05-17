@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from "react";
 import type { GameEventDto, RoomPlayer } from "../api/client";
 import { useT } from "../i18n/I18nProvider";
 import { avatarPalette, firstReadableInitial } from "./SeatAvatar";
 import type { SceneId } from "./GameRoomShell";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface CenterInfoPanelProps {
   rawPhase: string | null | undefined;
@@ -188,13 +190,47 @@ export function CenterInfoPanel({
       ? t("centerInfo.agentStream")
       : t("centerInfo.liveCaptions");
   const text = speechText(latestSpeech);
+  const [displayText, setDisplayText] = useState(text);
+  const speechTextRef = useRef<HTMLParagraphElement | null>(null);
+
+  useEffect(() => {
+    if (!text) {
+      setDisplayText("");
+      return undefined;
+    }
+    setDisplayText((current) => (text.startsWith(current) ? current : ""));
+    const id = window.setInterval(() => {
+      setDisplayText((current) => {
+        if (current === text) {
+          window.clearInterval(id);
+          return current;
+        }
+        return text.slice(0, current.length + 1);
+      });
+    }, 18);
+    return () => window.clearInterval(id);
+  }, [text]);
+
+  useEffect(() => {
+    const node = speechTextRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [displayText]);
 
   if (!isVotePhase && !isSpeechPhase) {
     return null;
   }
 
   return (
-    <section className="center-info-panel ui-panel" aria-live="polite">
+    <UiPanelFrame
+      as="section"
+      className="center-info-panel"
+      contentClassName="center-info-panel-content"
+      tone="bare"
+      size="compact"
+      ornament={false}
+      aria-live="polite"
+    >
       <div className="center-info-surface">
         {isVotePhase ? (
           <div className="center-live-block center-vote-block">
@@ -251,14 +287,14 @@ export function CenterInfoPanel({
                     : t("centerInfo.waitingSpeech")}
               </span>
             </div>
-            {text ? (
-              <p className="center-speech-text">{text}</p>
+            {displayText ? (
+              <p className="center-speech-text" ref={speechTextRef}>{displayText}</p>
             ) : (
               <div className="center-info-empty">{t("centerInfo.noSpeechYet")}</div>
             )}
           </div>
         ) : null}
       </div>
-    </section>
+    </UiPanelFrame>
   );
 }

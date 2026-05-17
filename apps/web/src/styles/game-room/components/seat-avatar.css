@@ -152,19 +152,20 @@
   background-image: var(--art-ring-selected);
 }
 
-.game-layout-root .player-rail .seat-state-speaking .avatar::before {
-  background-image: var(--art-ring-speaking);
-}
-
 .game-layout-root .player-rail .seat-state-selected .avatar::after {
   background-image: var(--art-avatar-selected-glow-effect), var(--art-avatar-glow-selected);
   opacity: 0.78;
 }
 
+.game-layout-root .player-rail .seat-state-speaking .avatar {
+  outline: calc(2px * var(--layout-ui-scale, 1)) solid rgba(255, 223, 138, 0.92) !important;
+  outline-offset: calc(6px * var(--layout-ui-scale, 1));
+}
+
 .game-layout-root .player-rail .seat-state-speaking .avatar::after {
-  background-image: var(--art-avatar-speaking-pulse);
-  opacity: 0.72;
-  animation: seat-speaking-pulse 1.55s ease-in-out infinite;
+  background-image: none;
+  opacity: 0;
+  animation: none;
 }
 
 .game-layout-root .player-rail .seat-state-target .avatar::after {
@@ -286,22 +287,8 @@
 
 .game-layout-root .player-rail .avatar {
   box-shadow: none !important;
-  outline: 0 !important;
 }
 
 .game-layout-root .player-rail .seat-state-dead .avatar {
   box-shadow: none !important;
-}
-
-@keyframes seat-speaking-pulse {
-  0%,
-  100% {
-    opacity: 0.52;
-    transform: scale(0.96);
-  }
-
-  50% {
-    opacity: 0.95;
-    transform: scale(1.06);
-  }
 }
