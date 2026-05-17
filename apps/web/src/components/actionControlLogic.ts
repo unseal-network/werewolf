@@ -74,10 +74,10 @@ export function getRadialItemStyle(index: number, count: number) {
 }
 
 export function getRadialAvatarSize(count: number) {
-  if (count >= 12) return 42;
-  if (count >= 10) return 46;
-  if (count >= 8) return 50;
-  return 58;
+  if (count >= 12) return 36;
+  if (count >= 10) return 40;
+  if (count >= 8) return 44;
+  return 50;
 }
 
 export function getRadialAvatarRadius(count: number) {
@@ -94,5 +94,35 @@ export function getRadialSliceStyle(index: number, count: number) {
   const fillEndDeg = sliceDeg - featherDeg;
   return {
     background: `conic-gradient(from ${startDeg}deg, rgba(143, 33, 49, 0.08) 0deg, rgba(207, 64, 86, 0.34) ${fillStartDeg}deg, rgba(143, 33, 49, 0.30) ${fillEndDeg}deg, rgba(242, 228, 196, 0.08) ${sliceDeg}deg, transparent ${sliceDeg}deg, transparent 360deg)`,
+  };
+}
+
+export function getRadialWheelLayout({
+  center,
+  viewport,
+  count,
+  margin = 18,
+}: {
+  center: RadialPoint;
+  viewport: { width: number; height: number };
+  count: number;
+  margin?: number;
+}) {
+  const avatarSize = getRadialAvatarSize(count);
+  const visualCap = Math.min(304, viewport.width * 0.76, viewport.height * 0.42);
+  const horizontalCap = Math.max(0, (Math.min(center.x, viewport.width - center.x) - margin) * 2);
+  const maxSize = Math.max(220, Math.min(visualCap, horizontalCap));
+  const size = Math.round(Math.max(220, Math.min(304, maxSize)));
+  const radius = size / 2;
+  const minCenterY = margin + radius;
+  const maxCenterY = viewport.height - margin - radius;
+  const fittedCenterY =
+    minCenterY > maxCenterY
+      ? viewport.height / 2
+      : Math.min(maxCenterY, Math.max(minCenterY, center.y));
+  return {
+    size,
+    avatarSize,
+    offsetY: Math.round(fittedCenterY - center.y),
   };
 }
