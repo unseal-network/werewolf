@@ -195,68 +195,70 @@ export function CenterInfoPanel({
 
   return (
     <section className="center-info-panel ui-panel" aria-live="polite">
-      {isVotePhase ? (
-        <div className="center-live-block center-vote-block">
-          <div className="center-live-heading">
-            <span>{t("centerInfo.voteLive")}</span>
-          </div>
-          {voteGroups.length ? (
-            <div className="center-vote-groups">
-              {voteGroups.map((group) => (
-                <article className="center-vote-group" key={group.targetId}>
-                  <div className="center-vote-target">
-                    <span>{t("centerInfo.voteTarget")}</span>
-                    <strong>
-                      {seatNoLabel(
-                        group.target?.seatNo,
-                        t("centerInfo.seatSuffix")
-                      )}
-                    </strong>
-                  </div>
-                  <div className="center-voter-list center-voter-seat-list">
-                    {group.voters
-                      .map((voter) =>
-                        seatNoLabel(voter.seatNo, t("centerInfo.seatSuffix"))
-                      )
-                      .join("，")}
-                  </div>
-                </article>
-              ))}
+      <div className="center-info-surface">
+        {isVotePhase ? (
+          <div className="center-live-block center-vote-block">
+            <div className="center-live-heading">
+              <span>{t("centerInfo.voteLive")}</span>
             </div>
-          ) : (
-            <div className="center-info-empty">{t("centerInfo.voteWaiting")}</div>
-          )}
-        </div>
-      ) : null}
+            {voteGroups.length ? (
+              <div className="center-vote-groups">
+                {voteGroups.map((group) => (
+                  <article className="center-vote-group" key={group.targetId}>
+                    <div className="center-vote-target">
+                      <span>{t("centerInfo.voteTarget")}</span>
+                      <strong>
+                        {seatNoLabel(
+                          group.target?.seatNo,
+                          t("centerInfo.seatSuffix")
+                        )}
+                      </strong>
+                    </div>
+                    <div className="center-voter-list center-voter-seat-list">
+                      {group.voters
+                        .map((voter) =>
+                          seatNoLabel(voter.seatNo, t("centerInfo.seatSuffix"))
+                        )
+                        .join("，")}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="center-info-empty">{t("centerInfo.voteWaiting")}</div>
+            )}
+          </div>
+        ) : null}
 
-      {isSpeechPhase ? (
-        <div className="center-live-block center-speech-block">
-          <div className="center-live-heading">
-            <span>{speechHeading}</span>
-          </div>
-          <div className="center-speaker-row">
-            <MiniAvatar player={speechPlayer} />
-            <span>
-              {currentSpeaker
-                ? t("centerInfo.currentSpeaker", {
-                    seat: currentSpeaker.seatNo,
-                    name: playerLabel(currentSpeaker),
-                  })
-                : latestSpeechPlayer
-                  ? t("centerInfo.latestSpeaker", {
-                      seat: latestSpeechPlayer.seatNo,
-                      name: playerLabel(latestSpeechPlayer),
+        {isSpeechPhase ? (
+          <div className="center-live-block center-speech-block">
+            <div className="center-live-heading">
+              <span>{speechHeading}</span>
+            </div>
+            <div className="center-speaker-row">
+              <MiniAvatar player={speechPlayer} />
+              <span>
+                {currentSpeaker
+                  ? t("centerInfo.currentSpeaker", {
+                      seat: currentSpeaker.seatNo,
+                      name: playerLabel(currentSpeaker),
                     })
-                  : t("centerInfo.waitingSpeech")}
-            </span>
+                  : latestSpeechPlayer
+                    ? t("centerInfo.latestSpeaker", {
+                        seat: latestSpeechPlayer.seatNo,
+                        name: playerLabel(latestSpeechPlayer),
+                      })
+                    : t("centerInfo.waitingSpeech")}
+              </span>
+            </div>
+            {text ? (
+              <p className="center-speech-text">{text}</p>
+            ) : (
+              <div className="center-info-empty">{t("centerInfo.noSpeechYet")}</div>
+            )}
           </div>
-          {text ? (
-            <p className="center-speech-text">{text}</p>
-          ) : (
-            <div className="center-info-empty">{t("centerInfo.noSpeechYet")}</div>
-          )}
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </section>
   );
 }

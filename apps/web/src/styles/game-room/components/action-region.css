@@ -15,7 +15,7 @@
   display: grid;
   place-items: center;
   justify-items: center;
-  pointer-events: none;
+  pointer-events: auto;
   transform: translateX(-50%);
 }
 
@@ -47,6 +47,7 @@
   max-width: 100% !important;
   justify-self: stretch !important;
   margin-inline: auto;
+  pointer-events: auto;
 }
 
 .game-layout-root .action-region .target-row,
@@ -66,6 +67,17 @@
 
 .game-layout-root .action-region .player-picker {
   width: min(100%, 320px);
+  pointer-events: auto;
+}
+
+.game-layout-root .action-region .player-picker-control-slot,
+.game-layout-root .action-region .player-picker-action-slot,
+.game-layout-root .action-region .player-picker-wheel,
+.game-layout-root .action-region .player-picker-avatar,
+.game-layout-root .action-region .player-picker-slice,
+.game-layout-root .action-region .stage-action-button,
+.game-layout-root .action-region .player-picker-action {
+  pointer-events: auto;
 }
 
 .game-layout-root .action-region .voice-panel {
@@ -146,8 +158,8 @@
   width: 100% !important;
   min-width: 0 !important;
   max-width: 100% !important;
-  height: calc(60px * var(--layout-action-scale, 1)) !important;
-  min-height: calc(60px * var(--layout-action-scale, 1)) !important;
+  height: calc(72px * var(--layout-action-scale, 1)) !important;
+  min-height: calc(72px * var(--layout-action-scale, 1)) !important;
   padding-inline: calc(24px * var(--layout-action-scale, 1)) !important;
   font-size: calc(19px * var(--layout-action-scale, 1)) !important;
   line-height: 1 !important;
@@ -155,14 +167,14 @@
 
 .game-layout-root .action-region .stage-skip,
 .game-layout-root .action-region .player-picker-action.stage-skip {
-  height: calc(44px * var(--layout-action-scale, 1)) !important;
-  min-height: calc(44px * var(--layout-action-scale, 1)) !important;
+  height: calc(72px * var(--layout-action-scale, 1)) !important;
+  min-height: calc(72px * var(--layout-action-scale, 1)) !important;
   font-size: calc(16px * var(--layout-action-scale, 1)) !important;
 }
 
 .game-layout-root .action-region .player-picker {
   --player-picker-action-width: 100%;
-  --player-picker-action-height: calc(44px * var(--layout-action-scale, 1));
+  --player-picker-action-height: calc(72px * var(--layout-action-scale, 1));
   --player-picker-control-height: calc(98px * var(--layout-action-scale, 1));
   --player-picker-slice-size: calc(58px * var(--layout-action-scale, 1));
 }
@@ -205,25 +217,77 @@
 .game-layout-root .action-region .stage-skip,
 .game-layout-root .action-region .player-picker-action {
   border: 0 !important;
+  border-style: solid !important;
   box-shadow: none !important;
   background-color: transparent !important;
-  background-repeat: no-repeat !important;
-  background-position: center !important;
-  background-size: 100% 100% !important;
+  background-image: none !important;
+  background-repeat: initial !important;
+  background-position: initial !important;
+  background-size: initial !important;
+  overflow: visible;
+  color: #fff7d8 !important;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.82),
+    0 0 12px rgba(0, 0, 0, 0.52);
 }
 
 .game-layout-root .action-region .stage-start {
-  background-image: url("/assets/werewolf-ui/final/button/decision/submit-button-9slice.png") !important;
+  height: calc(96px * var(--layout-action-scale, 1)) !important;
+  min-height: calc(96px * var(--layout-action-scale, 1)) !important;
+  border-width: calc(38px * var(--layout-action-scale, 1)) calc(84px * var(--layout-action-scale, 1)) !important;
+  border-image-source: url("/assets/werewolf-ui/final/button/decision/submit-button-9slice.png") !important;
+  border-image-slice: 76 168 fill !important;
+  border-image-width: calc(38px * var(--layout-action-scale, 1)) calc(84px * var(--layout-action-scale, 1)) !important;
+  border-image-repeat: stretch !important;
+}
+
+.game-layout-root .action-region .stage-action-button__content {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .game-layout-root .action-region .stage-confirm,
 .game-layout-root .action-region .player-picker-action:not(.stage-skip) {
-  background-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.png") !important;
+  border-width: 0 !important;
+  border-image-source: none !important;
+  border-image-slice: initial !important;
+  border-image-width: initial !important;
+  border-image-repeat: initial !important;
+  background:
+    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 28px 28px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 28px 28px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 28px 28px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 28px 28px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 44px) 13px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 44px) 13px repeat-x,
+    linear-gradient(180deg, rgba(51, 113, 77, 0.72), rgba(22, 76, 49, 0.78)),
+    rgba(9, 22, 17, 0.58) !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, repeat-x, no-repeat, no-repeat !important;
+  background-position: left top, right top, left bottom, right bottom, top center, bottom center, center, center !important;
+  background-size: 28px 28px, 28px 28px, 28px 28px, 28px 28px, calc(100% - 44px) 13px, calc(100% - 44px) 13px, calc(100% - 40px) calc(100% - 22px), calc(100% - 40px) calc(100% - 22px) !important;
+}
+
+/*
+ * Fallback 9-slice metadata is kept below for the standalone asset, but the
+ * runtime confirm button uses the componentized log corner/edge pieces above.
+ */
+.game-layout-root .action-region .stage-confirm.use-confirm-asset,
+.game-layout-root .action-region .player-picker-action.use-confirm-asset:not(.stage-skip) {
+  border-width: calc(22px * var(--layout-action-scale, 1)) calc(32px * var(--layout-action-scale, 1)) !important;
+  border-image-source: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.png") !important;
+  border-image-slice: 40 64 fill !important;
+  border-image-width: calc(22px * var(--layout-action-scale, 1)) calc(32px * var(--layout-action-scale, 1)) !important;
+  border-image-repeat: stretch !important;
 }
 
 .game-layout-root .action-region .stage-skip,
 .game-layout-root .action-region .player-picker-action.stage-skip {
-  background-image: url("/assets/werewolf-ui/final/button/decision/cancel-button-9slice.png") !important;
+  border-width: calc(28px * var(--layout-action-scale, 1)) calc(70px * var(--layout-action-scale, 1)) !important;
+  border-image-source: url("/assets/werewolf-ui/final/button/decision/cancel-button-9slice.png") !important;
+  border-image-slice: 76 168 fill !important;
+  border-image-width: calc(28px * var(--layout-action-scale, 1)) calc(70px * var(--layout-action-scale, 1)) !important;
+  border-image-repeat: stretch !important;
 }
 
 .game-layout-root .action-region .phase-card > .stage-identity,

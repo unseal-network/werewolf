@@ -30,8 +30,10 @@
 
 .game-layout-root .hud-region::before {
   background:
-    url("/assets/werewolf-ui/final/hud/rail-top-line.png") top center / calc(100% - 74px) 16px repeat-x,
-    url("/assets/werewolf-ui/final/hud/rail-bottom-line.png") bottom center / calc(100% - 74px) 16px repeat-x,
+    url("/assets/werewolf-ui/final/hud/socket-left.png") left center / auto 100% no-repeat,
+    url("/assets/werewolf-ui/final/hud/socket-right.png") right center / auto 100% no-repeat,
+    url("/assets/werewolf-ui/final/hud/rail-top-line.png") top center / calc(100% - 104px) 16px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-bottom-line.png") bottom center / calc(100% - 104px) 16px repeat-x,
     url("/assets/werewolf-ui/final/hud/rail-fill.png") center / 100% 100% no-repeat;
   opacity: 0.92;
 }

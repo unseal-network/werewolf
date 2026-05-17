@@ -22,7 +22,15 @@
     var(--ui-panel-content-left);
   border: 0;
   border-radius: 0;
-  --ui-panel-skin:
+  isolation: isolate;
+  background: none;
+  --ui-panel-fill-layer:
+    url("/assets/werewolf-ui/final/panel-9slice/fill.png")
+      center /
+      128px
+      128px
+      repeat;
+  --ui-panel-frame-layer:
     url("/assets/werewolf-ui/final/panel-9slice/ornament-top.png")
       center top calc(-17px * var(--ui-panel-scale)) /
       calc(128px * var(--ui-panel-scale))
@@ -72,13 +80,32 @@
       right var(--ui-panel-edge-right-x) center /
       var(--ui-panel-edge)
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
-      repeat-y,
-    url("/assets/werewolf-ui/final/panel-9slice/fill.png")
-      center /
-      calc(100% - var(--ui-panel-fill-inset) * 2)
-      calc(100% - var(--ui-panel-fill-inset) * 2)
-      repeat;
-  background: var(--ui-panel-skin);
+      repeat-y;
+  --ui-panel-skin: var(--ui-panel-frame-layer);
+}
+
+.game-layout-root .ui-panel::before,
+.game-layout-root .ui-panel::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.game-layout-root .ui-panel::before {
+  inset: var(--ui-panel-fill-inset);
+  z-index: 0;
+  background: var(--ui-panel-fill-layer);
+}
+
+.game-layout-root .ui-panel::after {
+  inset: 0;
+  z-index: 1;
+  background: var(--ui-panel-frame-layer);
+}
+
+.game-layout-root .ui-panel > * {
+  position: relative;
+  z-index: 2;
 }
 
 .game-layout-root .log-sheet.ui-panel {
@@ -106,7 +133,7 @@
   --ui-panel-content-left: 42px;
   border: 0 !important;
   border-radius: 0 !important;
-  background: var(--ui-panel-skin) !important;
+  background: none !important;
   color: #f6f0dc !important;
 }
 
@@ -119,6 +146,6 @@
   --ui-panel-content-left: 38px;
   border: 0 !important;
   border-radius: 0 !important;
-  background: var(--ui-panel-skin) !important;
+  background: none !important;
   color: #f6f0dc !important;
 }

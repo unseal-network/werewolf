@@ -163,7 +163,7 @@
   align-content: space-between;
   justify-items: center;
   gap: 0;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
 }
 
@@ -188,10 +188,10 @@
   box-sizing: border-box;
   max-height: min(31dvh, 220px);
   --ui-panel-scale: 0.24;
-  --ui-panel-content-top: 34px;
-  --ui-panel-content-right: 34px;
-  --ui-panel-content-bottom: 34px;
-  --ui-panel-content-left: 34px;
+  --ui-panel-content-top: 20px;
+  --ui-panel-content-right: 22px;
+  --ui-panel-content-bottom: 20px;
+  --ui-panel-content-left: 22px;
   color: #f6f0dc;
   text-align: center;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.84);

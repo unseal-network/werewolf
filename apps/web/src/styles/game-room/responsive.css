@@ -108,12 +108,25 @@
   }
 
   .game-layout-root .center-info-panel {
-    max-height: min(29dvh, 190px);
+    max-height: min(36dvh, 260px);
     --ui-panel-scale: 0.2;
-    --ui-panel-content-top: 28px;
+    --ui-panel-content-top: 18px;
+    --ui-panel-content-right: 18px;
+    --ui-panel-content-bottom: 18px;
+    --ui-panel-content-left: 18px;
+  }
+
+  .game-layout-root .center-info-panel.ui-panel {
+    --ui-panel-scale: 0.24;
+    --ui-panel-content-top: 24px;
     --ui-panel-content-right: 26px;
-    --ui-panel-content-bottom: 28px;
+    --ui-panel-content-bottom: 24px;
     --ui-panel-content-left: 26px;
+  }
+
+  .game-layout-root .center-info-surface {
+    min-height: 82px;
+    padding: 12px 14px;
   }
 
   .game-layout-root .action-region .phase-card,

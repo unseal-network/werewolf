@@ -1,4 +1,78 @@
 /* Component: realtime center information for speeches, votes, and notices. */
+.game-layout-root .center-info-panel.ui-panel {
+  --ui-panel-scale: 0.28;
+  --ui-panel-content-top: 28px;
+  --ui-panel-content-right: 34px;
+  --ui-panel-content-bottom: 28px;
+  --ui-panel-content-left: 34px;
+  --ui-panel-frame-layer:
+    url("/assets/werewolf-ui/final/panel-9slice/corner-tl.png")
+      left top /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-tr.png")
+      right top /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-bl.png")
+      left bottom /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/corner-br.png")
+      right bottom /
+      var(--ui-panel-corner)
+      var(--ui-panel-corner)
+      no-repeat,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-top.png")
+      center var(--ui-panel-edge-top-y) /
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      var(--ui-panel-edge)
+      repeat-x,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-bottom.png")
+      center bottom var(--ui-panel-edge-bottom-y) /
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      var(--ui-panel-edge)
+      repeat-x,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-left.png")
+      var(--ui-panel-edge-left-x) center /
+      var(--ui-panel-edge)
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      repeat-y,
+    url("/assets/werewolf-ui/final/panel-9slice/edge-right.png")
+      right var(--ui-panel-edge-right-x) center /
+      var(--ui-panel-edge)
+      calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
+      repeat-y;
+  background: none !important;
+  isolation: isolate;
+}
+
+.game-layout-root .center-info-panel::before {
+  inset: var(--ui-panel-fill-inset);
+}
+
+.game-layout-root .center-info-surface {
+  position: relative;
+  z-index: 2;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 92px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: auto;
+  background:
+    linear-gradient(180deg, rgba(7, 18, 21, 0.38), rgba(4, 10, 13, 0.30)),
+    rgba(4, 10, 13, 0.18);
+  box-shadow:
+    inset 0 0 28px rgba(0, 0, 0, 0.18),
+    0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
 .game-layout-root .center-live-block {
   min-height: 0;
   margin-top: 0;
@@ -32,7 +106,7 @@
   gap: 7px;
   margin-top: 7px;
   padding-right: 2px;
-  max-height: min(25dvh, 290px);
+  max-height: min(30dvh, 220px);
   overflow: auto;
 }
 

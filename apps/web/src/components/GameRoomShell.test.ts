@@ -218,18 +218,19 @@ describe("game room seat layout", () => {
     expect(shell).not.toContain("{rawPhase ?? scene}");
     expect(shell).not.toContain("{living}/{targetPlayerCount || playerCount} 存活");
     expect(centerInfo).toContain("center-info-panel ui-panel");
+    expect(centerInfo).toContain("center-info-surface");
     expect(timeline).toContain("log-sheet ui-panel");
     expect(layoutCss).not.toContain("panel-9slice/corner-tl.png");
   });
 
-  it("keeps the top HUD free of side socket frames", () => {
+  it("uses HUD side sockets so the top rail has closed end caps", () => {
     const hudCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/hud.css"),
       "utf8"
     );
 
-    expect(hudCss).not.toContain("socket-left.png");
-    expect(hudCss).not.toContain("socket-right.png");
+    expect(hudCss).toContain("socket-left.png");
+    expect(hudCss).toContain("socket-right.png");
   });
 
   it("wires the remaining usable werewolf-ui final assets into runtime surfaces", () => {
@@ -292,9 +293,18 @@ describe("game room seat layout", () => {
     }
 
     expect(centerInfoCss).not.toContain("panel-9slice/arrow-point");
+    expect(centerInfoCss).not.toContain("panel-9slice/ornament");
+    expect(centerInfoCss).toContain("panel-9slice/edge-left.png");
+    expect(centerInfoCss).toContain("panel-9slice/edge-right.png");
+    expect(centerInfoCss).toContain(".center-info-surface");
+    expect(centerInfoCss).toContain("--ui-panel-frame-layer");
+    expect(centerInfoCss).not.toMatch(/center-info-panel\.ui-panel[\s\S]*panel-9slice\/fill\.png[\s\S]*repeat !important/);
 
     expect(legacyCss).toContain("werewolf-ui/final/effect/radial-picker-ring.png");
     expect(panelCss).toContain("--ui-panel-skin");
+    expect(panelCss).toContain(".game-layout-root .ui-panel::before");
+    expect(panelCss).toContain("inset: var(--ui-panel-fill-inset)");
+    expect(panelCss).toContain(".game-layout-root .ui-panel::after");
     expect(seatAvatar).toContain("seatBadgeId");
     expect(seatAvatar).toContain("seat-hooded-portrait");
     expect(seatAvatar).toContain("hasHoodedAvatar");
@@ -319,7 +329,59 @@ describe("game room seat layout", () => {
     expect(actionCss).toContain(".game-layout-root .action-region .voice-panel");
     expect(actionCss).toContain(".game-layout-root .action-region .voice-text-bubble .speech-textarea");
     expect(actionCss).toContain("calc(100% - (var(--layout-rail-width) * 2)");
+    expect(actionCss).toContain("button/log-corner-tl.png");
+    expect(actionCss).toContain("button/log-edge-horizontal.png");
+    expect(actionCss).toContain(".stage-confirm.use-confirm-asset");
+    expect(actionCss).toContain("border-image-slice: 76 168 fill");
+    expect(actionCss).not.toContain("background-size: 100% 100%");
     expect(voicePanel).not.toContain("autoFocus");
+  });
+
+  it("keeps mobile center voting readable without bleeding over the scene", () => {
+    const responsiveCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/responsive.css"),
+      "utf8"
+    );
+    const centerInfoCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/center-info.css"),
+      "utf8"
+    );
+
+    expect(responsiveCss).toContain("max-height: min(36dvh, 260px)");
+    expect(centerInfoCss).toContain(".center-info-panel::before");
+    expect(centerInfoCss).toContain("inset: var(--ui-panel-fill-inset)");
+    expect(centerInfoCss).toContain(".center-vote-groups");
+    expect(centerInfoCss).toContain("max-height: min(30dvh, 220px)");
+  });
+
+  it("keeps player rail overflow visible for avatar rings and glow effects", () => {
+    const layoutCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/layout.css"),
+      "utf8"
+    );
+    const railBlock = layoutCss.match(/\.game-layout-root \.player-rail \{[^}]+\}/)?.[0] ?? "";
+
+    expect(railBlock).toContain("overflow: visible");
+    expect(railBlock).not.toContain("overflow: hidden");
+  });
+
+  it("keeps role reveal backdrop from intercepting action controls", () => {
+    const legacyCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/legacy.css"),
+      "utf8"
+    );
+    const roleReveal = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/RoleRevealEngine.tsx"),
+      "utf8"
+    );
+
+    expect(legacyCss).toContain(".role-reveal-engine");
+    expect(legacyCss).toContain("pointer-events: none");
+    expect(legacyCss).toContain(".role-reveal-card3d");
+    expect(legacyCss).toContain("pointer-events: auto");
+    expect(roleReveal).toContain('className="role-reveal-card3d"');
+    expect(roleReveal).toContain('role="button"');
+    expect(roleReveal).not.toContain('className="role-reveal-engine"\\n      role="button"');
   });
 
   it("keeps werewolf-ui metadata references limited to copied final files", () => {
