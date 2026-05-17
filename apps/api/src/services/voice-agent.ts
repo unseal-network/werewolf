@@ -33,7 +33,7 @@ export interface VoiceAgentConfig {
   livekitApiSecret: string;
   unsealApiBaseUrl: string;
   unsealApiKey: string;
-  unsealAgentId: string; // explicit fallback agent ID for TTS when no Matrix binding exists
+  unsealAgentId: string; // default Unseal agent ID for STT, and TTS fallback when no Matrix binding exists
 }
 
 interface PlayerSttSession {
@@ -110,9 +110,8 @@ export class VoiceAgentService {
   }
 
   /**
-   * Register the Matrix identity for a player. LiveKit participants and
-   * Unseal STT/TTS calls must use this external ID; `playerId` is only for
-   * internal game attribution.
+   * Register the Matrix identity for a player. LiveKit participants use this
+   * external ID; `playerId` is only for internal game attribution.
    */
   registerPlayerVoiceIdentity(playerId: string, matrixUserId: string): void {
     if (!playerId || !matrixUserId) return;
@@ -123,6 +122,7 @@ export class VoiceAgentService {
     const binding = { playerId, matrixUserId };
     this.playerVoiceIdentityByPlayerId.set(playerId, binding);
     this.playerVoiceIdentityByMatrixUserId.set(matrixUserId, binding);
+    this.subscribeExistingPlayerAudioTracks();
   }
 
   unregisterPlayerVoiceIdentity(playerId: string): void {
@@ -183,10 +183,29 @@ export class VoiceAgentService {
         this.scheduleReconnect("LiveKit room disconnected");
       }
     });
+    room.on(RoomEvent.TrackPublished, (publication, participant) => {
+      if (publication.kind !== TrackKind.KIND_AUDIO) return;
+      const identity = participant.identity;
+      if (identity.startsWith("voice-agent:")) return;
+      console.info("[VoiceAgent] remote audio published", {
+        gameRoomId: this.gameRoomId,
+        participantIdentity: identity,
+        trackSid: publication.sid ?? null,
+      });
+      publication.setSubscribed(true);
+      if (publication.track) {
+        void this.handlePlayerTrack(identity, publication.track as RemoteTrack);
+      }
+    });
     room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
       if (track.kind !== TrackKind.KIND_AUDIO) return;
       const identity = participant.identity;
       if (identity.startsWith("voice-agent:")) return;
+      console.info("[VoiceAgent] remote audio subscribed", {
+        gameRoomId: this.gameRoomId,
+        participantIdentity: identity,
+        trackSid: _publication.sid ?? null,
+      });
       void this.handlePlayerTrack(identity, track as RemoteTrack);
     });
     try {
@@ -221,6 +240,7 @@ export class VoiceAgentService {
         participantIdentity: room.localParticipant.identity,
         trackName: AGENT_VOICE_TRACK_NAME,
       });
+      this.subscribeExistingPlayerAudioTracks();
     } catch (err) {
       this.connected = false;
       this.audioSource = null;
@@ -468,6 +488,14 @@ export class VoiceAgentService {
       return;
     }
     const { playerId, matrixUserId } = binding;
+    const sttAgentId = this.config.unsealAgentId;
+    console.info("[VoiceAgent] starting STT for player audio", {
+      gameRoomId: this.gameRoomId,
+      playerId,
+      matrixUserId,
+      sttAgentId,
+      trackSid: track.sid ?? null,
+    });
     const prior = this.playerSessions.get(playerId);
     if (prior) {
       prior.active = false;
@@ -477,7 +505,7 @@ export class VoiceAgentService {
 
     const sttClient = new SttWebSocketClient({
       apiBaseUrl: this.config.unsealApiBaseUrl,
-      agentId: matrixUserId,
+      agentId: sttAgentId,
       apiKey: this.config.unsealApiKey,
       onPartialTranscript: (text) => {
         this.transcriptHandler?.({
@@ -500,6 +528,7 @@ export class VoiceAgentService {
           gameRoomId: this.gameRoomId,
           playerId,
           matrixUserId,
+          sttAgentId,
           err,
         }),
     });
@@ -510,6 +539,7 @@ export class VoiceAgentService {
         gameRoomId: this.gameRoomId,
         playerId,
         matrixUserId,
+        sttAgentId,
         err,
       });
       return;
@@ -525,6 +555,7 @@ export class VoiceAgentService {
 
     const stream = new AudioStream(track);
     const reader = stream.getReader();
+    let firstFrameLogged = false;
     try {
       while (true) {
         const { value: frame, done } = await reader.read();
@@ -532,6 +563,17 @@ export class VoiceAgentService {
         if (!frame) continue;
         if (!session.active) continue;
         if (frame.channels !== 1) continue;
+        if (!firstFrameLogged) {
+          firstFrameLogged = true;
+          console.info("[VoiceAgent] first STT audio frame", {
+            gameRoomId: this.gameRoomId,
+            playerId,
+            matrixUserId,
+            sampleRate: frame.sampleRate,
+            channels: frame.channels,
+            samplesPerChannel: frame.samplesPerChannel,
+          });
+        }
         for (const out of this.resampleToStt(session, frame)) {
           if (out.data.length === 0) continue;
           if (session.client.sendAudio(out.data, STT_TARGET_SAMPLE_RATE)) {
@@ -571,6 +613,26 @@ export class VoiceAgentService {
       }
       session.client.close();
       this.playerSessions.delete(playerId);
+    }
+  }
+
+  private subscribeExistingPlayerAudioTracks(): void {
+    const room = this.room;
+    if (!room) return;
+    for (const participant of room.remoteParticipants.values()) {
+      const identity = participant.identity;
+      if (identity.startsWith("voice-agent:")) continue;
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.kind !== TrackKind.KIND_AUDIO) continue;
+        publication.setSubscribed(true);
+        if (!publication.track) continue;
+        console.info("[VoiceAgent] found existing player audio track", {
+          gameRoomId: this.gameRoomId,
+          participantIdentity: identity,
+          trackSid: publication.sid ?? null,
+        });
+        void this.handlePlayerTrack(identity, publication.track as RemoteTrack);
+      }
     }
   }
 
