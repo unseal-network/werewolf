@@ -125,6 +125,9 @@ importers:
       '@unseal-network/game-sdk':
         specifier: ^0.0.10
         version: 0.0.10(@unseal-network/mobile-sdk@0.0.1)
+      '@unseal-network/mobile-log':
+        specifier: ^0.0.9
+        version: 0.0.9
       '@unseal-network/mobile-sdk':
         specifier: ^0.0.1
         version: 0.0.1
@@ -1143,6 +1146,9 @@ packages:
     resolution: {integrity: sha512-7aRsHl4xYugPTPfKZpw/QouxnWvEnaHtqDHL/zK3fGV5xxIRi+FF1uIJG1utgqX9a4pZnqHxOXyN+GqRSb/kuQ==, tarball: https://npm.pkg.github.com/download/@unseal-network/game-sdk/0.0.10/824d3dbbeb65f198338ac4ac6b77f5d8a2d71c0d}
     peerDependencies:
       '@unseal-network/mobile-sdk': '>=0.0.1'
+
+  '@unseal-network/mobile-log@0.0.9':
+    resolution: {integrity: sha512-FWqrAtaiyjUEpBsX4rp9Y3V7BqekDIAWXdd4jOIC7x1eDSY/ehdJF6abRSE2z7biuIbcqiSCydZkDRkFTp7QrA==, tarball: https://npm.pkg.github.com/download/@unseal-network/mobile-log/0.0.9/25a51ea987625663ab30c739a2364ca065f7b73d}
 
   '@unseal-network/mobile-sdk@0.0.1':
     resolution: {integrity: sha512-HlMO2BrF7oZpfobpmNuLuJiBQKwZYSVa5ynS+BBPCn7YOLba0zuSSsTeYVX8jDFfCXq3AQfhJmdBCxWYoFt8ug==, tarball: https://npm.pkg.github.com/download/@unseal-network/mobile-sdk/0.0.1/e2d181e77d55d1c9a788bc4340db69c37a1a2f1f}
@@ -2560,6 +2566,8 @@ snapshots:
   '@unseal-network/game-sdk@0.0.10(@unseal-network/mobile-sdk@0.0.1)':
     dependencies:
       '@unseal-network/mobile-sdk': 0.0.1
+
+  '@unseal-network/mobile-log@0.0.9': {}
 
   '@unseal-network/mobile-sdk@0.0.1': {}
 

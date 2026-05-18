@@ -20,7 +20,6 @@ import {
   readStoredMatrixDisplayName,
   readStoredMatrixUserId,
 } from "../matrix/session";
-import { createHostBridge } from "../runtime/hostBridge";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -89,7 +88,7 @@ export function IframeCreatePage({
     if (onLeave) {
       onLeave();
     } else {
-      createHostBridge().hideApp?.();
+      (window.iframeMessage as { hideApp?: () => void } | undefined)?.hideApp?.();
     }
   }
 
