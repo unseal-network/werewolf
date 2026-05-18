@@ -2474,7 +2474,7 @@ export class InMemoryGameService {
     const ttsStream =
       hasValidAgentSpeech && voiceAgent
         ? Promise.resolve(
-            voiceAgent.speak(speech, playerId, room.timing.agentSpeechRate ?? 1.5)
+            voiceAgent.speak(speech, playerId, room.timing.agentSpeechRate ?? 1)
           )
             .then((captured) => {
               if (!captured) {

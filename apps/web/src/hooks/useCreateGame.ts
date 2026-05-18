@@ -39,7 +39,7 @@ export function useCreateGame({
 
   const [title, setTitle] = useState(() => t("create.gameTitleDefault"));
   const [language, setLanguage] = useState<"zh-CN" | "en">("zh-CN");
-  const [agentSpeechRate, setAgentSpeechRate] = useState(1.5);
+  const [agentSpeechRate, setAgentSpeechRate] = useState(1);
   const [targetPlayerCount, setTargetPlayerCount] = useState(12);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
