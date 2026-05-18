@@ -28,7 +28,6 @@ import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seat
 import {
   DEMO_DISPLAY_NAME,
   DEMO_USER_ID,
-  matrixServerBaseFromToken,
   readStoredMatrixDisplayName,
   readStoredMatrixUserId,
   readMatrixToken,
@@ -82,6 +81,7 @@ interface UserSeatState {
 const apiBaseUrl = defaultApiBaseUrl();
 const appBasePath = import.meta.env.BASE_URL ?? "/";
 const roleAssetBase = `${appBasePath.replace(/\/?$/, "/")}assets/role-cards`;
+const errorToastDurationMs = 3600;
 
 function normalizeRoleId(roleId: string | undefined): string {
   switch (roleId) {
@@ -521,7 +521,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   useEffect(() => {
     let cancelled = false;
     void client
-      .whoAmI(matrixServerBaseFromToken(matrixToken))
+      .whoAmIAgainstApi()
       .then((whoami) => {
         if (cancelled || !whoami.user_id) return;
         writeMatrixIdentity(
@@ -536,6 +536,18 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       cancelled = true;
     };
   }, [client, matrixToken]);
+
+  useEffect(() => {
+    if (!errorMessage) return undefined;
+    const timeout = window.setTimeout(() => setErrorMessage(""), errorToastDurationMs);
+    return () => window.clearTimeout(timeout);
+  }, [errorMessage]);
+
+  useEffect(() => {
+    if (!agentError) return undefined;
+    const timeout = window.setTimeout(() => setAgentError(undefined), errorToastDurationMs);
+    return () => window.clearTimeout(timeout);
+  }, [agentError]);
 
   const applyServerEvent = useCallback(
     (event: GameEventDto) => {
@@ -1203,6 +1215,16 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     }
   }
 
+  async function removeAgentFromSeat(agent: AgentCandidate) {
+    try {
+      const removed = await client.removePlayer(gameRoomId, agent.userId);
+      setRoomSnapshot((current) => upsertRoomPlayers(current, [removed.player]));
+      await refreshAgentCandidates();
+    } catch (error) {
+      setAgentError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function handleStartIntent() {
     if (!room) return;
     if (hasEnoughPlayers) {
@@ -1599,6 +1621,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
               )}
               canStartNow={hasEnoughPlayers}
               onAdd={addAgentToSeat}
+              onRemove={removeAgentFromSeat}
               onRefresh={refreshAgentCandidates}
               onStartNow={onAgentPickerStartNow}
               onClose={onAgentPickerClose}

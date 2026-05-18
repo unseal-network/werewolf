@@ -129,6 +129,17 @@ export function shouldShowActionBubbleCopy({
   return shouldStartActionBubbleCollapsed(actionMode) && copy.trim().length > 0;
 }
 
+export function getLobbyPrimaryAction({
+  isCreator,
+  canAddAgent,
+}: {
+  isCreator: boolean;
+  canAddAgent: boolean | undefined;
+}): "start" | "add-agent" | "disabled" {
+  if (isCreator) return "start";
+  return canAddAgent ? "add-agent" : "disabled";
+}
+
 export function shouldPinActionBubbleOpen({
   actionMode,
   canCurrentUserAct,
@@ -251,7 +262,13 @@ export function CenterStage({
 
   // Lobby: only the start button + status copy
   if (actionMode === "lobby") {
-    const primaryLabel = isCreator ? t("stage.startButton") : t("stage.readyButton");
+    const primaryAction = getLobbyPrimaryAction({ isCreator, canAddAgent });
+    const primaryLabel =
+      primaryAction === "start"
+        ? t("stage.startButton")
+        : primaryAction === "add-agent"
+          ? t("stage.addAgentButton")
+          : t("stage.readyButton");
     return (
       <article className="phase-card phase-card-lobby">
         {identity}
@@ -262,10 +279,16 @@ export function CenterStage({
             className="stage-start"
             label={primaryLabel}
             variant="primary"
-            onClick={isCreator ? onStart : undefined}
-            disabled={!isCreator}
+            onClick={
+              primaryAction === "start"
+                ? onStart
+                : primaryAction === "add-agent"
+                  ? onAddAgent
+                  : undefined
+            }
+            disabled={primaryAction === "disabled"}
           />
-          {onAddAgent && canAddAgent ? (
+          {onAddAgent && canAddAgent && primaryAction !== "add-agent" ? (
             <StageActionButton
               className="stage-skip stage-add-player"
               label="+"

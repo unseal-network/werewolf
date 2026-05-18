@@ -326,6 +326,44 @@ describe("game room seat layout", () => {
     expect(componentMap).toContain('"button/decision/confirm-button-9slice"');
   });
 
+  it("keeps mobile action buttons wide and filled instead of hollow", () => {
+    const shell = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/GameRoomShell.tsx"),
+      "utf8"
+    );
+    const primitiveCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
+      "utf8"
+    );
+    const actionCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
+    const buttonCss = primitiveCss.slice(
+      primitiveCss.indexOf(".game-layout-root .ww-game-button {")
+    );
+
+    expect(shell).toContain("compact ? 340");
+    expect(shell).toContain("compact ? 380");
+    expect(buttonCss).toContain("--ww-button-aspect-ratio");
+    expect(buttonCss).toContain("aspect-ratio: var(--ww-button-aspect-ratio)");
+    expect(buttonCss).toContain("--ww-button-bg-image");
+    expect(buttonCss).toContain("button/decision/cancel-button-9slice.png");
+    expect(buttonCss).toContain("button/decision/submit-button-9slice.png");
+    expect(buttonCss).not.toContain("log-fill.png");
+    expect(buttonCss).not.toContain("--ww-button-fill");
+    expect(buttonCss).not.toContain("background-size: 100% 100%");
+    expect(buttonCss).not.toContain(".game-layout-root .ww-game-button::before");
+    expect(buttonCss).not.toContain("--ww-button-label-plate-cover");
+    expect(buttonCss).toContain("border-image-source: none");
+    expect(buttonCss).not.toContain("border-image-slice: 76 168 fill");
+    expect(buttonCss).not.toContain("border-image-slice: 40 64 fill");
+    expect(buttonCss).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button");
+    expect(buttonCss).toContain("--ww-agent-add-size");
+    expect(buttonCss).toContain("background-image: none");
+    expect(actionCss).toContain("calc(100vw - 24px)");
+  });
+
   it("keeps speech input owned by the bottom action region", () => {
     const actionCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),

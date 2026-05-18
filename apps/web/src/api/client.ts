@@ -205,6 +205,9 @@ export function createApiClient(options: ApiClientOptions) {
         body: JSON.stringify(body),
       });
     },
+    whoAmIAgainstApi() {
+      return request<MatrixWhoAmI>("/games/me");
+    },
     joinGame(gameRoomId: string, seatNo?: number) {
       return request<JoinedPlayer>(`/games/${gameRoomId}/join`, {
         method: "POST",
