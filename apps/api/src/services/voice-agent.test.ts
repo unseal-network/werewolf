@@ -31,6 +31,32 @@ function createSession(overrides: Record<string, unknown> = {}) {
 }
 
 describe("VoiceAgentService STT buffering", () => {
+  it("deduplicates repeated LiveKit callbacks for the same player track", () => {
+    const agent = new VoiceAgentService("game_1", config);
+    agent.registerPlayerVoiceIdentity("player_6", "@raysonx:keepsecret.io");
+
+    expect(
+      (agent as any).claimPlayerAudioTrack("@raysonx:keepsecret.io", "track_1")
+    ).toEqual({
+      playerId: "player_6",
+      matrixUserId: "@raysonx:keepsecret.io",
+      trackKey: "track_1",
+    });
+    expect(
+      (agent as any).claimPlayerAudioTrack("@raysonx:keepsecret.io", "track_1")
+    ).toBeNull();
+
+    (agent as any).releasePlayerAudioTrack("track_1");
+
+    expect(
+      (agent as any).claimPlayerAudioTrack("@raysonx:keepsecret.io", "track_1")
+    ).toEqual({
+      playerId: "player_6",
+      matrixUserId: "@raysonx:keepsecret.io",
+      trackKey: "track_1",
+    });
+  });
+
   it("preserves a finished microphone track transcript until speech submit", async () => {
     const agent = new VoiceAgentService("game_1", config);
     const session = createSession({

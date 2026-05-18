@@ -647,7 +647,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     ? `${roomIdForVoice}:${myPlayerId ?? "spectator"}`
     : "";
   useEffect(() => {
-    if (!room || !matrixUserId) {
+    if (!room || !matrixUserId || !myPlayerId) {
       setLivekitToken(null);
       setLivekitServerUrl(null);
       return;

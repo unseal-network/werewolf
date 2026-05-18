@@ -416,6 +416,28 @@ describe("game room seat layout", () => {
     );
   });
 
+  it("submits voice speech completion when pointer leaves during hold-to-speak", () => {
+    const voicePanel = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoicePanel.tsx"),
+      "utf8"
+    );
+    const leaveStart = voicePanel.indexOf("onPointerLeave");
+    const leaveEnd = voicePanel.indexOf("disabled={", leaveStart);
+    const leaveBody = voicePanel.slice(leaveStart, leaveEnd);
+
+    expect(leaveBody).toContain("void finishVoiceSpeech()");
+    expect(leaveBody).not.toContain("void stopMicrophone()");
+  });
+
+  it("only fetches a LiveKit token after the viewer is seated as a player", () => {
+    const gameRoute = readFileSync(
+      resolve(process.cwd(), "apps/web/src/routes/game.$gameRoomId.tsx"),
+      "utf8"
+    );
+
+    expect(gameRoute).toContain("if (!room || !matrixUserId || !myPlayerId)");
+  });
+
   it("keeps the closed timeline sheet from blocking action controls", () => {
     const utilityCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/utility-region.css"),

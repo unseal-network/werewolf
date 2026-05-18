@@ -111,6 +111,7 @@ export class VoiceAgentService {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalDisconnect = false;
   private transcriptHandler: VoiceTranscriptHandler | null = null;
+  private activePlayerAudioTrackKeys = new Set<string>();
   /** Serializes speak() so two simultaneous utterances don't interleave
    *  PCM into the shared audio track. */
   private speakQueue: Promise<unknown> = Promise.resolve();
@@ -284,6 +285,7 @@ export class VoiceAgentService {
       session.client.close();
     }
     this.playerSessions.clear();
+    this.activePlayerAudioTrackKeys.clear();
     if (this.agentTrack) {
       await this.agentTrack.close();
       this.agentTrack = null;
@@ -657,15 +659,11 @@ export class VoiceAgentService {
     participantIdentity: string,
     track: RemoteTrack
   ): Promise<void> {
-    const binding = this.playerVoiceIdentityByMatrixUserId.get(participantIdentity);
-    if (!binding) {
-      console.warn("[VoiceAgent] ignoring audio track without Matrix binding", {
-        gameRoomId: this.gameRoomId,
-        participantIdentity,
-      });
+    const claim = this.claimPlayerAudioTrack(participantIdentity, track.sid ?? null);
+    if (!claim) {
       return;
     }
-    const { playerId, matrixUserId } = binding;
+    const { playerId, matrixUserId, trackKey } = claim;
     console.info("[VoiceAgent] starting STT for player audio", {
       gameRoomId: this.gameRoomId,
       playerId,
@@ -719,6 +717,7 @@ export class VoiceAgentService {
         matrixUserId,
         err,
       });
+      this.releasePlayerAudioTrack(trackKey);
       return;
     }
     const session: PlayerSttSession = {
@@ -789,10 +788,44 @@ export class VoiceAgentService {
           });
         }
       }
-      await this.finalizePlayerSttSession(session, playerId, matrixUserId);
-      session.client.close();
-      session.active = false;
+      try {
+        await this.finalizePlayerSttSession(session, playerId, matrixUserId);
+      } finally {
+        session.client.close();
+        session.active = false;
+        this.releasePlayerAudioTrack(trackKey);
+      }
     }
+  }
+
+  private claimPlayerAudioTrack(
+    participantIdentity: string,
+    trackSid: string | null
+  ): (PlayerVoiceIdentityBinding & { trackKey: string }) | null {
+    const binding = this.playerVoiceIdentityByMatrixUserId.get(participantIdentity);
+    if (!binding) {
+      console.warn("[VoiceAgent] ignoring audio track without Matrix binding", {
+        gameRoomId: this.gameRoomId,
+        participantIdentity,
+        trackSid,
+      });
+      return null;
+    }
+    const trackKey = trackSid ?? `${participantIdentity}:unknown-audio`;
+    if (this.activePlayerAudioTrackKeys.has(trackKey)) {
+      console.info("[VoiceAgent] ignoring duplicate player audio track callback", {
+        gameRoomId: this.gameRoomId,
+        participantIdentity,
+        trackSid,
+      });
+      return null;
+    }
+    this.activePlayerAudioTrackKeys.add(trackKey);
+    return { ...binding, trackKey };
+  }
+
+  private releasePlayerAudioTrack(trackKey: string): void {
+    this.activePlayerAudioTrackKeys.delete(trackKey);
   }
 
   private async finalizePlayerSttSession(

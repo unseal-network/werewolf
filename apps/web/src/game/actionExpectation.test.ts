@@ -18,10 +18,11 @@ function projection(overrides: Partial<RoomProjection> = {}): RoomProjection {
 }
 
 describe("buildActionExpectation", () => {
-  it("does not send the projection event sequence as an action lock", () => {
+  it("sends phase, day, and projection version as an action lock", () => {
     expect(buildActionExpectation(projection())).toEqual({
       expectedPhase: "day_speak",
       expectedDay: 2,
+      expectedVersion: 147,
     });
   });
 

@@ -197,7 +197,7 @@ export function VoicePanel({
               shouldCompleteSpeechOnPointerLeave() &&
               (voice.isMicrophoneEnabled || micPressing)
             ) {
-              void stopMicrophone();
+              void finishVoiceSpeech();
             }
           }}
           disabled={inputMode === "voice" ? !canToggleMic : actionLoading}
