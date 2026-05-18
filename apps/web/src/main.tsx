@@ -133,12 +133,7 @@ function App() {
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
         const unsealBase = unsealBaseFromStreamUrl(info.config?.streamURL);
-<<<<<<< HEAD
-        console.log('--unsealBase', unsealBase, info);
         if (unsealBase && matrixToken) {
-=======
-        if (unsealBase) {
->>>>>>> 7c067d2cdba94ad7217f43d388afd8e5b8ec84ed
           unsealClient = createUnsealClient(unsealBase);
           const entered = await unsealClient.enter(hostToken);
           unsealJwt = entered.token;
