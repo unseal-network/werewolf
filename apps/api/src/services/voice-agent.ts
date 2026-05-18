@@ -33,7 +33,7 @@ export interface VoiceAgentConfig {
   livekitApiSecret: string;
   unsealApiBaseUrl: string;
   unsealApiKey: string;
-  unsealAgentId: string; // default Unseal agent ID for STT, and TTS fallback when no Matrix binding exists
+  unsealAgentId: string; // explicit fallback agent ID for TTS when no Matrix binding exists
 }
 
 interface PlayerSttSession {
@@ -110,8 +110,9 @@ export class VoiceAgentService {
   }
 
   /**
-   * Register the Matrix identity for a player. LiveKit participants use this
-   * external ID; `playerId` is only for internal game attribution.
+   * Register the Matrix identity for a player. LiveKit participants and
+   * Unseal STT/TTS calls must use this external ID; `playerId` is only for
+   * internal game attribution.
    */
   registerPlayerVoiceIdentity(playerId: string, matrixUserId: string): void {
     if (!playerId || !matrixUserId) return;
@@ -488,12 +489,10 @@ export class VoiceAgentService {
       return;
     }
     const { playerId, matrixUserId } = binding;
-    const sttAgentId = this.config.unsealAgentId;
     console.info("[VoiceAgent] starting STT for player audio", {
       gameRoomId: this.gameRoomId,
       playerId,
       matrixUserId,
-      sttAgentId,
       trackSid: track.sid ?? null,
     });
     const prior = this.playerSessions.get(playerId);
@@ -505,7 +504,7 @@ export class VoiceAgentService {
 
     const sttClient = new SttWebSocketClient({
       apiBaseUrl: this.config.unsealApiBaseUrl,
-      agentId: sttAgentId,
+      agentId: matrixUserId,
       apiKey: this.config.unsealApiKey,
       onPartialTranscript: (text) => {
         this.transcriptHandler?.({
@@ -528,7 +527,6 @@ export class VoiceAgentService {
           gameRoomId: this.gameRoomId,
           playerId,
           matrixUserId,
-          sttAgentId,
           err,
         }),
     });
@@ -539,7 +537,6 @@ export class VoiceAgentService {
         gameRoomId: this.gameRoomId,
         playerId,
         matrixUserId,
-        sttAgentId,
         err,
       });
       return;
