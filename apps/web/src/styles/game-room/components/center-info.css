@@ -1,9 +1,47 @@
 /* Component: realtime center information for speeches, votes, and notices. */
+.game-layout-root .center-info-panel.ww-ui-panel {
+  --ww-panel-scale: 0.24;
+  --ww-panel-content-top: 28px;
+  --ww-panel-content-right: 34px;
+  --ww-panel-content-bottom: 28px;
+  --ww-panel-content-left: 34px;
+  width: 100%;
+  max-height: min(52dvh, calc(100dvh - var(--layout-safe-top) - var(--layout-safe-bottom) - var(--layout-action-bottom, 28px) - 250px));
+  background: none !important;
+  isolation: isolate;
+  color: #f6f0dc;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.84);
+  overflow: hidden;
+}
+
+.game-layout-root .center-info-panel-content {
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.game-layout-root .center-info-surface {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 104px;
+  max-height: 100%;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: auto;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 .game-layout-root .center-live-block {
   min-height: 0;
-  margin-top: 9px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(226, 210, 164, 0.22);
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  background: none;
   overflow: hidden;
 }
 
@@ -26,23 +64,18 @@
   text-transform: uppercase;
 }
 
-.game-layout-root .center-live-heading b {
-  color: #f6d783;
-  font-size: 12px;
-}
-
 .game-layout-root .center-vote-groups {
   display: grid;
   gap: 7px;
   margin-top: 7px;
   padding-right: 2px;
-  max-height: min(25dvh, 290px);
+  max-height: min(30dvh, 220px);
   overflow: auto;
 }
 
 .game-layout-root .center-vote-group {
   min-width: 0;
-  padding: 7px 8px;
+  padding: 8px 9px;
   border: 1px solid rgba(226, 210, 164, 0.20);
   border-radius: 10px;
   background: rgba(3, 9, 11, 0.34);
@@ -50,18 +83,15 @@
 }
 
 .game-layout-root .center-vote-target {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  display: flex;
   align-items: baseline;
   gap: 7px;
   min-width: 0;
 }
 
-.game-layout-root .center-vote-target span,
-.game-layout-root .center-vote-target em {
+.game-layout-root .center-vote-target span {
   color: rgba(246, 240, 220, 0.66);
   font-size: 10px;
-  font-style: normal;
   font-weight: 850;
   white-space: nowrap;
 }
@@ -77,10 +107,16 @@
 }
 
 .game-layout-root .center-voter-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  min-width: 0;
   margin-top: 6px;
+  overflow: hidden;
+  color: rgba(255, 246, 214, 0.86);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: normal;
 }
 
 .game-layout-root .center-mini-avatar {
@@ -88,6 +124,7 @@
   place-items: center;
   width: 22px;
   height: 22px;
+  flex: 0 0 auto;
   border: 1px solid rgba(226, 210, 164, 0.42);
   border-radius: 50%;
   background:
@@ -120,14 +157,14 @@
 }
 
 .game-layout-root .center-speech-text {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   margin: 7px 0 0;
-  max-height: min(25dvh, 290px);
+  max-height: min(38dvh, 420px);
   overflow: auto;
   color: rgba(246, 240, 220, 0.84);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.35;
+  font-size: clamp(13px, 2.4vw, 16px);
+  font-weight: 800;
+  line-height: 1.45;
   text-align: left;
 }
 

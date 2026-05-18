@@ -1,4 +1,6 @@
 import { useT } from "../i18n/I18nProvider";
+import { GameButton } from "./GameButton";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface StartDialogProps {
   open: boolean;
@@ -19,20 +21,35 @@ export function StartDialog({ open, filled, target, onFillAi, onWait }: StartDia
         onClick={onWait}
         aria-hidden
       />
-      <section className="start-dialog open" role="dialog" aria-modal="true">
+      <UiPanelFrame
+        as="section"
+        className="start-dialog open"
+        contentClassName="start-dialog-content"
+        role="dialog"
+        aria-modal="true"
+        tone="filled"
+        size="medium"
+        ornament
+      >
         <div className="start-title">{t("startDialog.title")}</div>
         <div className="start-copy">
           {t("startDialog.copy", { now: filled })}
         </div>
         <div className="start-actions">
-          <button type="button" className="action secondary" onClick={onWait}>
-            {t("stage.continueWait")}
-          </button>
-          <button type="button" className="action primary" onClick={onFillAi}>
-            {t("stage.fillAi")}
-          </button>
+          <GameButton
+            variant="secondary"
+            size="sm"
+            label={t("stage.continueWait")}
+            onClick={onWait}
+          />
+          <GameButton
+            variant="primary"
+            size="sm"
+            label={t("stage.fillAi")}
+            onClick={onFillAi}
+          />
         </div>
-      </section>
+      </UiPanelFrame>
     </>
   );
 }

@@ -1,17 +1,17 @@
 /* Component: player rail seats and avatar frames. */
 .game-layout-root .player-rail .seat {
   box-sizing: border-box;
-  width: var(--layout-seat);
+  width: var(--layout-rail-width);
   height: var(--layout-seat-slot);
   min-width: 0;
   aspect-ratio: auto !important;
   min-height: 0;
   padding: 0;
   display: grid;
-  grid-template-rows: calc(var(--layout-avatar) * 1.4);
+  grid-template-rows: calc(var(--layout-avatar) * 1.24);
   justify-items: center;
   align-content: start;
-  gap: 2px;
+  gap: 0;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
@@ -24,6 +24,10 @@
   transform: none !important;
   transition: none;
   pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .game-layout-root .player-rail .seat:hover,
@@ -66,6 +70,9 @@
   color: var(--seat-avatar-fg, #f6f0dc);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.36);
   overflow: visible;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .game-layout-root .player-rail .avatar::before {
@@ -75,6 +82,16 @@
   z-index: 3;
   pointer-events: none;
   background: var(--art-ring-normal) center / contain no-repeat;
+}
+
+.game-layout-root .player-rail .avatar::after {
+  content: "";
+  position: absolute;
+  inset: -28%;
+  z-index: 0;
+  pointer-events: none;
+  background: transparent center / contain no-repeat;
+  opacity: 0;
 }
 
 .game-layout-root .player-rail .seat-avatar-img {
@@ -88,17 +105,28 @@
   object-fit: cover;
   object-position: 50% 30%;
   clip-path: none;
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .game-layout-root .player-rail .player-avatar-img {
   object-position: center;
 }
 
-.game-layout-root .player-rail .role-avatar-img {
-  object-position: 50% 28%;
+.game-layout-root .player-rail .seat-hooded-portrait {
+  position: absolute;
+  inset: -3%;
+  z-index: 1;
+  border-radius: inherit;
+  background: var(--art-avatar-portrait-hooded) center / 112% 112% no-repeat;
+  opacity: 0.96;
+  filter: saturate(0.92) brightness(0.9);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.game-layout-root .player-rail .avatar > span:first-child {
+.game-layout-root .player-rail .seat-avatar-initial {
   position: relative;
   z-index: 2;
   color: var(--seat-avatar-fg, #f6f0dc);
@@ -106,6 +134,12 @@
   font-weight: 800;
   line-height: 1;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.42);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.game-layout-root .player-rail .avatar-mode-hooded .seat-avatar-initial {
+  display: none;
 }
 
 .game-layout-root .player-rail .seat-state-ready .avatar::before,
@@ -114,8 +148,77 @@
   opacity: 1;
 }
 
+.game-layout-root .player-rail .seat-state-selected .avatar::before {
+  background-image: var(--art-ring-selected);
+}
+
+.game-layout-root .player-rail .seat-state-selected .avatar::after {
+  background-image: var(--art-avatar-selected-glow-effect), var(--art-avatar-glow-selected);
+  opacity: 0.78;
+}
+
+.game-layout-root .player-rail .seat-state-speaking .avatar {
+  outline: calc(2px * var(--layout-ui-scale, 1)) solid rgba(255, 223, 138, 0.92) !important;
+  outline-offset: calc(6px * var(--layout-ui-scale, 1));
+}
+
+.game-layout-root .player-rail .seat-state-speaking .avatar::after {
+  background-image: none;
+  opacity: 0;
+  animation: none;
+}
+
+.game-layout-root .player-rail .seat-state-target .avatar::after {
+  background-image: var(--art-avatar-vote-target);
+  opacity: 0.86;
+}
+
 .game-layout-root .player-rail .seat-state-dead .seat-avatar-img,
-.game-layout-root .player-rail .seat-state-dead .avatar > span:first-child {
+.game-layout-root .player-rail .seat-state-dead .seat-hooded-portrait,
+.game-layout-root .player-rail .seat-state-dead .seat-avatar-initial {
+  filter: grayscale(1) saturate(0) brightness(0.62) contrast(1.08) !important;
+}
+
+.game-layout-root .player-rail .seat-role-badge {
+  position: absolute;
+  top: calc(var(--layout-avatar) * -0.05);
+  right: calc(var(--layout-avatar) * -0.09);
+  z-index: 6;
+  width: calc(var(--layout-avatar) * 0.34);
+  height: calc(var(--layout-avatar) * 0.34);
+  background: var(--seat-role-badge-image) center / contain no-repeat;
+  filter:
+    drop-shadow(0 3px 5px rgba(0, 0, 0, 0.62))
+    drop-shadow(0 0 8px rgba(216, 183, 107, 0.16));
+  pointer-events: none;
+}
+
+.game-layout-root .player-rail .seat-role-badge-blade {
+  --seat-role-badge-image: var(--art-badge-blade);
+}
+
+.game-layout-root .player-rail .seat-role-badge-eye {
+  --seat-role-badge-image: var(--art-badge-eye);
+}
+
+.game-layout-root .player-rail .seat-role-badge-moon {
+  --seat-role-badge-image: var(--art-badge-moon);
+}
+
+.game-layout-root .player-rail .seat-role-badge-people {
+  --seat-role-badge-image: var(--art-badge-people);
+}
+
+.game-layout-root .player-rail .seat-role-badge-shield {
+  --seat-role-badge-image: var(--art-badge-shield);
+}
+
+.game-layout-root .player-rail .seat-role-badge-star {
+  --seat-role-badge-image: var(--art-badge-star);
+}
+
+.game-layout-root .player-rail .seat-state-dead .seat-role-badge {
+  opacity: 0.52;
   filter: grayscale(1) saturate(0) brightness(0.62) contrast(1.08) !important;
 }
 
@@ -123,6 +226,14 @@
   background-image: var(--art-ring-dead);
   filter: none !important;
   opacity: 1;
+}
+
+.game-layout-root .player-rail .seat-state-dead .avatar::after {
+  inset: -4%;
+  z-index: 4;
+  background-image: var(--art-avatar-dead-overlay);
+  opacity: 0.58;
+  animation: none;
 }
 
 .game-layout-root .player-rail .seat-number-badge {
@@ -146,24 +257,13 @@
   box-shadow:
     0 2px 5px rgba(0, 0, 0, 0.72),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.game-layout-root .player-rail .seat-name {
-  width: 22px;
-  height: 18px;
-  margin: 0;
-  display: grid;
-  place-items: center;
-  overflow: visible;
-  text-align: center;
-  white-space: nowrap;
-  color: #fff4bd;
-  font-size: 11px !important;
-  font-weight: 800;
-  line-height: 1 !important;
-  text-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.9),
-    0 0 8px rgba(0, 0, 0, 0.72);
+.game-layout-root .player-rail .seat::selection,
+.game-layout-root .player-rail .seat *::selection {
+  background: transparent;
 }
 
 .game-layout-root .player-rail .seat-tooltip {
@@ -187,15 +287,6 @@
 
 .game-layout-root .player-rail .avatar {
   box-shadow: none !important;
-  outline: 0 !important;
-}
-
-.game-layout-root .player-rail .avatar::after {
-  display: none !important;
-  content: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  filter: none !important;
 }
 
 .game-layout-root .player-rail .seat-state-dead .avatar {

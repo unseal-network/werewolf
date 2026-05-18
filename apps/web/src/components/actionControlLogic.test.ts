@@ -13,6 +13,7 @@ import {
   getRadialSelectionState,
   getRadialSegmentAngles,
   getRadialSliceStyle,
+  getRadialWheelLayout,
 } from "./actionControlLogic";
 
 describe("radial player picker", () => {
@@ -130,10 +131,32 @@ describe("radial player picker", () => {
   });
 
   it("tightens and pulls in avatars for dense player wheels", () => {
-    expect(getRadialAvatarSize(6)).toBe(58);
-    expect(getRadialAvatarSize(12)).toBe(42);
+    expect(getRadialAvatarSize(6)).toBe(50);
+    expect(getRadialAvatarSize(12)).toBe(36);
     expect(getRadialAvatarRadius(10)).toBeLessThan(getRadialAvatarRadius(6));
     expect(getRadialAvatarRadius(12)).toBeLessThan(getRadialAvatarRadius(6));
+  });
+
+  it("sizes and shifts the radial wheel to fit the viewport around its trigger", () => {
+    const layout = getRadialWheelLayout({
+      center: { x: 180, y: 510 },
+      viewport: { width: 360, height: 640 },
+      count: 6,
+      margin: 18,
+    });
+
+    expect(layout.size).toBeLessThanOrEqual(269);
+    expect(layout.offsetY).toBeLessThan(0);
+  });
+
+  it("keeps radial wheel size bounded on roomy desktop surfaces", () => {
+    expect(
+      getRadialWheelLayout({
+        center: { x: 500, y: 500 },
+        viewport: { width: 1000, height: 900 },
+        count: 12,
+      }).size
+    ).toBe(304);
   });
 
   it("keeps adjacent twelve player avatars separated on the outer track", () => {

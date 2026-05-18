@@ -5,6 +5,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
+import { GameButton, type GameButtonVariant } from "./GameButton";
 
 export type StageActionButtonVariant = "primary" | "secondary";
 
@@ -43,6 +44,13 @@ export function StageActionButton({
         .join(" "),
     [className, loading, pressed, variant]
   );
+  const buttonVariant: GameButtonVariant = className
+    ?.split(/\s+/)
+    .includes("stage-start")
+    ? "primary"
+    : variant === "secondary"
+      ? "secondary"
+      : "confirm";
 
   function resetPressState() {
     setPressed(false);
@@ -71,28 +79,20 @@ export function StageActionButton({
   }
 
   return (
-    <button
-      type="button"
+    <GameButton
       {...rest}
       className={resolvedClassName}
+      variant={buttonVariant}
       data-variant={variant}
       data-loading={loading ? "true" : "false"}
       disabled={disabled || loading}
+      label={label}
+      loading={loading}
+      loadingLabel={loadingLabel}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onPointerLeave={handlePointerLeave}
-    >
-      <span className="stage-action-button__content">
-        {loading ? (
-          <>
-            <span className="stage-action-button__spinner" aria-hidden="true" />
-            <span>{loadingLabel}</span>
-          </>
-        ) : (
-          label
-        )}
-      </span>
-    </button>
+    />
   );
 }

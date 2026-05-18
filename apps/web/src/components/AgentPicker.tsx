@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ButtonHTMLAttributes } from "react";
 import { useT } from "../i18n/I18nProvider";
 import type { AgentCandidate } from "../api/client";
+import { UiPanelFrame } from "./UiPanelFrame";
 
 interface AgentPickerProps {
   open: boolean;
@@ -57,10 +58,15 @@ export function AgentPicker({
         onClick={onClose}
         aria-hidden
       />
-      <section
+      <UiPanelFrame
+        as="section"
         className="agent-picker open"
+        contentClassName="agent-picker-content"
         role="dialog"
         aria-modal="true"
+        tone="filled"
+        size="medium"
+        ornament
       >
         <div className="agent-picker-head">
           <div>
@@ -106,43 +112,63 @@ export function AgentPicker({
                   <div className="agent-name">{agent.displayName}</div>
                   <div className="agent-id">{agent.userId}</div>
                 </div>
-                <button
-                  type="button"
-                  className={`stage-skip ${agent.alreadyJoined ? "added" : ""}`}
+                <AgentPickerButton
+                  className={`agent-add-button ${agent.alreadyJoined ? "added" : ""}`}
                   disabled={
                     agent.alreadyJoined ||
                     pendingId === agent.userId ||
                     remainingSeats <= 0
                   }
                   onClick={() => handleAdd(agent)}
-                >
-                  {agent.alreadyJoined
+                  label={agent.alreadyJoined
                     ? t("agentPicker.added")
                     : pendingId === agent.userId
                       ? "..."
                       : t("agentPicker.add")}
-                </button>
+                />
               </div>
             ))
           )}
         </div>
 
         <div className="agent-picker-actions">
-          <button type="button" className="action secondary" onClick={onRefresh}>
-            {t("agentPicker.refresh")}
-          </button>
+          <AgentPickerButton
+            label={t("agentPicker.refresh")}
+            onClick={onRefresh}
+          />
           {onStartNow ? (
-            <button
-              type="button"
-              className="action primary"
+            <AgentPickerButton
+              tone="primary"
+              label={t("agentPicker.startNow")}
               onClick={onStartNow}
               disabled={!canStartNow}
-            >
-              {t("agentPicker.startNow")}
-            </button>
+            />
           ) : null}
         </div>
-      </section>
+      </UiPanelFrame>
     </>
+  );
+}
+
+function AgentPickerButton({
+  label,
+  tone = "secondary",
+  className,
+  ...props
+}: {
+  label: string;
+  tone?: "primary" | "secondary";
+  className?: string;
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={["agent-picker-button", `agent-picker-button--${tone}`, className]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <span>{label}</span>
+    </button>
   );
 }

@@ -1,9 +1,24 @@
 /* Region layout: root shell, scene layer, table rails, and center info. */
 .game-layout-root {
-  --art-ring-normal: url("/assets/ui/generated/slices/avatar-rings-atlas/avatar-rings-atlas-02.png");
-  --art-ring-dead: url("/assets/ui/generated/slices/avatar-rings-atlas/avatar-rings-atlas-18.png");
-  --art-seat-badge: url("/assets/ui/generated/slices/radial-base-hub-parts/radial-base-hub-parts-14.png");
-  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-mobile.png");
+  --ww-ui-base: "/assets/werewolf-ui/final";
+  --art-ring-normal: url("/assets/werewolf-ui/final/avatar/frame-default.png");
+  --art-ring-selected: url("/assets/werewolf-ui/final/avatar/frame-selected.png");
+  --art-ring-speaking: url("/assets/werewolf-ui/final/avatar/frame-speaking.png");
+  --art-ring-dead: url("/assets/werewolf-ui/final/avatar/frame-dead.png");
+  --art-avatar-glow-selected: url("/assets/werewolf-ui/final/avatar/glow-selected.png");
+  --art-avatar-selected-glow-effect: url("/assets/werewolf-ui/final/effect/avatar-selected-glow.png");
+  --art-avatar-portrait-hooded: url("/assets/werewolf-ui/final/avatar/portrait-hooded.png");
+  --art-avatar-speaking-pulse: url("/assets/werewolf-ui/final/effect/avatar-speaking-pulse.png");
+  --art-avatar-vote-target: url("/assets/werewolf-ui/final/effect/vote-target-ring.png");
+  --art-avatar-dead-overlay: url("/assets/werewolf-ui/final/avatar/dead-overlay.png");
+  --art-badge-blade: url("/assets/werewolf-ui/final/badge/blade.png");
+  --art-badge-eye: url("/assets/werewolf-ui/final/badge/eye.png");
+  --art-badge-moon: url("/assets/werewolf-ui/final/badge/moon.png");
+  --art-badge-people: url("/assets/werewolf-ui/final/badge/people.png");
+  --art-badge-shield: url("/assets/werewolf-ui/final/badge/shield.png");
+  --art-badge-star: url("/assets/werewolf-ui/final/badge/star.png");
+  --layout-bg-image: url("/assets/werewolf-ui/final/background/night-village.png");
+  --layout-vignette-image: url("/assets/werewolf-ui/final/background/vignette-overlay.png");
   --layout-bg-position: center top;
   --layout-bg-overlay:
     linear-gradient(180deg, rgba(1, 6, 9, 0.10), rgba(0, 0, 0, 0.58)),
@@ -17,8 +32,10 @@
   --layout-edge: clamp(10px, 3vw, 28px);
   --layout-seat: clamp(64px, 8vw, 90px);
   --layout-avatar: calc(var(--layout-seat) * 0.7);
-  --layout-seat-slot: calc(var(--layout-avatar) * 1.4 + 20px);
-  --layout-rail-height: min(64dvh, calc(100dvh - 230px));
+  --layout-rail-width: calc(var(--layout-avatar) * 1.66);
+  --layout-seat-slot: calc(var(--layout-avatar) * 1.24 + 14px);
+  --layout-rail-height: min(62dvh, calc(100dvh - 250px));
+  --layout-table-top-gap: clamp(18px, 3vh, 36px);
   --layout-action-width: min(380px, calc(100vw - 142px));
   position: relative;
   width: 100%;
@@ -47,6 +64,7 @@
   z-index: 0;
   background:
     var(--layout-bg-overlay),
+    var(--layout-vignette-image) center / cover no-repeat,
     var(--layout-bg-image) var(--layout-bg-position) / cover no-repeat;
 }
 
@@ -128,24 +146,27 @@
 .game-layout-root .table-region {
   grid-area: table;
   position: relative;
+  box-sizing: border-box;
   min-height: 0;
+  padding-top: var(--layout-table-top-gap);
   display: grid;
-  grid-template-columns: var(--layout-seat) minmax(0, 1fr) var(--layout-seat);
+  grid-template-columns: var(--layout-rail-width) minmax(0, 1fr) var(--layout-rail-width);
   grid-template-areas: "left center right";
   align-items: start;
   column-gap: clamp(10px, 4vw, 48px);
+  overflow: visible;
 }
 
 .game-layout-root .player-rail {
-  width: var(--layout-seat);
+  width: var(--layout-rail-width);
   height: var(--layout-rail-height);
-  max-height: 66dvh;
+  max-height: 100%;
   display: grid;
   grid-auto-rows: var(--layout-seat-slot);
   align-content: space-between;
   justify-items: center;
   gap: 0;
-  overflow: hidden;
+  overflow: visible;
   pointer-events: none;
 }
 
@@ -162,43 +183,13 @@
   grid-area: center;
   align-self: start;
   justify-self: center;
-  width: min(360px, 100%);
+  width: min(430px, 100%);
   margin-top: clamp(22px, 7vh, 76px);
 }
 
 .game-layout-root .center-info-panel {
   box-sizing: border-box;
-  max-height: min(42dvh, 460px);
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(2, 8, 10, 0.28);
-  color: #f6f0dc;
-  text-align: center;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.84);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.game-layout-root .center-info-kicker {
-  color: rgba(246, 240, 220, 0.62);
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.game-layout-root .center-info-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: clamp(16px, 3vw, 24px);
-  font-weight: 950;
-  line-height: 1.12;
-}
-
-.game-layout-root .center-info-meta {
-  color: rgba(246, 240, 220, 0.72);
-  font-size: 12px;
-  font-weight: 850;
 }

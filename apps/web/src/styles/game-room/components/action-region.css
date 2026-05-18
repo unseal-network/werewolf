@@ -2,23 +2,40 @@
 .game-layout-root .action-region {
   grid-area: action;
   z-index: 6;
-  width: var(--layout-action-width);
-  min-height: 42px;
+  position: relative;
   justify-self: center;
+  align-self: end;
+  width: min(
+    var(--layout-action-width),
+    calc(100% - (var(--layout-rail-width) * 2) - clamp(28px, 8vw, 96px))
+  );
+  min-width: 0;
+  min-height: 0;
+  margin-bottom: 0;
   display: grid;
   place-items: center;
   justify-items: center;
+  pointer-events: auto;
+  --action-button-width: min(100%, calc(280px * var(--layout-action-scale, 1)));
+  --action-primary-button-width: min(100%, calc(320px * var(--layout-action-scale, 1)));
+  --action-secondary-button-width: min(100%, calc(260px * var(--layout-action-scale, 1)));
+  --ww-button-scale: var(--layout-action-scale, 1);
 }
 
 .game-layout-root .action-region .phase-card {
+  display: grid !important;
+  justify-items: stretch !important;
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  border: 0;
-  border-radius: 16px;
-  background: rgba(4, 10, 12, 0.24);
-  box-shadow: none;
-  backdrop-filter: none;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: auto;
 }
 
 .game-layout-root .action-region .action-bubble-panel,
@@ -29,17 +46,19 @@
 .game-layout-root .action-region .player-picker-action-slot,
 .game-layout-root .action-region .binary-action {
   box-sizing: border-box;
-  width: 100%;
-  max-width: 100%;
-  justify-self: center;
+  width: 100% !important;
+  max-width: 100% !important;
+  justify-self: stretch !important;
   margin-inline: auto;
+  pointer-events: auto;
 }
 
 .game-layout-root .action-region .target-row,
 .game-layout-root .action-region .action-control-stack,
 .game-layout-root .action-region .binary-action {
   display: grid;
-  justify-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: stretch;
   align-items: center;
 }
 
@@ -51,6 +70,119 @@
 
 .game-layout-root .action-region .player-picker {
   width: min(100%, 320px);
+  pointer-events: auto;
+}
+
+.game-layout-root .action-region .player-picker-control-slot,
+.game-layout-root .action-region .player-picker-action-slot,
+.game-layout-root .action-region .player-picker-wheel,
+.game-layout-root .action-region .player-picker-avatar,
+.game-layout-root .action-region .player-picker-slice,
+.game-layout-root .action-region .stage-action-button,
+.game-layout-root .action-region .player-picker-action {
+  pointer-events: auto;
+}
+
+.game-layout-root .action-region .voice-panel {
+  box-sizing: border-box;
+  width: min(100%, 360px);
+  max-width: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: calc(8px * var(--layout-action-scale, 1));
+  justify-self: center;
+  align-self: end;
+  pointer-events: auto;
+}
+
+.game-layout-root .action-region .voice-bubble-row {
+  position: relative;
+  width: 100%;
+  height: calc(48px * var(--layout-action-scale, 1));
+  --voice-square-size: calc(48px * var(--layout-action-scale, 1));
+}
+
+.game-layout-root .action-region .voice-bubble {
+  height: calc(48px * var(--layout-action-scale, 1));
+  min-height: calc(48px * var(--layout-action-scale, 1));
+  border: 0 !important;
+  border-radius: 0 !important;
+  background:
+    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 36px) 11px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 11px repeat-x,
+    linear-gradient(180deg, rgba(7, 13, 15, 0.44), rgba(3, 8, 10, 0.34)),
+    rgba(3, 8, 10, 0.20) !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, repeat-x, no-repeat, no-repeat !important;
+  background-position: left top, right top, left bottom, right bottom, top center, bottom center, center, center !important;
+  background-size: 22px 22px, 22px 22px, 22px 22px, 22px 22px, calc(100% - 36px) 11px, calc(100% - 36px) 11px, calc(100% - 28px) calc(100% - 18px), calc(100% - 28px) calc(100% - 18px) !important;
+  box-shadow: none !important;
+  color: #fff7d8 !important;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.82),
+    0 0 12px rgba(0, 0, 0, 0.42);
+  filter: none !important;
+}
+
+.game-layout-root .action-region .voice-bubble.pressing,
+.game-layout-root .action-region .voice-bubble.recording,
+.game-layout-root .action-region .voice-bubble.is-active:not(.pressing):not(.recording) {
+  border: 0 !important;
+  background:
+    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 22px 22px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 36px) 11px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 11px repeat-x,
+    linear-gradient(180deg, rgba(34, 30, 22, 0.48), rgba(8, 9, 10, 0.36)),
+    rgba(3, 8, 10, 0.20) !important;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, repeat-x, no-repeat, no-repeat !important;
+  background-position: left top, right top, left bottom, right bottom, top center, bottom center, center, center !important;
+  background-size: 22px 22px, 22px 22px, 22px 22px, 22px 22px, calc(100% - 36px) 11px, calc(100% - 36px) 11px, calc(100% - 28px) calc(100% - 18px), calc(100% - 28px) calc(100% - 18px) !important;
+  box-shadow: none !important;
+  color: #fff7d8 !important;
+}
+
+.game-layout-root .action-region .voice-bubble-large {
+  width: calc(100% - var(--voice-square-size) - calc(10px * var(--layout-action-scale, 1)));
+}
+
+.game-layout-root .action-region .voice-text-bubble .speech-textarea {
+  box-sizing: border-box;
+  width: 100%;
+  height: calc(48px * var(--layout-action-scale, 1));
+  min-height: calc(48px * var(--layout-action-scale, 1));
+  padding: calc(12px * var(--layout-action-scale, 1)) calc(14px * var(--layout-action-scale, 1)) 0;
+  background: transparent !important;
+  color: #fff7d8 !important;
+  font-size: calc(15px * var(--layout-action-scale, 1));
+  line-height: calc(21px * var(--layout-action-scale, 1));
+}
+
+.game-layout-root .action-region .voice-actions {
+  width: 100%;
+  justify-items: center;
+}
+
+.game-layout-root .action-region .voice-state,
+.game-layout-root .action-region .voice-error {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: rgba(246, 240, 220, 0.72);
+  font-size: calc(11px * var(--layout-action-scale, 1));
+  font-weight: 780;
+  line-height: 1.25;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.86);
+}
+
+.game-layout-root .action-region .voice-error {
+  color: #ff9aa5;
 }
 
 .game-layout-root .action-region .player-picker-control-slot {
@@ -60,7 +192,41 @@
 
 .game-layout-root .action-region .stage-action-button,
 .game-layout-root .action-region .player-picker-action {
-  justify-self: center;
+  justify-self: center !important;
+}
+
+.game-layout-root .action-region .stage-start,
+.game-layout-root .action-region .stage-confirm,
+.game-layout-root .action-region .stage-skip,
+.game-layout-root .action-region .player-picker-action {
+  box-sizing: border-box;
+  position: relative;
+  width: var(--action-button-width) !important;
+  min-width: 0 !important;
+  max-width: var(--action-button-width) !important;
+  padding-inline: calc(24px * var(--layout-action-scale, 1)) !important;
+  font-size: calc(19px * var(--layout-action-scale, 1)) !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  pointer-events: auto;
+}
+
+.game-layout-root .action-region .stage-skip,
+.game-layout-root .action-region .player-picker-action.stage-skip {
+  width: var(--action-secondary-button-width) !important;
+  max-width: var(--action-secondary-button-width) !important;
+  font-size: calc(16px * var(--layout-action-scale, 1)) !important;
+}
+
+.game-layout-root .action-region .player-picker {
+  --player-picker-action-width: var(--action-button-width);
+  --player-picker-action-height: calc(72px * var(--layout-action-scale, 1));
+  --player-picker-control-height: calc(98px * var(--layout-action-scale, 1));
+  --player-picker-slice-size: calc(58px * var(--layout-action-scale, 1));
+}
+
+.game-layout-root .action-region .target-row {
+  gap: calc(12px * var(--layout-action-scale, 1));
 }
 
 .game-layout-root .action-region .phase-card::before,
@@ -71,7 +237,7 @@
 .game-layout-root .action-region .phase-card.action-bubble {
   width: 100%;
   min-width: 0;
-  background: rgba(4, 10, 12, 0.22);
+  background: transparent !important;
 }
 
 .game-layout-root .action-region .phase-card.action-bubble.is-collapsed {
@@ -90,4 +256,41 @@
 .game-layout-root .action-region .stage-skip,
 .game-layout-root .action-region .target-chip {
   border-radius: 999px;
+}
+
+.game-layout-root .action-region .stage-start,
+.game-layout-root .action-region .stage-confirm,
+.game-layout-root .action-region .stage-skip,
+.game-layout-root .action-region .player-picker-action {
+  box-shadow: none;
+  overflow: visible;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.82),
+    0 0 12px rgba(0, 0, 0, 0.52);
+}
+
+.game-layout-root .action-region .stage-start {
+  width: var(--action-primary-button-width) !important;
+  max-width: var(--action-primary-button-width) !important;
+}
+
+.game-layout-root .action-region .stage-action-button__content {
+  display: contents;
+}
+
+.game-layout-root .action-region .stage-confirm,
+.game-layout-root .action-region .player-picker-action:not(.stage-skip) {
+  width: var(--action-button-width) !important;
+}
+
+.game-layout-root .action-region .stage-skip,
+.game-layout-root .action-region .player-picker-action.stage-skip {
+  width: var(--action-secondary-button-width) !important;
+}
+
+.game-layout-root .action-region .phase-card > .stage-identity,
+.game-layout-root .action-region .phase-card > .phase-kicker,
+.game-layout-root .action-region .phase-card > .phase-title,
+.game-layout-root .action-region .phase-card > .phase-copy:not(.phase-action-copy) {
+  display: none !important;
 }

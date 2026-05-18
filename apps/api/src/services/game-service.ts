@@ -131,6 +131,12 @@ export type PlayerSubmittedAction =
   };
 
 const absentNightActorAutoAdvanceMs = 15_000;
+const AGENT_SPEECH_DELTA_DELAY_MS = 300;
+
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export class InMemoryGameService {
   private rooms = new Map<string, StoredGameRoom>();
@@ -2353,6 +2359,50 @@ export class InMemoryGameService {
     return result;
   }
 
+  private async emitAgentSpeechDeltas(
+    room: StoredGameRoom,
+    playerId: string,
+    speech: string,
+    expectedSpeechTurn: {
+      phase: GamePhase;
+      day: number;
+      version: number;
+      currentSpeakerPlayerId: string | null;
+    },
+    delayMs: number
+  ): Promise<void> {
+    const deltas = splitSpeechForDeltas(speech);
+    for (let index = 0; index < deltas.length; index += 1) {
+      if (
+        !room.projection ||
+        room.projection.phase !== expectedSpeechTurn.phase ||
+        room.projection.day !== expectedSpeechTurn.day ||
+        room.projection.version !== expectedSpeechTurn.version ||
+        room.projection.currentSpeakerPlayerId !==
+          expectedSpeechTurn.currentSpeakerPlayerId
+      ) {
+        return;
+      }
+      this.assignAndAppendEvents(room, [
+        {
+          ...this.baseEvent(room, playerId, "public"),
+          type: "speech_transcript_delta",
+          payload: {
+            day: expectedSpeechTurn.day,
+            phase: expectedSpeechTurn.phase,
+            text: deltas[index],
+            final: false,
+            source: "agent",
+            stream: true,
+          },
+        },
+      ]);
+      if (index < deltas.length - 1) {
+        await sleep(delayMs);
+      }
+    }
+  }
+
   private async runCurrentSpeaker(
     room: StoredGameRoom,
     runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
@@ -2389,6 +2439,16 @@ export class InMemoryGameService {
       toolSpeech ??
       textSpeech ??
       `${player.displayName} did not provide a valid speech.`;
+    const expectedSpeechTurn = {
+      phase: room.projection.phase,
+      day: room.projection.day,
+      version: room.projection.version,
+      currentSpeakerPlayerId: room.projection.currentSpeakerPlayerId,
+    };
+    const hasValidAgentSpeech =
+      (toolSpeech !== undefined || textSpeech !== undefined) &&
+      speech.trim() &&
+      !result.fallback;
     // Synthesize agent speech via TTS and wait for the TTS WebSocket to finish
     // and for the generated PCM frames to be handed to LiveKit before rotating
     // to the next speaker.
@@ -2396,30 +2456,49 @@ export class InMemoryGameService {
     // Skip TTS when the LLM call fell back to a placeholder speech: that
     // means the agent_id isn't provisioned on Unseal, and TTS for the same
     // id will just hang the speakQueue against the 120s hard timeout.
+    const voiceAgent =
+      this.voiceAgents && player.kind === "agent"
+        ? this.voiceAgents.get(room.id)
+        : null;
+    const deltaDelayMs = voiceAgent ? AGENT_SPEECH_DELTA_DELAY_MS : 0;
+    const deltaStream = hasValidAgentSpeech
+      ? this.emitAgentSpeechDeltas(
+          room,
+          playerId,
+          speech,
+          expectedSpeechTurn,
+          deltaDelayMs
+        )
+      : Promise.resolve();
+
+    const ttsStream =
+      hasValidAgentSpeech && voiceAgent
+        ? Promise.resolve(
+            voiceAgent.speak(speech, playerId, room.timing.agentSpeechRate ?? 1.5)
+          )
+            .then((captured) => {
+              if (!captured) {
+                console.error(
+                  `[VoiceAgent] no TTS audio captured for ${room.id}/${playerId}`
+                );
+              }
+            })
+            .catch((err) => {
+              console.error("[VoiceAgent] speak failed:", err);
+            })
+        : Promise.resolve();
+
+    await Promise.all([deltaStream, ttsStream]);
+
     if (
-      this.voiceAgents &&
-      player.kind === "agent" &&
-      (toolSpeech !== undefined || textSpeech !== undefined) &&
-      speech.trim() &&
-      !result.fallback
+      !room.projection ||
+      room.projection.phase !== expectedSpeechTurn.phase ||
+      room.projection.day !== expectedSpeechTurn.day ||
+      room.projection.version !== expectedSpeechTurn.version ||
+      room.projection.currentSpeakerPlayerId !==
+        expectedSpeechTurn.currentSpeakerPlayerId
     ) {
-      const voiceAgent = this.voiceAgents.get(room.id);
-      if (voiceAgent) {
-        try {
-          const captured = await voiceAgent.speak(
-            speech,
-            playerId,
-            room.timing.agentSpeechRate ?? 1.5
-          );
-          if (!captured) {
-            console.error(
-              `[VoiceAgent] no TTS audio captured for ${room.id}/${playerId}`
-            );
-          }
-        } catch (err) {
-          console.error("[VoiceAgent] speak failed:", err);
-        }
-      }
+      return;
     }
 
     const completedAt = new Date();
@@ -2698,6 +2777,44 @@ function normalizeAgentTurnOutput(output: RuntimeAgentTurnOutput): RuntimeAgentT
 
 function stringValue(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function splitSpeechForDeltas(speech: string): string[] {
+  const normalized = speech.replace(/\r\n/g, "\n").trim();
+  if (!normalized) return [];
+
+  const pieces: string[] = [];
+  let buffer = "";
+  for (const char of normalized) {
+    buffer += char;
+    if (/[。！？!?；;，,、\n]/u.test(char)) {
+      const piece = buffer.trim();
+      if (piece) pieces.push(piece);
+      buffer = "";
+    }
+  }
+  const tail = buffer.trim();
+  if (tail) pieces.push(tail);
+
+  if (pieces.length <= 1) return [normalized];
+  const targetCount = Math.min(5, Math.max(3, pieces.length));
+  const grouped: string[] = [];
+  for (let index = 0; index < targetCount; index += 1) {
+    const start = Math.floor((index * pieces.length) / targetCount);
+    const end = Math.floor(((index + 1) * pieces.length) / targetCount);
+    const group = pieces.slice(start, end).join("").trim();
+    if (group) grouped.push(group);
+  }
+
+  const cumulative: string[] = [];
+  let current = "";
+  for (const group of grouped) {
+    current = `${current}${group}`.trim();
+    if (current && cumulative[cumulative.length - 1] !== current) {
+      cumulative.push(current);
+    }
+  }
+  return cumulative.length > 0 ? cumulative : [normalized];
 }
 
 function speechTextFromAgentOutput(text: string): string | undefined {

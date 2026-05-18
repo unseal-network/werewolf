@@ -13,7 +13,7 @@ export interface VoicePanelProps {
   textDraft: string;
   onTextChange: (value: string) => void;
   onSubmitText: (text: string) => void; // submits {kind:"speech", speech: text}
-  onSpeechComplete: () => void; // submits {kind:"speechComplete"}
+  onSpeechComplete: () => void | Promise<void>; // submits {kind:"speechComplete"}
   actionLoading: boolean;
   submitLabel: string;
   placeholder: string;
@@ -88,6 +88,19 @@ export function VoicePanel({
     }
   }
 
+  async function finishVoiceSpeech() {
+    setMicPressing(false);
+    if (!enabled || actionLoading) return;
+    setMicError(null);
+    try {
+      await onSpeechComplete();
+    } finally {
+      if (voice.isMicrophoneEnabled) {
+        await voice.disableMicrophone();
+      }
+    }
+  }
+
   async function handleTextMode() {
     if (isMicOn) {
       await voice.disableMicrophone().catch(() => undefined);
@@ -144,9 +157,10 @@ export function VoicePanel({
                   if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                     event.currentTarget.releasePointerCapture(event.pointerId);
                   }
-                  void stopMicrophone();
                   if (shouldCompleteSpeechOnPointerRelease()) {
-                    onSpeechComplete();
+                    void finishVoiceSpeech();
+                  } else {
+                    void stopMicrophone();
                   }
                 }
               : undefined
@@ -235,7 +249,6 @@ export function VoicePanel({
                   handleVoiceMode();
                 }
               }}
-              autoFocus
             />
           )}
         </div>

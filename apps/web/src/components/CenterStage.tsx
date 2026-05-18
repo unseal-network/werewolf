@@ -3,6 +3,7 @@ import { LOGO_IMG, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG, ROLE_LABEL } from
 import { useT } from "../i18n/I18nProvider";
 import { PlayerRadialPicker } from "./PlayerRadialPicker";
 import { StageActionButton } from "./StageActionButton";
+import { UiPanelFrame } from "./UiPanelFrame";
 import { VoicePanel } from "./VoicePanel";
 
 export interface StageSeat {
@@ -293,13 +294,22 @@ export function CenterStage({
   // End
   if (actionMode === "end") {
     return (
-      <article className="phase-card endgame-phase-card" role="dialog" aria-live="polite">
+      <UiPanelFrame
+        as="article"
+        className="phase-card endgame-phase-card"
+        contentClassName="endgame-phase-card-content"
+        tone="filled"
+        size="medium"
+        ornament
+        role="dialog"
+        aria-live="polite"
+      >
         {identity}
         <div className="endgame-kicker">GAME OVER</div>
         <div className="endgame-title">{title}</div>
         {winnerText ? <div className="endgame-winner">{winnerText}</div> : null}
         {copy ? <div className="endgame-copy">{copy}</div> : null}
-      </article>
+      </UiPanelFrame>
     );
   }
 

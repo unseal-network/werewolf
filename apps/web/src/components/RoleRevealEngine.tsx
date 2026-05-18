@@ -95,24 +95,27 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
     <div
       ref={hostRef}
       className="role-reveal-engine"
-      role="button"
-      tabIndex={0}
-      aria-label={roleCard.roleLabel}
-      onPointerDown={() => {
-        void requestGyroPermissionIfNeeded();
-      }}
-      onClick={() => {
-        if (closeBlockedRef.current) return;
-        onClose?.();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onClose?.();
-        }
-      }}
     >
-      <div ref={cardRef} className="role-reveal-card3d" aria-hidden>
+      <div
+        ref={cardRef}
+        className="role-reveal-card3d"
+        role="button"
+        tabIndex={0}
+        aria-label={roleCard.roleLabel}
+        onPointerDown={() => {
+          void requestGyroPermissionIfNeeded();
+        }}
+        onClick={() => {
+          if (closeBlockedRef.current) return;
+          onClose?.();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onClose?.();
+          }
+        }}
+      >
         <div className="role-reveal-card3d-glow" />
         <div className="role-reveal-card3d-inner">
           <div className="role-reveal-card3d-face role-reveal-card3d-back">

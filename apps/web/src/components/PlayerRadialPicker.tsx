@@ -15,6 +15,7 @@ import {
   getRadialItemStyle,
   getRadialSelectionState,
   getRadialSliceStyle,
+  getRadialWheelLayout,
 } from "./actionControlLogic";
 import { normalizeDisplayRole, ROLE_COLOR, ROLE_IMG } from "../constants/roles";
 import { avatarPalette } from "./SeatAvatar";
@@ -125,6 +126,7 @@ export function PlayerRadialPicker({
   const [wheelOpen, setWheelOpen] = useState(defaultOpen);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectionPulseId, setSelectionPulseId] = useState<string | null>(null);
+  const [openLayout, setOpenLayout] = useState<{ size: number; offsetY: number } | null>(null);
   const hoveredIdRef = useRef<string | null>(null);
   const selectedTarget = useMemo(
     () => targets.find((target) => target.playerId === selectedTargetId),
@@ -133,6 +135,12 @@ export function PlayerRadialPicker({
   const pickerStyle = {
     "--player-picker-slice-size": `${getRadialAvatarSize(targets.length)}px`,
     "--player-picker-slice-deg": `${targets.length > 0 ? 360 / targets.length : 360}deg`,
+    ...(openLayout
+      ? {
+          "--player-picker-open-size": `${openLayout.size}px`,
+          "--player-picker-open-offset-y": `${openLayout.offsetY}px`,
+        }
+      : {}),
   } as CSSProperties;
 
   const hoveredTarget = targets.find((target) => target.playerId === hoveredId);
@@ -162,6 +170,7 @@ export function PlayerRadialPicker({
 
   useEffect(() => {
     if (!wheelOpen) return;
+    updateOpenLayout();
     const closeOnOutsidePointer = (event: globalThis.PointerEvent) => {
       const wheel = wheelRef.current;
       if (wheel && isInsideOpenWheel(event, wheel)) return;
@@ -171,11 +180,21 @@ export function PlayerRadialPicker({
       pressStartRef.current = null;
       setHoveredIdIfChanged(null);
       wheelGeometryRef.current = null;
+      setOpenLayout(null);
       setWheelOpen(false);
     };
+    const update = () => updateOpenLayout();
     document.addEventListener("pointerdown", closeOnOutsidePointer);
-    return () => document.removeEventListener("pointerdown", closeOnOutsidePointer);
-  }, [wheelOpen]);
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
+  }, [targets.length, wheelOpen]);
 
   function clearLongPressTimer() {
     if (longPressTimerRef.current === null) return;
@@ -193,6 +212,25 @@ export function PlayerRadialPicker({
     };
     wheelGeometryRef.current = geometry;
     return geometry;
+  }
+
+  function updateOpenLayout() {
+    const rect = wheelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const viewport = window.visualViewport;
+    const width = viewport?.width ?? window.innerWidth;
+    const height = viewport?.height ?? window.innerHeight;
+    const center = {
+      x: rect.left - (viewport?.offsetLeft ?? 0) + rect.width / 2,
+      y: rect.top - (viewport?.offsetTop ?? 0) + rect.height / 2,
+    };
+    setOpenLayout(
+      getRadialWheelLayout({
+        center,
+        viewport: { width, height },
+        count: targets.length,
+      })
+    );
   }
 
   function getHoverTargetIdFromPoint(
@@ -264,6 +302,7 @@ export function PlayerRadialPicker({
     setWheelOpen(false);
     setHoveredIdIfChanged(null);
     wheelGeometryRef.current = null;
+    setOpenLayout(null);
   }
 
   function commitHover() {
@@ -273,6 +312,7 @@ export function PlayerRadialPicker({
       setWheelOpen(false);
       setHoveredIdIfChanged(null);
       wheelGeometryRef.current = null;
+      setOpenLayout(null);
     }
   }
 
@@ -325,6 +365,7 @@ export function PlayerRadialPicker({
           setWheelOpen(false);
           setHoveredIdIfChanged(null);
           wheelGeometryRef.current = null;
+          setOpenLayout(null);
         }
         break;
       case "Escape":
@@ -333,6 +374,7 @@ export function PlayerRadialPicker({
           setWheelOpen(false);
           setHoveredIdIfChanged(null);
           wheelGeometryRef.current = null;
+          setOpenLayout(null);
         } else if (selectedTarget) {
           clearSelectionAndClose();
         }
@@ -355,6 +397,7 @@ export function PlayerRadialPicker({
       setWheelOpen(true);
       setHoveredIdIfChanged(null);
       window.requestAnimationFrame(() => {
+        updateOpenLayout();
         wheelGeometryRef.current = measureWheelGeometry();
       });
     }, PLAYER_PICKER_LONG_PRESS_MS);
@@ -399,6 +442,7 @@ export function PlayerRadialPicker({
       setWheelOpen(false);
       setHoveredIdIfChanged(null);
       wheelGeometryRef.current = null;
+      setOpenLayout(null);
     } else if (selectedTarget) {
       clearSelectionAndClose();
     }
@@ -446,6 +490,7 @@ export function PlayerRadialPicker({
                 setWheelOpen(false);
                 setHoveredIdIfChanged(null);
                 wheelGeometryRef.current = null;
+                setOpenLayout(null);
               }}
             >
               {renderTargetAvatar(target)}
@@ -473,7 +518,10 @@ export function PlayerRadialPicker({
             clearSelectionAndClose();
             return;
           }
-          setWheelOpen((open) => !open);
+          setWheelOpen((open) => {
+            if (open) setOpenLayout(null);
+            return !open;
+          });
         }}
         aria-label={selectedTarget ? `重新选择 ${selectedTarget.displayName}` : "选择玩家"}
       >
