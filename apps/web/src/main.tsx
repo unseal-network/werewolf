@@ -130,7 +130,7 @@ function App() {
             gameInfo.displayName ?? gameInfo.userId
           );
         }
-        const hostRoomId = gameInfo.roomId || gameInfo.gameRoomId || undefined;
+        const hostRoomId = gameInfo.gameRoomId || undefined;
         if (hostRoomId) {
           localStorage.setItem(SOURCE_ROOM_STORAGE_KEY, hostRoomId);
         }
