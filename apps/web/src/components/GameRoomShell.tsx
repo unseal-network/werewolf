@@ -5,6 +5,8 @@ import type { SeatData } from "./SeatAvatar";
 import { GameEngine, type EngineGameState } from "../engine/GameEngine";
 import { RoleRevealEngine } from "./RoleRevealEngine";
 import { computeVisibleSeatCount, splitSeatsIntoRails } from "../game/seatLayout";
+import { co } from "@unseal-network/mobile-sdk";
+import { MobileHeader } from "./MobileHeader";
 
 export type SceneId = "lobby" | "deal" | "night" | "day" | "vote" | "tie" | "end" | "waiting";
 
@@ -268,6 +270,13 @@ export function GameRoomShell({
         }
       }}
     >
+      {co.isMobile && (
+        <MobileHeader onMore={() => {
+
+        }} onClose={() => {
+          
+        }} />
+      )}
       <div className="scene-layer" aria-hidden>
         <GameEngine gameState={engineGameState} />
       </div>
