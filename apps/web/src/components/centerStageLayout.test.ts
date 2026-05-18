@@ -6,6 +6,7 @@ import {
   shouldAutoOpenActionBubble,
   shouldStartActionBubbleCollapsed,
   shouldShowCenterPhaseSummary,
+  getLobbyPrimaryAction,
 } from "./CenterStage";
 
 describe("center stage layout", () => {
@@ -102,6 +103,15 @@ describe("center stage layout", () => {
         canCurrentUserAct: true,
       })
     ).toBe(true);
+  });
+
+  it("lets non-creators use the lobby primary action to add agents when seats remain", () => {
+    expect(
+      getLobbyPrimaryAction({
+        isCreator: false,
+        canAddAgent: true,
+      })
+    ).toBe("add-agent");
   });
 
 });

@@ -305,3 +305,9 @@
 .game-layout-root .action-region .phase-card > .phase-copy:not(.phase-action-copy) {
   display: none !important;
 }
+
+@media (max-width: 560px) {
+  .game-layout-root .action-region {
+    width: min(var(--layout-action-width), calc(100vw - 24px));
+  }
+}

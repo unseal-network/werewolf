@@ -13,6 +13,7 @@ interface AgentPickerProps {
   remainingSeats: number;
   canStartNow: boolean;
   onAdd: (agent: AgentCandidate) => Promise<void>;
+  onRemove: (agent: AgentCandidate) => Promise<void>;
   onRefresh: () => void;
   onStartNow?: () => void;
   onClose: () => void;
@@ -27,6 +28,7 @@ export function AgentPicker({
   remainingSeats,
   canStartNow,
   onAdd,
+  onRemove,
   onRefresh,
   onStartNow,
   onClose,
@@ -48,6 +50,18 @@ export function AgentPicker({
       }
     },
     [onAdd]
+  );
+
+  const handleRemove = useCallback(
+    async (agent: AgentCandidate) => {
+      setPendingId(agent.userId);
+      try {
+        await onRemove(agent);
+      } finally {
+        setPendingId(null);
+      }
+    },
+    [onRemove]
   );
 
   if (!open) return null;
@@ -89,9 +103,9 @@ export function AgentPicker({
         </div>
 
         {errorMessage ? (
-          <p className="create-error">
+          <div className="agent-picker-error-toast" role="alert" aria-live="polite">
             {t("agentPicker.error", { message: errorMessage })}
-          </p>
+          </div>
         ) : null}
 
         <div className="agent-picker-list">
@@ -118,16 +132,19 @@ export function AgentPicker({
                   size="sm"
                   className={`agent-add-button ${agent.alreadyJoined ? "added" : ""}`}
                   disabled={
-                    agent.alreadyJoined ||
                     pendingId === agent.userId ||
-                    remainingSeats <= 0
+                    (!agent.alreadyJoined && remainingSeats <= 0)
                   }
-                  onClick={() => handleAdd(agent)}
+                  onClick={() =>
+                    agent.alreadyJoined ? handleRemove(agent) : handleAdd(agent)
+                  }
                   label={agent.alreadyJoined
-                    ? t("agentPicker.added")
+                    ? pendingId === agent.userId
+                      ? "..."
+                      : "-"
                     : pendingId === agent.userId
                       ? "..."
-                      : t("agentPicker.add")}
+                      : "+"}
                 />
               </div>
             ))

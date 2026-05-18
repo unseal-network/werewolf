@@ -79,6 +79,25 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     )}/${encodeURIComponent(path.slice(slash + 1))}`;
   }
 
+  app.get("/me", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      return c.json({
+        user_id: user.id,
+        display_name: user.displayName,
+        ...(user.avatarUrl ? { avatar_url: user.avatarUrl } : {}),
+      });
+    } catch (error) {
+      if (error instanceof AppError) {
+        return appErrorResponse(error);
+      }
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
   app.post("/", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);

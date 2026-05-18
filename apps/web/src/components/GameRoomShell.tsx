@@ -96,9 +96,9 @@ function useResponsiveGameLayoutVars(railSlotCount: number) {
       const naturalSlot = avatar * (compact ? 1.45 : 1.4) + (compact ? 16 : 20);
       const seatSlot = Math.min(naturalSlot, railHeight / railRows);
       const actionWidth = clampValue(
-        width - railWidth * 2 - width * (compact ? 0.34 : narrow ? 0.4 : 0.22),
-        compact ? 220 : narrow ? 260 : 260,
-        compact ? 300 : narrow ? 360 : 380
+        width - railWidth * 2 - width * (compact ? 0.12 : narrow ? 0.4 : 0.22),
+        compact ? 340 : narrow ? 260 : 260,
+        compact ? 380 : narrow ? 360 : 380
       );
       const actionBottom = clampValue(
         height * (compact ? 0.022 : narrow ? 0.028 : 0.04),

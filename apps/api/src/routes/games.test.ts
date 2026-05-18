@@ -9,6 +9,20 @@ describe("games API", () => {
     expect(response.status).toBe(401);
   });
 
+  it("reports the API-authenticated Matrix user for the current token", async () => {
+    const app = createApp(createTestDeps());
+
+    const response = await app.request("/games/me", {
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      user_id: "@alice:example.com",
+      display_name: "Alice",
+    });
+  });
+
   it("requires Matrix bearer auth for SSE subscriptions", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games/game_missing/subscribe");
