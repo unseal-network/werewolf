@@ -859,6 +859,22 @@ export class InMemoryGameService {
     }
 
     if (action.kind === "speechComplete") {
+      const privateState = this.requirePrivateState(room, playerId);
+      const isWolfDiscussion =
+        phase === "night_wolf" && privateState.role === "werewolf";
+      if (isWolfDiscussion) {
+        const assigned = await this.finalizeWolfNightSpeech(
+          room,
+          playerId,
+          now,
+          `${player.displayName} fell silent.`
+        );
+        if (!assigned) {
+          throw new AppError("conflict", "Action turn has changed", 409);
+        }
+        void this.scheduleAdvance(gameRoomId);
+        return assigned;
+      }
       if (phase !== "day_speak" && phase !== "tie_speech") {
         throw new AppError("invalid_phase", "Speech complete not allowed in this phase", 400);
       }
@@ -1508,13 +1524,18 @@ export class InMemoryGameService {
     if (!text) return null;
     const player = room.players.find((candidate) => candidate.id === input.playerId);
     if (!player || player.leftAt) return null;
-    if (
-      room.projection.phase !== "day_speak" &&
-      room.projection.phase !== "tie_speech"
-    ) {
+    const privateState = room.privateStates.find(
+      (state) => state.playerId === input.playerId
+    );
+    const isWolfDiscussion =
+      room.projection.phase === "night_wolf" && privateState?.role === "werewolf";
+    const isSpeechTurn =
+      room.projection.phase === "day_speak" ||
+      room.projection.phase === "tie_speech";
+    if (!isSpeechTurn && !isWolfDiscussion) {
       return null;
     }
-    if (room.projection.currentSpeakerPlayerId !== input.playerId) {
+    if (isSpeechTurn && room.projection.currentSpeakerPlayerId !== input.playerId) {
       return null;
     }
     const event = this.upsertSpeechStreamEvent(room, {
@@ -1524,6 +1545,7 @@ export class InMemoryGameService {
       text,
       final: input.final,
       source: player.kind === "agent" ? "agent" : "human",
+      visibility: isWolfDiscussion ? "private:team:wolf" : "public",
     });
     console.log(
       `[STT] ${room.id} ${event.id} ${player.displayName}: ${text}`
@@ -1561,6 +1583,7 @@ export class InMemoryGameService {
       text: string;
       final: boolean;
       source: "agent" | "human";
+      visibility?: GameEvent["visibility"] | undefined;
     }
   ): GameEvent {
     const existing = [...room.events]
@@ -1584,6 +1607,7 @@ export class InMemoryGameService {
     };
 
     if (existing) {
+      existing.visibility = input.visibility ?? "public";
       existing.payload = { ...existing.payload, ...payload };
       if (this.broker) {
         this.broker.publish(room.id, existing.seq, existing);
@@ -1596,7 +1620,7 @@ export class InMemoryGameService {
 
     const [event] = this.assignAndAppendEvents(room, [
       {
-        ...this.baseEvent(room, input.playerId, "public"),
+        ...this.baseEvent(room, input.playerId, input.visibility ?? "public"),
         type: "stream",
         payload,
       },
@@ -2683,6 +2707,50 @@ export class InMemoryGameService {
     const [assigned] = this.assignAndAppendEvents(room, [event]);
     this.advanceSpeechSpeaker(room, playerId, now);
     this.emitSpeechTurnStarted(room, playerId, now);
+    return assigned ?? null;
+  }
+
+  private async finalizeWolfNightSpeech(
+    room: StoredGameRoom,
+    playerId: string,
+    now: Date,
+    fallbackSpeech: string
+  ): Promise<GameEvent | null> {
+    if (!room.projection) return null;
+    const expectedSpeechTurn = {
+      phase: room.projection.phase,
+      day: room.projection.day,
+      version: room.projection.version,
+    };
+    const transcript = await this.flushPlayerTranscript(room.id, playerId);
+    if (
+      !room.projection ||
+      room.projection.phase !== expectedSpeechTurn.phase ||
+      room.projection.day !== expectedSpeechTurn.day ||
+      room.projection.version !== expectedSpeechTurn.version
+    ) {
+      return null;
+    }
+    const speechText =
+      transcript.trim() ||
+      this.latestSpeechTranscriptText(room, {
+        playerId,
+        day: expectedSpeechTurn.day,
+        phase: expectedSpeechTurn.phase,
+      }) ||
+      fallbackSpeech;
+    const [assigned] = this.assignAndAppendEvents(room, [
+      {
+        ...this.baseEvent(room, playerId, "private:team:wolf"),
+        type: "speech_submitted",
+        payload: {
+          day: room.projection.day,
+          phase: "night_wolf",
+          speech: speechText,
+        },
+      },
+    ]);
+    this.resetPlayerTranscript(room.id, playerId);
     return assigned ?? null;
   }
 

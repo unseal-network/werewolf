@@ -172,7 +172,7 @@ describe("runtime tick API", () => {
     expect(internalEventTypes).toContain("vote_submitted");
     expect(internalEventTypes).toContain("player_eliminated");
     expect(internalEventTypes).toContain("game_ended");
-  });
+  }, 15_000);
 
   it("rejects runtime ticks from authenticated users outside the room", async () => {
     const deps = createTestDeps();

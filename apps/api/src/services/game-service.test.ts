@@ -1106,6 +1106,89 @@ describe("InMemoryGameService rules", () => {
     ).rejects.toThrow("Speech not allowed in this phase");
   });
 
+  it("records wolf night STT transcript deltas as private team streams", () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf");
+    expect(wolf).toBeDefined();
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 72,
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+
+    const event = games.recordSpeechTranscript(gameRoomId, {
+      playerId: wolf!.playerId,
+      text: "今晚先看3号的反应",
+      final: false,
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "stream",
+        visibility: "private:team:wolf",
+        actorId: wolf!.playerId,
+        payload: expect.objectContaining({
+          kind: "speech",
+          phase: "night_wolf",
+          stream: true,
+          final: false,
+          source: "human",
+          text: "今晚先看3号的反应",
+        }),
+      })
+    );
+  });
+
+  it("submits wolf night voice speech without consuming the wolf kill vote", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const wolf = room.privateStates.find((state) => state.role === "werewolf");
+    expect(wolf).toBeDefined();
+
+    games.setVoiceAgents({
+      get: () => ({
+        flushPlayerTranscript: async () => "我觉得先别刀明显焦点，看看4号。",
+        resetPlayerTranscript: () => undefined,
+      }),
+      setTranscriptHandler: () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 73,
+      currentSpeakerPlayerId: null,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+    room.pendingNightActions = [];
+
+    const event = await games.submitAction(gameRoomId, wolf!.playerId, {
+      kind: "speechComplete",
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 73,
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "speech_submitted",
+        visibility: "private:team:wolf",
+        actorId: wolf!.playerId,
+        payload: expect.objectContaining({
+          phase: "night_wolf",
+          speech: "我觉得先别刀明显焦点，看看4号。",
+        }),
+      })
+    );
+    expect(room.pendingNightActions).toHaveLength(0);
+    expect(room.projection.phase).toBe("night_wolf");
+  });
+
   it("records live STT transcript deltas as stream events", () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
