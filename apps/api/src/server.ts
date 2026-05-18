@@ -7,6 +7,7 @@ import { TickWorker } from "./services/tick-worker";
 import { VoiceAgentRegistry } from "./services/voice-agent";
 import { buildRunAgentTurn } from "./services/agent-turn";
 import { DbMatrixProfileCache } from "./services/user-profile-cache";
+import type { MatrixAuthClient } from "./context/auth";
 
 const matrixBaseUrl = process.env.MATRIX_BASE_URL ?? "http://localhost:8008";
 const demoToken = process.env.DEMO_USER_TOKEN;
@@ -33,55 +34,55 @@ const games = new InMemoryGameService();
 // needs from the `input` arg the service passes in.
 games.setRunAgentTurn(buildRunAgentTurn());
 
-// Persistent store — best-effort. If DATABASE_URL is unset or the DB is
-// unreachable we still run in-memory; restarts just lose state.
 const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error("[Startup] DATABASE_URL is required; refusing to start without persistent store");
+  process.exit(1);
+}
+const requiredDatabaseUrl = databaseUrl;
+
 let pgSql: ReturnType<typeof createDbClient>["sql"] | null = null;
 let tickWorker: TickWorker | null = null;
 let store: GameStore | null = null;
 let profileCache: DbMatrixProfileCache | null = null;
-if (databaseUrl) {
-  // 确保数据库存在并应用所有 pending migrations，再启动业务逻辑
-  void ensureDatabase(databaseUrl)
-    .then(() => {
-      const { db, sql } = createDbClient(databaseUrl);
-      store = new GameStore(db);
-      profileCache = new DbMatrixProfileCache(db);
-      games.setStore(store);
-      pgSql = sql;
 
-      // Hydrate any active games from DB into the in-memory cache, then start
-      // the tick worker. This is what makes "kill API, restart, game continues"
-      // actually work: rooms whose `next_tick_at` has passed get picked up by
-      // the very first tick after startup.
-      const activeStore = store;
-      return games
-        .hydrateFromStore()
-        .then((roomIds) => {
-          if (roomIds.length > 0) {
-            console.log(
-              `[Startup] hydrated ${roomIds.length} rooms from store: ${roomIds.join(", ")}`
-            );
-          }
-          tickWorker = new TickWorker(activeStore, games);
-          tickWorker.start();
-          for (const roomId of roomIds) {
-            const room = games.snapshot(roomId);
-            if (room.status === "active") {
-              void games
-                .scheduleAdvance(roomId)
-                .catch((err) =>
-                  console.error(`[Startup] scheduleAdvance(${roomId}) failed:`, err)
-                );
-            }
-          }
-        });
-    })
-    .catch((err) => {
-      console.error("[Startup] DB init failed — running in-memory only:", err);
-    });
-} else {
-  console.warn("[Startup] DATABASE_URL not set — running in-memory only, state will be lost on restart");
+async function initializeStore(): Promise<void> {
+  try {
+    // 确保数据库存在并应用所有 pending migrations，再对外开始监听。
+    await ensureDatabase(requiredDatabaseUrl);
+    const { db, sql } = createDbClient(requiredDatabaseUrl);
+    store = new GameStore(db);
+    profileCache = new DbMatrixProfileCache(db);
+    games.setStore(store);
+    pgSql = sql;
+
+    // Hydrate any active games from DB into the in-memory cache, then start
+    // the tick worker. This is what makes "kill API, restart, game continues"
+    // actually work: rooms whose `next_tick_at` has passed get picked up by
+    // the very first tick after startup.
+    const activeStore = store;
+    const roomIds = await games.hydrateFromStore();
+    if (roomIds.length > 0) {
+      console.log(
+        `[Startup] hydrated ${roomIds.length} rooms from store: ${roomIds.join(", ")}`
+      );
+    }
+    tickWorker = new TickWorker(activeStore, games);
+    tickWorker.start();
+    for (const roomId of roomIds) {
+      const room = games.snapshot(roomId);
+      if (room.status === "active") {
+        void games
+          .scheduleAdvance(roomId)
+          .catch((err) =>
+            console.error(`[Startup] scheduleAdvance(${roomId}) failed:`, err)
+          );
+      }
+    }
+  } catch (err) {
+    console.error("[Startup] DB init failed — refusing to start without persistent store:", err);
+    process.exit(1);
+  }
 }
 
 // Initialize voice agent registry; LiveKit connections are established lazily
@@ -99,12 +100,7 @@ const voiceAgents = new VoiceAgentRegistry({
 });
 games.setVoiceAgents(voiceAgents);
 
-const app = createApp({
-  games,
-  store,
-  profileCache: profileCache ?? undefined,
-  matrixHomeserverUrl: matrixBaseUrl,
-  matrix: {
+const matrix: MatrixAuthClient = {
     async whoami(token) {
       if (demoToken && token === demoToken) {
         return { user_id: demoUserId };
@@ -148,10 +144,26 @@ const app = createApp({
         ...(avatarUrl ? { avatarUrl } : {}),
       };
     },
-  },
-});
+  };
 
-const server = serve({ fetch: app.fetch, port: Number(process.env.PORT ?? 3000) });
+let server: ReturnType<typeof serve> | null = null;
+
+async function startServer() {
+  await initializeStore();
+  const app = createApp({
+    games,
+    store,
+    profileCache: profileCache ?? undefined,
+    matrixHomeserverUrl: matrixBaseUrl,
+    matrix,
+  });
+  server = serve({ fetch: app.fetch, port: Number(process.env.PORT ?? 3000) });
+}
+
+void startServer().catch((err) => {
+  console.error("[Startup] server start failed:", err);
+  process.exit(1);
+});
 
 // Graceful shutdown — stop the tick worker and close the pg pool so a tsx
 // watch reload doesn't leak connections.
@@ -165,7 +177,11 @@ const shutdown = async (signal: string) => {
       console.error("[Shutdown] sql.end failed:", err);
     }
   }
-  server.close(() => process.exit(0));
+  if (server) {
+    server.close(() => process.exit(0));
+  } else {
+    process.exit(0);
+  }
   // Force-exit after 5s if server.close hangs (LiveKit etc.).
   setTimeout(() => process.exit(0), 5000).unref();
 };

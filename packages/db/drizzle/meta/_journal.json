@@ -8,6 +8,34 @@
       "when": 1778351840398,
       "tag": "0000_aberrant_ultron",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1778638498052,
+      "tag": "0001_player_avatar_url",
+      "breakpoints": false
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1778638498061,
+      "tag": "0002_user_profile_synced_at",
+      "breakpoints": false
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1778638498064,
+      "tag": "0003_drop_allowed_source_matrix_room_ids",
+      "breakpoints": false
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1778638498069,
+      "tag": "0004_player_invited_by_user_id",
+      "breakpoints": false
     }
   ]
 }
