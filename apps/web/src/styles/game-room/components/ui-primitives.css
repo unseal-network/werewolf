@@ -450,7 +450,10 @@
   z-index: 1;
   display: grid;
   place-items: center;
+  box-sizing: border-box;
   padding-inline: calc(28px * var(--ww-button-scale));
+  border: 0;
+  background: transparent;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

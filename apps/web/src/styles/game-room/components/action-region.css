@@ -289,10 +289,6 @@
   font-size: calc(18px * var(--layout-action-scale, 1)) !important;
 }
 
-.game-layout-root .action-region .stage-action-button__content {
-  display: contents;
-}
-
 .game-layout-root .action-region .stage-confirm,
 .game-layout-root .action-region .player-picker-action:not(.stage-skip) {
   width: var(--action-button-width) !important;

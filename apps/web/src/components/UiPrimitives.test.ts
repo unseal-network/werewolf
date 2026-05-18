@@ -84,6 +84,8 @@ describe("new UI primitives", () => {
     expect(css).toContain("cancel-button-9slice.png");
     expect(css).toContain(".game-layout-root .ww-game-button--primary");
     expect(css).toContain("color: #fff7d8");
+    expect(css).toContain("background: transparent");
+    expect(css).toContain("box-sizing: border-box");
     expect(css).toContain("border-image-slice: 76 168");
     expect(css).toContain("border-image-slice: 40 64");
     expect(css).not.toContain("border-image-slice: 76 168 fill");
@@ -113,5 +115,6 @@ describe("new UI primitives", () => {
     expect(css).toContain("content: none !important");
     expect(css).toContain("display: none !important");
     expect(css).toContain(".game-layout-root .action-region .stage-action-button.is-pressed");
+    expect(css).not.toContain(".game-layout-root .action-region .stage-action-button__content");
   });
 });
