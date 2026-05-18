@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type ButtonHTMLAttributes } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n/I18nProvider";
 import type { AgentCandidate } from "../api/client";
+import { GameButton } from "./GameButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 interface AgentPickerProps {
@@ -112,7 +113,9 @@ export function AgentPicker({
                   <div className="agent-name">{agent.displayName}</div>
                   <div className="agent-id">{agent.userId}</div>
                 </div>
-                <AgentPickerButton
+                <GameButton
+                  variant="secondary"
+                  size="sm"
                   className={`agent-add-button ${agent.alreadyJoined ? "added" : ""}`}
                   disabled={
                     agent.alreadyJoined ||
@@ -132,13 +135,16 @@ export function AgentPicker({
         </div>
 
         <div className="agent-picker-actions">
-          <AgentPickerButton
+          <GameButton
+            variant="secondary"
+            size="sm"
             label={t("agentPicker.refresh")}
             onClick={onRefresh}
           />
           {onStartNow ? (
-            <AgentPickerButton
-              tone="primary"
+            <GameButton
+              variant="primary"
+              size="sm"
               label={t("agentPicker.startNow")}
               onClick={onStartNow}
               disabled={!canStartNow}
@@ -147,28 +153,5 @@ export function AgentPicker({
         </div>
       </UiPanelFrame>
     </>
-  );
-}
-
-function AgentPickerButton({
-  label,
-  tone = "secondary",
-  className,
-  ...props
-}: {
-  label: string;
-  tone?: "primary" | "secondary";
-  className?: string;
-} & ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button
-      type="button"
-      {...props}
-      className={["agent-picker-button", `agent-picker-button--${tone}`, className]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <span>{label}</span>
-    </button>
   );
 }

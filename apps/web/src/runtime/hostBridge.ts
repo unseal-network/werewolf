@@ -6,6 +6,7 @@ export interface HostGameInfo {
   linkRoomId?: string | undefined;
   userId?: string | undefined;
   displayName?: string | undefined;
+  avatarUrl?: string | undefined;
   powerLevel?: number | undefined;
   config?: {
     streamURL?: string | undefined;
@@ -49,6 +50,9 @@ export function createHostBridge(): HostBridge {
   const realBridge = window.__WEREWOLF_HOST_BRIDGE__ ?? window.iframeMessage;
   if (realBridge) return realBridge;
   if (co.isMobile) return createMobileHostBridge();
+  if (isInIframe()) {
+    return createIframeHostBridge();
+  }
   return createMockHostBridge();
 }
 
@@ -75,6 +79,64 @@ export function createMobileHostBridge(): HostBridge {
       void co.back();
     },
   };
+}
+
+export interface IframeHostBridgeOptions {
+  timeoutMs?: number;
+}
+
+let iframeRequestSeq = 0;
+
+export function createIframeHostBridge(
+  options: IframeHostBridgeOptions = {}
+): HostBridge {
+  return {
+    getInfo: async () =>
+      normalizeHostInfo(await requestIframeHost("game-info", options)),
+    getToken: async () =>
+      normalizeHostToken(await requestIframeHost("game-get-token", options)),
+    closeApp: () => {
+      void sendIframeHostCommand("game-minimize");
+    },
+    hideApp: () => {
+      void sendIframeHostCommand("game-minimize");
+    },
+  };
+}
+
+function requestIframeHost(
+  op: string,
+  options: IframeHostBridgeOptions
+): Promise<unknown> {
+  const id = `werewolf_${Date.now()}_${++iframeRequestSeq}`;
+  const timeoutMs = options.timeoutMs ?? 8000;
+  return new Promise((resolve, reject) => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const cleanup = () => {
+      if (timeout) clearTimeout(timeout);
+      window.removeEventListener("message", onMessage);
+    };
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as Record<string, unknown> | null;
+      if (!data || typeof data !== "object") return;
+      if (data.op !== op || data.id !== id) return;
+      cleanup();
+      resolve(data.data);
+    };
+    window.addEventListener("message", onMessage);
+    timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error(`Unseal iframe host did not respond to ${op}`));
+    }, timeoutMs);
+    window.parent?.postMessage({ op, id }, "*");
+  });
+}
+
+function sendIframeHostCommand(op: string): void {
+  window.parent?.postMessage(
+    { op, id: `werewolf_${Date.now()}_${++iframeRequestSeq}` },
+    "*"
+  );
 }
 
 export function createMockHostBridge(): HostBridge {

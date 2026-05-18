@@ -129,7 +129,7 @@ function App() {
         const admin = (info.powerLevel ?? 0) >= 100;
         setIsAdmin(admin);
 
-        let linkRoomId = info.linkRoomId ?? null;
+        let linkRoomId = info.linkRoomId ?? info.gameRoomId ?? null;
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
         const unsealBase = unsealBaseFromStreamUrl(info.config?.streamURL);

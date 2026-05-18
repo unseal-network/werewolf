@@ -17,7 +17,7 @@
   justify-items: center;
   pointer-events: auto;
   --action-button-width: min(100%, calc(280px * var(--layout-action-scale, 1)));
-  --action-primary-button-width: min(100%, calc(320px * var(--layout-action-scale, 1)));
+  --action-primary-button-width: min(100%, calc(390px * var(--layout-action-scale, 1)));
   --action-secondary-button-width: min(100%, calc(260px * var(--layout-action-scale, 1)));
   --ww-button-scale: var(--layout-action-scale, 1);
 }
@@ -272,6 +272,7 @@
 .game-layout-root .action-region .stage-start {
   width: var(--action-primary-button-width) !important;
   max-width: var(--action-primary-button-width) !important;
+  font-size: calc(18px * var(--layout-action-scale, 1)) !important;
 }
 
 .game-layout-root .action-region .stage-action-button__content {
