@@ -146,7 +146,9 @@ function App() {
 
         if (unsealBase && hostToken) {
           unsealClient = createUnsealClient(unsealBase);
+          un.log("[werewolf] run: hostToken", hostToken);
           const entered = await unsealClient.enter(hostToken);
+          un.log("[werewolf] run: 2222", hostToken);
           un.log("[werewolf] run: unseal entered", entered);
           unsealJwt = entered.token;
 

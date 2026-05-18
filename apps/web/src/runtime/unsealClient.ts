@@ -1,3 +1,5 @@
+import { un } from "@unseal-network/mobile-log";
+
 export interface UnsealEnterResponse {
   token: string;
   user?: {
@@ -34,13 +36,16 @@ export function createUnsealClient(baseUrl: string): UnsealClient {
   const normalized = baseUrl.replace(/\/+$/, "");
 
   async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+
     const response = await fetch(`${normalized}${path}`, init);
+    un.log('[werewolf] request request', response)
     if (!response.ok) {
       const body = (await response.json().catch(() => null)) as {
         code?: string;
         message?: string;
       } | null;
       if (body?.code) {
+        un.log('[werewolf] request response', response.status)
         throw new UnsealApiError(
           body.code,
           body.message ?? `Unseal API ${path} failed`,
@@ -53,13 +58,14 @@ export function createUnsealClient(baseUrl: string): UnsealClient {
   }
 
   return {
+    // https://keepsecret.io/app-mgr/room/api/auth/enter
     enter(unsealToken: string) {
       return request<UnsealEnterResponse>("/api/auth/enter", {
         method: "POST",
         headers: { unsealToken },
       });
     },
-
+    // https://keepsecret.io/app-mgr/room/api/rooms/45b54890-98a4-4a9f-9717-af131456755b
     async getRoom(roomId: string, jwt: string) {
       const response = await request<{ data: UnsealRoomData }>(
         `/api/rooms/${encodeURIComponent(roomId)}`,
@@ -68,6 +74,7 @@ export function createUnsealClient(baseUrl: string): UnsealClient {
       return response.data;
     },
 
+    // https://keepsecret.io/app-mgr/room/api/rooms/45b54890-98a4-4a9f-9717-af131456755b/link
     async linkRoom(roomId: string, linkRoomId: string, jwt: string) {
       await request(`/api/rooms/${encodeURIComponent(roomId)}/link`, {
         method: "POST",
