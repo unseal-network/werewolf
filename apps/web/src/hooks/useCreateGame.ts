@@ -91,7 +91,15 @@ export function useCreateGame({
         },
       });
 
-      await onGameCreated?.(result.gameRoomId, roomId);
+      try {
+        await onGameCreated?.(result.gameRoomId, roomId);
+      } catch (hookError) {
+        if (shouldContinueAfterGameCreatedHookError(hookError)) {
+          console.warn("[CreateGame] optional post-create hook failed:", hookError);
+        } else {
+          throw hookError;
+        }
+      }
       window.location.href = `${window.location.pathname}?gameRoomId=${result.gameRoomId}`;
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -115,4 +123,8 @@ export function useCreateGame({
     setError,
     submit,
   };
+}
+
+export function shouldContinueAfterGameCreatedHookError(_error: unknown): boolean {
+  return true;
 }
