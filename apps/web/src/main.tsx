@@ -250,7 +250,12 @@ function App() {
 
   // Game room
   if (gameRoomId) {
-    return <GameRoomPage gameRoomId={gameRoomId} />;
+    return (
+      <GameRoomPage
+        gameRoomId={gameRoomId}
+        onLeave={() => iframeAuth.iframeMessage.hideApp()}
+      />
+    );
   }
 
   // Create game

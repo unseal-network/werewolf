@@ -13,3 +13,5 @@ apps/web/public/test-users.local.json
 tmp-screens/
 *.heapsnapshot
 livekit.yaml
+.claude/
+.claude/*

@@ -36,6 +36,7 @@ interface GameRoomShellProps {
   isLoading?: boolean;
   errorMessage?: string | undefined;
   centerInfo?: ReactNode;
+  onMobileClose?: (() => void) | undefined;
 }
 
 function useCountdown(deadlineAt: string | null | undefined) {
@@ -228,6 +229,7 @@ export function GameRoomShell({
   isLoading,
   errorMessage,
   centerInfo,
+  onMobileClose,
 }: GameRoomShellProps) {
   const { t } = useI18n();
   const assetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/werewolf-ui/final`;
@@ -271,11 +273,7 @@ export function GameRoomShell({
       }}
     >
       {co.isMobile && (
-        <MobileHeader onMore={() => {
-
-        }} onClose={() => {
-          
-        }} />
+        <MobileHeader onClose={onMobileClose} />
       )}
       <div className="scene-layer" aria-hidden>
         <GameEngine gameState={engineGameState} />

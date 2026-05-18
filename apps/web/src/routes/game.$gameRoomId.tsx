@@ -451,7 +451,7 @@ function parseCurrentSpeakerSeat(
   return player?.seatNo;
 }
 
-export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
+export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLeave?: (() => void) | undefined }) {
   const t = useT();
   const [matrixToken] = useState(() => readMatrixToken());
   const [matrixUserId, setMatrixUserId] = useState(
@@ -1503,6 +1503,7 @@ export function GameRoomPage({ gameRoomId }: { gameRoomId: string }) {
         seatCount={maxSeatCount}
         onSeatClick={onSeatClick}
         onHomeClick={goHome}
+        onMobileClose={onLeave}
         isLoading={runtimeInProgress}
         errorMessage={errorMessage || undefined}
         centerInfo={

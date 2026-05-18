@@ -11,7 +11,11 @@
       "Bash(npx tsc *)",
       "Bash(node -e \"const p = require\\('./apps/web/node_modules/@unseal-network/game-sdk/package.json'\\); console.log\\(p.version, p.exports ? Object.keys\\(p.exports\\) : p.main\\)\")",
       "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\(p.get\\('version'\\), list\\(\\(p.get\\('exports'\\) or {}\\).keys\\(\\)\\)[:8]\\)\")",
-      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\(json.dumps\\({k: p[k] for k in ['version','main','module','types','exports'] if k in p}, indent=2\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; p=json.load\\(sys.stdin\\); print\\(json.dumps\\({k: p[k] for k in ['version','main','module','types','exports'] if k in p}, indent=2\\)\\)\")",
+      "Bash(grep -n \"GameRoomShell\\\\|onHomeClick\\\\|onClose\\\\|hideApp\\\\|iframeMessage\\\\|iframeAuth\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx 2>/dev/null | head -30)",
+      "Bash(grep -n \"GameRoomPageProps\\\\|interface.*GameRoom\\\\|hideApp\\\\|iframeMessage\\\\|onLeave\\\\|onClose\\\\b\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)",
+      "Bash(sed -n '1,30p' /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx)",
+      "Bash(grep -n \"export function GameRoomPage\\\\|interface GameRoomPage\\\\|GameRoomPageProps\\\\|goHome\\\\b\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -10)"
     ]
   }
 }

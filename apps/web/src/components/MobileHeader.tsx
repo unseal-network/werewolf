@@ -1,6 +1,6 @@
 interface MobileHeaderProps {
-  onClose: () => void;
-  onMore?: () => void;
+  onClose?: (() => void) | undefined;
+  onMore?: (() => void) | undefined;
 }
 
 export function MobileHeader({ onClose, onMore }: MobileHeaderProps) {
