@@ -253,7 +253,7 @@ export function GameRoomShell({
   const avatarMode = scene === "lobby" ? "identity" : "hooded";
   const rootStyle = {
     ["--accent" as string]: accent,
-    ["--role-card-back-url" as string]: `url("${assetBase}/card/role-card-back.png")`,
+    ["--role-card-back-url" as string]: `url("${assetBase}/card/role-card-back.avif")`,
     ...responsiveLayoutVars,
   } as React.CSSProperties;
   return (

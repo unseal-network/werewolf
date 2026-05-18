@@ -297,7 +297,11 @@ export function VoiceRoomProvider({
   }, [serverUrl, token]);
 
   const enableMicrophone = useCallback(async () => {
-    if (!room) return;
+    if (!room) {
+      const err = new Error("语音房间尚未连接，请稍后再试");
+      setErrorMessage(err.message);
+      throw err;
+    }
     try {
       await room.localParticipant.setMicrophoneEnabled(true);
       setIsMicrophoneEnabled(true);

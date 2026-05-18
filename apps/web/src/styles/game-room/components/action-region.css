@@ -113,56 +113,160 @@
   position: relative;
   width: 100%;
   height: calc(48px * var(--layout-action-scale, 1));
+  display: block;
   --voice-square-size: calc(48px * var(--layout-action-scale, 1));
+  --voice-gap: calc(10px * var(--layout-action-scale, 1));
+  --voice-corner-size: calc(22px * var(--layout-action-scale, 1));
+  --voice-edge-width: calc(11px * var(--layout-action-scale, 1));
+  --voice-edge-span: calc(100% - (36px * var(--layout-action-scale, 1)));
+  --voice-fill-span-x: calc(100% - (28px * var(--layout-action-scale, 1)));
+  --voice-fill-span-y: calc(100% - (18px * var(--layout-action-scale, 1)));
+  --voice-frame-layer:
+    url("/assets/werewolf-ui/final/button/log-corner-tl.webp") left top / var(--voice-corner-size) var(--voice-corner-size) no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-tr.webp") right top / var(--voice-corner-size) var(--voice-corner-size) no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-bl.webp") left bottom / var(--voice-corner-size) var(--voice-corner-size) no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-br.webp") right bottom / var(--voice-corner-size) var(--voice-corner-size) no-repeat,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") top center / var(--voice-edge-span) var(--voice-edge-width) repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") bottom center / var(--voice-edge-span) var(--voice-edge-width) repeat-x;
+  --voice-fill-layer:
+    linear-gradient(180deg, rgba(7, 13, 15, 0.44), rgba(3, 8, 10, 0.34)) center / var(--voice-fill-span-x) var(--voice-fill-span-y) no-repeat,
+    rgba(3, 8, 10, 0.20);
+  --voice-active-fill-layer:
+    linear-gradient(180deg, rgba(34, 30, 22, 0.48), rgba(8, 9, 10, 0.36)) center / var(--voice-fill-span-x) var(--voice-fill-span-y) no-repeat,
+    rgba(3, 8, 10, 0.20);
 }
 
 .game-layout-root .action-region .voice-bubble {
+  appearance: none;
+  -webkit-appearance: none;
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  min-width: 0;
   height: calc(48px * var(--layout-action-scale, 1));
   min-height: calc(48px * var(--layout-action-scale, 1));
+  display: grid;
+  place-items: center;
+  gap: calc(6px * var(--layout-action-scale, 1));
+  padding: 0 calc(16px * var(--layout-action-scale, 1));
   border: 0 !important;
   border-radius: 0 !important;
-  background:
-    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 36px) 11px repeat-x,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 11px repeat-x,
-    linear-gradient(180deg, rgba(7, 13, 15, 0.44), rgba(3, 8, 10, 0.34)),
-    rgba(3, 8, 10, 0.20) !important;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, repeat-x, no-repeat, no-repeat !important;
-  background-position: left top, right top, left bottom, right bottom, top center, bottom center, center, center !important;
-  background-size: 22px 22px, 22px 22px, 22px 22px, 22px 22px, calc(100% - 36px) 11px, calc(100% - 36px) 11px, calc(100% - 28px) calc(100% - 18px), calc(100% - 28px) calc(100% - 18px) !important;
+  background: var(--voice-frame-layer), var(--voice-fill-layer) !important;
   box-shadow: none !important;
   color: #fff7d8 !important;
+  font: inherit;
+  font-weight: 950;
   text-shadow:
     0 2px 4px rgba(0, 0, 0, 0.82),
     0 0 12px rgba(0, 0, 0, 0.42);
+  cursor: pointer;
   filter: none !important;
+  transform: translateY(0) scale(1);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: manipulation;
+  transition:
+    transform 90ms ease,
+    color 120ms ease,
+    opacity 120ms ease !important;
 }
 
-.game-layout-root .action-region .voice-bubble.pressing,
-.game-layout-root .action-region .voice-bubble.recording,
-.game-layout-root .action-region .voice-bubble.is-active:not(.pressing):not(.recording) {
-  border: 0 !important;
-  background:
-    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 22px 22px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 36px) 11px repeat-x,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 11px repeat-x,
-    linear-gradient(180deg, rgba(34, 30, 22, 0.48), rgba(8, 9, 10, 0.36)),
-    rgba(3, 8, 10, 0.20) !important;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat-x, repeat-x, no-repeat, no-repeat !important;
-  background-position: left top, right top, left bottom, right bottom, top center, bottom center, center, center !important;
-  background-size: 22px 22px, 22px 22px, 22px 22px, 22px 22px, calc(100% - 36px) 11px, calc(100% - 36px) 11px, calc(100% - 28px) calc(100% - 18px), calc(100% - 28px) calc(100% - 18px) !important;
-  box-shadow: none !important;
-  color: #fff7d8 !important;
+.game-layout-root .action-region .voice-bubble-left {
+  left: 0;
+  z-index: 2;
+  transform-origin: left center;
+}
+
+.game-layout-root .action-region .voice-bubble-right {
+  right: 0;
+  z-index: 1;
+  transform-origin: right center;
+}
+
+.game-layout-root .action-region .voice-bubble-square {
+  width: var(--voice-square-size);
+  padding: 0;
 }
 
 .game-layout-root .action-region .voice-bubble-large {
-  width: calc(100% - var(--voice-square-size) - calc(10px * var(--layout-action-scale, 1)));
+  width: calc(100% - var(--voice-square-size) - var(--voice-gap));
+}
+
+.game-layout-root .action-region .voice-bubble-left.voice-bubble-large {
+  left: 0;
+  right: auto;
+}
+
+.game-layout-root .action-region .voice-bubble-right.voice-bubble-large {
+  right: 0;
+  left: auto;
+}
+
+.game-layout-root .action-region .voice-bubble-left.voice-bubble-square {
+  left: 0;
+  right: auto;
+}
+
+.game-layout-root .action-region .voice-bubble-right.voice-bubble-square {
+  right: 0;
+  left: auto;
+}
+
+.game-layout-root .action-region .voice-bubble:not(.voice-text-bubble),
+.game-layout-root .action-region .voice-bubble:not(.voice-text-bubble) * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.game-layout-root .action-region .voice-bubble-left.is-active {
+  touch-action: none;
+}
+
+.game-layout-root .action-region .voice-bubble-icon {
+  width: calc(24px * var(--layout-action-scale, 1));
+  height: calc(24px * var(--layout-action-scale, 1));
+  display: grid;
+  place-items: center;
+  font-size: calc(21px * var(--layout-action-scale, 1));
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.game-layout-root .action-region .voice-bubble strong {
+  max-width: min(100%, calc(190px * var(--layout-action-scale, 1)));
+  overflow: hidden;
+  font-size: calc(15px * var(--layout-action-scale, 1));
+  font-weight: 950;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.game-layout-root .action-region .voice-bubble-square strong {
+  max-width: 0;
+  opacity: 0;
+}
+
+.game-layout-root .action-region .voice-bubble.pressing,
+.game-layout-root .action-region .voice-bubble.recording {
+  border: 0 !important;
+  background: var(--voice-frame-layer), var(--voice-active-fill-layer) !important;
+  box-shadow:
+    inset 0 3px 8px rgba(0, 0, 0, 0.52),
+    inset 0 -1px 0 rgba(255, 235, 176, 0.10) !important;
+  color: #fff7d8 !important;
+  transform: translateY(calc(3px * var(--layout-action-scale, 1))) scale(0.985) !important;
+}
+
+.game-layout-root .action-region .voice-bubble.is-active:not(.pressing):not(.recording) {
+  border: 0 !important;
+  background: var(--voice-frame-layer), var(--voice-active-fill-layer) !important;
+  box-shadow: none !important;
+  color: #fff7d8 !important;
 }
 
 .game-layout-root .action-region .voice-text-bubble .speech-textarea {
@@ -218,10 +322,6 @@
   width: var(--action-button-width) !important;
   min-width: 0 !important;
   max-width: var(--action-button-width) !important;
-  padding-inline: calc(24px * var(--layout-action-scale, 1)) !important;
-  font-size: calc(19px * var(--layout-action-scale, 1)) !important;
-  line-height: 1 !important;
-  text-align: center !important;
   pointer-events: auto;
 }
 
@@ -229,7 +329,7 @@
 .game-layout-root .action-region .player-picker-action.stage-skip {
   width: var(--action-secondary-button-width) !important;
   max-width: var(--action-secondary-button-width) !important;
-  font-size: calc(16px * var(--layout-action-scale, 1)) !important;
+  --ww-button-font-size: calc(16px * var(--layout-action-scale, 1));
 }
 
 .game-layout-root .action-region .player-picker {
@@ -286,7 +386,6 @@
 .game-layout-root .action-region .stage-start {
   width: var(--action-primary-button-width) !important;
   max-width: var(--action-primary-button-width) !important;
-  font-size: calc(18px * var(--layout-action-scale, 1)) !important;
 }
 
 .game-layout-root .action-region .stage-confirm,

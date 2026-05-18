@@ -17,6 +17,7 @@ import {
 } from "@werewolf/engine";
 import { buildAgentTurnTools } from "@werewolf/agent-client";
 import { buildAgentPrompt } from "./agent-harness";
+import { GmAudioLibrary, type GmAudioAnnouncementContext } from "./gm-audio";
 import type { SseBroker } from "./sse-broker";
 import type { VoiceAgentRegistry } from "./voice-agent";
 import type { GameStore } from "./game-store";
@@ -148,6 +149,9 @@ export class InMemoryGameService {
   private voiceAgents: VoiceAgentRegistry | null = null;
   private store: GameStore | null = null;
   private speechFinalizations = new Map<string, Promise<GameEvent | null>>();
+  private gmAudio = new GmAudioLibrary();
+  private announcingRooms = new Set<string>();
+  private persistQueues = new Map<string, Promise<void>>();
 
   setBroker(broker: SseBroker) {
     this.broker = broker;
@@ -194,11 +198,29 @@ export class InMemoryGameService {
    */
   private persistRoom(room: StoredGameRoom): void {
     if (!this.store) return;
+    this.enqueuePersistRoom(room, [], "persistRoom");
+  }
+
+  private enqueuePersistRoom(
+    room: StoredGameRoom,
+    events: GameEvent[] = [],
+    label: string
+  ): void {
+    if (!this.store) return;
     const store = this.store;
     const snapshot = structuredClone(room);
-    void store
-      .saveSnapshot(snapshot)
-      .catch((err) => console.error("[Store] persistRoom failed:", err));
+    const eventSnapshot = structuredClone(events);
+    const previous = this.persistQueues.get(room.id) ?? Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(() => store.saveSnapshot(snapshot, eventSnapshot))
+      .catch((err) => console.error(`[Store] ${label} failed:`, err));
+    const queued = next.finally(() => {
+      if (this.persistQueues.get(room.id) === queued) {
+        this.persistQueues.delete(room.id);
+      }
+    });
+    this.persistQueues.set(room.id, queued);
   }
 
   setRunAgentTurn(impl: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>) {
@@ -743,17 +765,11 @@ export class InMemoryGameService {
     // Once connected, bind each internal player to the Matrix identity used
     // by LiveKit and Unseal STT/TTS.
     if (this.voiceAgents) {
-      const registry = this.voiceAgents;
-      void registry
-        .getOrCreate(gameRoomId)
-        .then((voiceAgent) => {
-          for (const player of room.players) {
-            if (player.leftAt) continue;
-            const matrixUserId = resolvePlayerMatrixUserId(player);
-            if (!matrixUserId) continue;
-            voiceAgent.registerPlayerVoiceIdentity(player.id, matrixUserId);
-          }
-        })
+      void this.playGmAnnouncement(room, {
+        kind: "phase",
+        phase: "night_guard",
+      })
+        .then(() => this.scheduleAdvance(gameRoomId))
         .catch((err) => console.error("[VoiceAgent] getOrCreate failed:", err));
     }
 
@@ -787,6 +803,9 @@ export class InMemoryGameService {
     const player = this.requirePlayer(room, playerId);
     if (player.leftAt) {
       throw new AppError("forbidden", "Player has left the game", 403);
+    }
+    if (this.announcingRooms.has(gameRoomId)) {
+      throw new AppError("conflict", "Server narration is still playing", 409);
     }
     if (!room.projection.alivePlayerIds.includes(playerId)) {
       throw new AppError("forbidden", "Player is eliminated", 403);
@@ -972,7 +991,7 @@ export class InMemoryGameService {
         targetPlayerId: action.targetPlayerId,
       } as RuntimeNightAction;
       const submittedEvent = this.recordNightAction(room, nightAction);
-      this.resolveWolfPhaseIfAllWolfVotesSubmitted(room, now);
+      await this.resolveWolfPhaseIfAllWolfVotesSubmitted(room, now);
       void this.scheduleAdvance(gameRoomId);
       return submittedEvent;
     }
@@ -1196,6 +1215,9 @@ export class InMemoryGameService {
 
     const now = new Date();
     const before = room.events.length;
+    if (this.announcingRooms.has(gameRoomId)) {
+      return this.tickResult(room, before);
+    }
 
     if (room.projection.phase === "night_guard") {
       const guard = this.findRolePlayer(room, "guard");
@@ -1224,7 +1246,7 @@ export class InMemoryGameService {
       } else if (!this.advanceAfterAbsentNightActor(room, "night_wolf", now)) {
         return this.tickResult(room, before);
       }
-      this.startPhase(room, "night_wolf", now);
+      await this.startPhaseAfterAnnouncement(room, "night_wolf", now);
     } else if (room.projection.phase === "night_wolf") {
       const wolves = room.privateStates
         .filter((state) => state.role === "werewolf" && state.alive)
@@ -1291,7 +1313,7 @@ export class InMemoryGameService {
       await this.runWolfDiscussion(room, wolves, runAgentTurn, now);
       await this.runWolfKillVote(room, wolves, runAgentTurn, now);
       this.revealWolfKillToWitch(room, now);
-      this.startPhase(room, "night_witch_heal", now);
+      await this.startPhaseAfterAnnouncement(room, "night_witch_heal", now);
     } else if (room.projection.phase === "night_witch_heal") {
       const witch = this.findRolePlayer(room, "witch");
       if (witch) {
@@ -1321,7 +1343,7 @@ export class InMemoryGameService {
       ) {
         return this.tickResult(room, before);
       }
-      this.startPhase(room, "night_witch_poison", now);
+      await this.startPhaseAfterAnnouncement(room, "night_witch_poison", now);
     } else if (room.projection.phase === "night_witch_poison") {
       const witch = this.findRolePlayer(room, "witch");
       if (witch) {
@@ -1349,7 +1371,7 @@ export class InMemoryGameService {
       } else if (!this.advanceAfterAbsentNightActor(room, "night_seer", now)) {
         return this.tickResult(room, before);
       }
-      this.startPhase(room, "night_seer", now);
+      await this.startPhaseAfterAnnouncement(room, "night_seer", now);
     } else if (room.projection.phase === "night_seer") {
       const seer = this.findRolePlayer(room, "seer");
       if (seer) {
@@ -1379,7 +1401,7 @@ export class InMemoryGameService {
       ) {
         return this.tickResult(room, before);
       }
-      this.startPhase(room, "night_resolution", now);
+      await this.startPhaseAfterAnnouncement(room, "night_resolution", now);
     } else if (room.projection.phase === "night_resolution") {
       const resolved = resolveNight({
         gameRoomId: room.id,
@@ -1395,10 +1417,13 @@ export class InMemoryGameService {
       room.pendingNightActions = [];
       const winner = determineWinner(room.privateStates);
       if (winner) {
+        await this.playGmAnnouncement(room, { kind: "game_over", winner });
         this.endGame(room, gameRoomId, winner, room.projection.day, now);
         return this.tickResult(room, before);
       }
-      this.startPhase(room, "day_speak", now);
+      await this.startPhaseAfterAnnouncement(room, "day_speak", now, {
+        nightDeathPlayerIds: resolved.eliminatedPlayerIds,
+      });
       this.beginSpeechQueue(
         room,
         room.players
@@ -1414,7 +1439,7 @@ export class InMemoryGameService {
     ) {
       await this.runCurrentSpeaker(room, runAgentTurn, now);
       if (!room.projection.currentSpeakerPlayerId) {
-        this.startPhase(
+        await this.startPhaseAfterAnnouncement(
           room,
           room.projection.phase === "tie_speech" ? "tie_vote" : "day_vote",
           now
@@ -1447,10 +1472,14 @@ export class InMemoryGameService {
       room.pendingVotes = [];
       if (resolved.exiledPlayerId) {
         this.markEliminated(room, [resolved.exiledPlayerId]);
+        await this.playGmAnnouncement(room, {
+          kind: "vote_result",
+          exiledPlayerId: resolved.exiledPlayerId,
+        });
         this.startPhase(room, "day_resolution", now);
       } else if (resolved.tiedPlayerIds.length > 0) {
         room.tiePlayerIds = resolved.tiedPlayerIds;
-        this.startPhase(room, "tie_speech", now);
+        await this.startPhaseAfterAnnouncement(room, "tie_speech", now);
         this.beginSpeechQueue(room, resolved.speechQueue, "runtime", new Date());
       } else {
         this.startPhase(room, "day_resolution", now);
@@ -1458,10 +1487,11 @@ export class InMemoryGameService {
     } else if (room.projection.phase === "day_resolution") {
       const winner = determineWinner(room.privateStates);
       if (winner) {
+        await this.playGmAnnouncement(room, { kind: "game_over", winner });
         this.endGame(room, gameRoomId, winner, room.projection.day, now);
       } else {
         room.projection.day += 1;
-        this.startPhase(room, "night_guard", now);
+        await this.startPhaseAfterAnnouncement(room, "night_guard", now);
       }
     }
 
@@ -1487,23 +1517,91 @@ export class InMemoryGameService {
     if (room.projection.currentSpeakerPlayerId !== input.playerId) {
       return null;
     }
+    const event = this.upsertSpeechStreamEvent(room, {
+      playerId: input.playerId,
+      day: room.projection.day,
+      phase: room.projection.phase,
+      text,
+      final: input.final,
+      source: player.kind === "agent" ? "agent" : "human",
+    });
+    console.log(
+      `[STT] ${room.id} ${event.id} ${player.displayName}: ${text}`
+    );
+    return event;
+  }
+
+  private latestSpeechTranscriptText(
+    room: StoredGameRoom,
+    input: { playerId: string; day: number; phase: GamePhase }
+  ): string {
+    for (let index = room.events.length - 1; index >= 0; index -= 1) {
+      const event = room.events[index]!;
+      if (
+        (event.type !== "stream" && event.type !== "speech_transcript_delta") ||
+        event.actorId !== input.playerId ||
+        (event.payload?.kind !== undefined && event.payload.kind !== "speech") ||
+        Number(event.payload?.day) !== input.day ||
+        event.payload?.phase !== input.phase
+      ) {
+        continue;
+      }
+      const text = String(event.payload?.text ?? "").trim();
+      if (text) return text;
+    }
+    return "";
+  }
+
+  private upsertSpeechStreamEvent(
+    room: StoredGameRoom,
+    input: {
+      playerId: string;
+      day: number;
+      phase: GamePhase;
+      text: string;
+      final: boolean;
+      source: "agent" | "human";
+    }
+  ): GameEvent {
+    const existing = [...room.events]
+      .reverse()
+      .find(
+        (event) =>
+          event.type === "stream" &&
+          event.actorId === input.playerId &&
+          event.payload?.kind === "speech" &&
+          Number(event.payload?.day) === input.day &&
+          event.payload?.phase === input.phase
+      );
+    const payload: GameEvent["payload"] = {
+      kind: "speech",
+      day: input.day,
+      phase: input.phase,
+      text: input.text,
+      final: input.final,
+      source: input.source,
+      stream: true,
+    };
+
+    if (existing) {
+      existing.payload = { ...existing.payload, ...payload };
+      if (this.broker) {
+        this.broker.publish(room.id, existing.seq, existing);
+      }
+    if (this.store) {
+      this.enqueuePersistRoom(room, [existing], "updateStreamEvent");
+    }
+    return existing;
+    }
+
     const [event] = this.assignAndAppendEvents(room, [
       {
         ...this.baseEvent(room, input.playerId, "public"),
-        type: "speech_transcript_delta",
-        payload: {
-          day: room.projection.day,
-          phase: room.projection.phase,
-          text,
-          final: input.final,
-          stream: true,
-        },
+        type: "stream",
+        payload,
       },
     ]);
-    console.log(
-      `[STT] ${room.id} ${event!.id} ${player.displayName}: ${text}`
-    );
-    return event ?? null;
+    return event!;
   }
 
   private tickResult(room: StoredGameRoom, before: number): RuntimeTickResult {
@@ -1589,11 +1687,7 @@ export class InMemoryGameService {
     // Persist async — events table has (room, seq) UNIQUE so duplicates
     // from retries are silently ignored.
     if (this.store && assigned.length > 0) {
-      const store = this.store;
-      const snapshot = structuredClone(room);
-      void store
-        .saveSnapshot(snapshot, assigned)
-        .catch((err) => console.error("[Store] appendEvents failed:", err));
+      this.enqueuePersistRoom(room, assigned, "appendEvents");
     }
     return assigned;
   }
@@ -1627,6 +1721,60 @@ export class InMemoryGameService {
         createdAt: now.toISOString(),
       },
     ]);
+  }
+
+  private async startPhaseAfterAnnouncement(
+    room: StoredGameRoom,
+    phase: GamePhase,
+    now: Date,
+    options: { nightDeathPlayerIds?: string[] } = {}
+  ): Promise<void> {
+    const context: GmAudioAnnouncementContext = {
+      kind: "phase",
+      phase,
+    };
+    if (options.nightDeathPlayerIds) {
+      context.nightDeathPlayerIds = options.nightDeathPlayerIds;
+    }
+    await this.playGmAnnouncement(room, context);
+    this.startPhase(room, phase, now);
+  }
+
+  private async playGmAnnouncement(
+    room: StoredGameRoom,
+    context: GmAudioAnnouncementContext
+  ): Promise<void> {
+    if (!this.voiceAgents) return;
+    const voiceAgent = await this.ensureVoiceAgentRegistered(room);
+    if (!voiceAgent) return;
+    const files = this.gmAudio.resolve(room, context);
+    if (files.length === 0) return;
+
+    this.announcingRooms.add(room.id);
+    try {
+      await voiceAgent.playAudioFiles(files);
+    } catch (err) {
+      console.error("[VoiceAgent] GM announcement failed:", {
+        gameRoomId: room.id,
+        context,
+        err,
+      });
+    } finally {
+      this.announcingRooms.delete(room.id);
+    }
+  }
+
+  private async ensureVoiceAgentRegistered(room: StoredGameRoom) {
+    if (!this.voiceAgents) return null;
+    if (typeof this.voiceAgents.getOrCreate !== "function") return null;
+    const voiceAgent = await this.voiceAgents.getOrCreate(room.id);
+    for (const player of room.players) {
+      if (player.leftAt) continue;
+      const matrixUserId = resolvePlayerMatrixUserId(player);
+      if (!matrixUserId) continue;
+      voiceAgent.registerPlayerVoiceIdentity(player.id, matrixUserId);
+    }
+    return voiceAgent;
   }
 
   private beginSpeechQueue(
@@ -2046,10 +2194,10 @@ export class InMemoryGameService {
     }
   }
 
-  private resolveWolfPhaseIfAllWolfVotesSubmitted(
+  private async resolveWolfPhaseIfAllWolfVotesSubmitted(
     room: StoredGameRoom,
     now: Date
-  ): boolean {
+  ): Promise<boolean> {
     if (!room.projection || room.projection.phase !== "night_wolf") {
       return false;
     }
@@ -2077,7 +2225,7 @@ export class InMemoryGameService {
       }));
     this.resolveWolfKillVotes(room, votes, now);
     this.revealWolfKillToWitch(room, now);
-    this.startPhase(room, "night_witch_heal", now);
+    await this.startPhaseAfterAnnouncement(room, "night_witch_heal", now);
     return true;
   }
 
@@ -2253,30 +2401,12 @@ export class InMemoryGameService {
   ): Promise<RuntimeAgentTurnResult> {
     if (!room.projection) throw new Error("projection is required");
     const agentId = resolvePlayerAgentId(player);
-    this.assignAndAppendEvents(room, [
-      {
-        id: "pending",
-        gameRoomId: room.id,
-        seq: 1,
-        type: "agent_turn_started",
-        visibility: "runtime",
-        actorId: "runtime",
-        subjectId: player.id,
-        payload: { phase: room.projection.phase, playerId: player.id, agentId },
-        createdAt: now.toISOString(),
-      },
-      {
-        id: "pending",
-        gameRoomId: room.id,
-        seq: 1,
-        type: "agent_llm_requested",
-        visibility: "runtime",
-        actorId: "runtime",
-        subjectId: player.id,
-        payload: { phase: room.projection.phase, playerId: player.id, agentId },
-        createdAt: now.toISOString(),
-      },
-    ]);
+    console.info("[AgentTurn] start", {
+      gameRoomId: room.id,
+      phase: room.projection.phase,
+      playerId: player.id,
+      agentId,
+    });
     const tools =
       "tools" in input && input.tools
         ? input.tools
@@ -2312,24 +2442,6 @@ export class InMemoryGameService {
       console.error(
         `[AgentTurn] ${player.displayName} (${player.id}, ${agentId}) failed in ${room.projection.phase}: ${errorMessage}`
       );
-      this.assignAndAppendEvents(room, [
-        {
-          id: "pending",
-          gameRoomId: room.id,
-          seq: 1,
-          type: "agent_turn_failed",
-          visibility: "runtime",
-          actorId: "runtime",
-          subjectId: player.id,
-          payload: {
-            phase: room.projection.phase,
-            playerId: player.id,
-            agentId,
-            error: errorMessage,
-          },
-          createdAt: now.toISOString(),
-        },
-      ]);
       return {
         text: `${player.displayName} did not act before deadline.`,
         toolName: "passAction",
@@ -2338,24 +2450,13 @@ export class InMemoryGameService {
       };
     }
     const result = normalizeAgentTurnOutput(output);
-    this.assignAndAppendEvents(room, [
-      {
-        id: "pending",
-        gameRoomId: room.id,
-        seq: 1,
-        type: "agent_llm_completed",
-        visibility: "runtime",
-        actorId: "runtime",
-        subjectId: player.id,
-        payload: {
-          phase: room.projection.phase,
-          playerId: player.id,
-          agentId,
-          toolName: result.toolName,
-        },
-        createdAt: now.toISOString(),
-      },
-    ]);
+    console.info("[AgentTurn] complete", {
+      gameRoomId: room.id,
+      phase: room.projection.phase,
+      playerId: player.id,
+      agentId,
+      toolName: result.toolName,
+    });
     return result;
   }
 
@@ -2383,20 +2484,14 @@ export class InMemoryGameService {
       ) {
         return;
       }
-      this.assignAndAppendEvents(room, [
-        {
-          ...this.baseEvent(room, playerId, "public"),
-          type: "speech_transcript_delta",
-          payload: {
-            day: expectedSpeechTurn.day,
-            phase: expectedSpeechTurn.phase,
-            text: deltas[index],
-            final: false,
-            source: "agent",
-            stream: true,
-          },
-        },
-      ]);
+      this.upsertSpeechStreamEvent(room, {
+        playerId,
+        day: expectedSpeechTurn.day,
+        phase: expectedSpeechTurn.phase,
+        text: deltas[index]!,
+        final: false,
+        source: "agent",
+      });
       if (index < deltas.length - 1) {
         await sleep(delayMs);
       }
@@ -2564,7 +2659,14 @@ export class InMemoryGameService {
     ) {
       return null;
     }
-    const speechText = transcript.trim() || fallbackSpeech;
+    const speechText =
+      transcript.trim() ||
+      this.latestSpeechTranscriptText(room, {
+        playerId,
+        day: expectedSpeechTurn.day,
+        phase: expectedSpeechTurn.phase,
+      }) ||
+      fallbackSpeech;
     const event = validatePlayerAction({
       gameRoomId: room.id,
       day: room.projection.day,

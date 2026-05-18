@@ -161,7 +161,7 @@ export class TtsWebSocketClient {
         if (!this.currentRequest) return;
         const req = this.currentRequest;
         this.currentRequest = null;
-        req.resolve();
+        req.reject(new Error("TTS synthesize timed out"));
       }, timeoutMs);
       this.currentRequest = { resolve, reject, timer, sampleRate };
       this.send(payload);
@@ -171,7 +171,7 @@ export class TtsWebSocketClient {
   close(): void {
     if (this.currentRequest) {
       if (this.currentRequest.timer) clearTimeout(this.currentRequest.timer);
-      this.currentRequest.resolve();
+      this.currentRequest.reject(new Error("TTS websocket closed"));
       this.currentRequest = null;
     }
     if (this.ws) {
@@ -249,7 +249,7 @@ export class TtsWebSocketClient {
       if (this.currentRequest.timer) clearTimeout(this.currentRequest.timer);
       const req = this.currentRequest;
       this.currentRequest = null;
-      req.resolve();
+      req.reject(new Error("TTS websocket closed"));
     }
   }
 }

@@ -54,14 +54,14 @@
   border: 1px solid rgba(226, 202, 139, 0.26) !important;
   border-radius: 0 !important;
   background:
-    url("/assets/werewolf-ui/final/button/log-corner-tl.png") left top / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-tr.png") right top / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-bl.png") left bottom / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-br.png") right bottom / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") top center / calc(100% - 36px) 12px repeat-x,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.png") bottom center / calc(100% - 36px) 12px repeat-x,
-    url("/assets/werewolf-ui/final/button/log-edge-vertical.png") left center / 12px calc(100% - 36px) repeat-y,
-    url("/assets/werewolf-ui/final/button/log-edge-vertical.png") right center / 12px calc(100% - 36px) repeat-y,
+    url("/assets/werewolf-ui/final/button/log-corner-tl.webp") left top / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-tr.webp") right top / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-bl.webp") left bottom / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-corner-br.webp") right bottom / 24px 24px no-repeat,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") top center / calc(100% - 36px) 12px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") bottom center / calc(100% - 36px) 12px repeat-x,
+    url("/assets/werewolf-ui/final/button/log-edge-vertical.webp") left center / 12px calc(100% - 36px) repeat-y,
+    url("/assets/werewolf-ui/final/button/log-edge-vertical.webp") right center / 12px calc(100% - 36px) repeat-y,
     linear-gradient(180deg, rgba(7, 13, 15, 0.22), rgba(3, 8, 10, 0.12)) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -77,7 +77,7 @@
   top: 50%;
   width: 22px;
   height: 22px;
-  background: url("/assets/werewolf-ui/final/icon/book.png") center / contain no-repeat;
+  background: url("/assets/werewolf-ui/final/icon/book.webp") center / contain no-repeat;
   transform: translateY(-50%);
   opacity: 0.88;
 }

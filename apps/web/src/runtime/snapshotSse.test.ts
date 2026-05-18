@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { GameEventDto, GameRoom, PlayerPrivateState, RoomProjection } from "../api/client";
 import {
+  appendTimelineEvent,
   applySubscribeMessage,
+  collapseStreamingTimelineEvents,
   parseSubscribeMessage,
   type SnapshotSseState,
 } from "./snapshotSse";
@@ -83,7 +85,61 @@ describe("snapshot-first SSE state", () => {
     expect(next.timeline).toEqual([event]);
     expect(next.timelineBaseSeq).toBe(3);
   });
+
+  it("keeps only the latest live-caption event for one speech stream", () => {
+    const first = transcriptEvent(56, "昨晚2号玩家出局，");
+    const second = transcriptEvent(57, "昨晚2号玩家出局，目前场上局势不明朗，");
+    const third = transcriptEvent(
+      58,
+      "昨晚2号玩家出局，目前场上局势不明朗，我们需要尽快通过发言找出狼人。"
+    );
+
+    expect(collapseStreamingTimelineEvents([first, second, third])).toEqual([third]);
+    expect(appendTimelineEvent([first, second], third)).toEqual([third]);
+  });
+
+  it("collapses streaming captions from the initial subscribe snapshot", () => {
+    const first = transcriptEvent(56, "昨晚2号玩家出局，");
+    const latest = transcriptEvent(
+      59,
+      "昨晚2号玩家出局，目前场上局势不明朗，我们需要尽快通过发言找出狼人。"
+    );
+    const parsed = parseSubscribeMessage(
+      JSON.stringify({
+        snapshot: {
+          room,
+          projection,
+          privateStates: [privateState],
+          events: [first, latest],
+        },
+      })
+    );
+
+    const next = applySubscribeMessage(emptyState(), parsed);
+
+    expect(next.timeline).toEqual([latest]);
+    expect(next.timelineBaseSeq).toBe(59);
+  });
 });
+
+function transcriptEvent(seq: number, text: string): GameEventDto {
+  return {
+    id: `caption_${seq}`,
+    gameRoomId: "game_1",
+    seq,
+    type: "stream",
+    visibility: "public",
+    actorId: "player_1",
+    payload: {
+      day: 2,
+      phase: "day_speak",
+      text,
+      final: false,
+      stream: true,
+    },
+    createdAt: `2026-05-14T00:00:${String(seq).padStart(2, "0")}.000Z`,
+  };
+}
 
 function emptyState(): SnapshotSseState {
   return {

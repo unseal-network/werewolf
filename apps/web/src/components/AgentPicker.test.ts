@@ -58,7 +58,7 @@ describe("AgentPicker", () => {
   it("uses a compact plus label for adding an agent to a seat", () => {
     const html = renderPicker();
 
-    expect(html).toContain('<span class="ww-game-button__content">+</span>');
+    expect(html).toContain('<span class="ww-game-button__label">+</span>');
     expect(html).not.toContain("加入座位");
   });
 
@@ -67,7 +67,7 @@ describe("AgentPicker", () => {
       candidates: [{ ...agents[0]!, alreadyJoined: true }],
     });
 
-    expect(html).toContain('<span class="ww-game-button__content">-</span>');
+    expect(html).toContain('<span class="ww-game-button__label">-</span>');
     expect(html).not.toContain("已入座");
   });
 });

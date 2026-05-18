@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVoiceRoom } from "./VoiceRoom";
 import {
   getSpeechBubbleLayout,
@@ -47,9 +47,11 @@ export function VoicePanel({
   const [inputMode, setInputMode] = useState<SpeechInputMode>("voice");
   const [micPressing, setMicPressing] = useState(false);
   const [modePulse, setModePulse] = useState<SpeechInputMode | null>(null);
+  const micPressActiveRef = useRef(false);
+  const micPressTokenRef = useRef(0);
 
   const canToggleMic =
-    enabled && voice.state === "connected" && !actionLoading;
+    enabled && voice.state === "connected" && Boolean(voice.room) && !actionLoading;
   const isMicOn = voice.isMicrophoneEnabled;
   const hasText = textDraft.trim().length > 0;
   const bubbleLayout = getSpeechBubbleLayout(inputMode);
@@ -62,19 +64,30 @@ export function VoicePanel({
 
   async function startMicrophone() {
     if (!canToggleMic) return;
+    const pressToken = micPressTokenRef.current + 1;
+    micPressTokenRef.current = pressToken;
+    micPressActiveRef.current = true;
     setMicPressing(true);
     setMicError(null);
     try {
       if (!isMicOn) {
         await voice.enableMicrophone();
       }
+      if (!micPressActiveRef.current || micPressTokenRef.current !== pressToken) {
+        await voice.disableMicrophone();
+      }
     } catch (err) {
       console.error("[VoicePanel] mic start error:", err);
       setMicError(err instanceof Error ? err.message : String(err));
+      if (micPressTokenRef.current === pressToken) {
+        micPressActiveRef.current = false;
+        setMicPressing(false);
+      }
     }
   }
 
   async function stopMicrophone() {
+    micPressActiveRef.current = false;
     setMicPressing(false);
     if (!enabled || actionLoading) return;
     setMicError(null);
@@ -89,15 +102,18 @@ export function VoicePanel({
   }
 
   async function finishVoiceSpeech() {
+    micPressActiveRef.current = false;
     setMicPressing(false);
     if (!enabled || actionLoading) return;
     setMicError(null);
     try {
-      await onSpeechComplete();
-    } finally {
       if (voice.isMicrophoneEnabled) {
         await voice.disableMicrophone();
       }
+      await onSpeechComplete();
+    } catch (err) {
+      console.error("[VoicePanel] speech complete error:", err);
+      setMicError(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -269,7 +285,7 @@ export function VoicePanel({
             className="stage-confirm"
             label={submitLabel}
             variant="primary"
-            onClick={onSpeechComplete}
+            onClick={finishVoiceSpeech}
             loading={actionLoading}
           />
         )}

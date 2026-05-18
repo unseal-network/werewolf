@@ -12,20 +12,32 @@ import {
   TrackPublishOptions,
   TrackSource,
 } from "@livekit/rtc-node";
+import { readFile } from "node:fs/promises";
 import { AccessToken } from "livekit-server-sdk";
+import { MPEGDecoder } from "mpg123-decoder";
 import { SttWebSocketClient } from "./stt-client";
-import { TtsWebSocketClient, type TtsOutputFormat } from "./tts-client";
+import {
+  TtsWebSocketClient,
+  type TtsClientOptions,
+  type TtsOutputFormat,
+} from "./tts-client";
 import { resamplePcmForPlaybackRate } from "./voice-audio";
 
 const STT_TARGET_SAMPLE_RATE = 16000;
 const TTS_OUTPUT_FORMAT: TtsOutputFormat = "pcm_16000";
 const TTS_AUDIO_SOURCE_SAMPLE_RATE = 16000;
 const TTS_AUDIO_SOURCE_CHANNELS = 1;
+const TTS_AUDIO_FRAME_DURATION_MS = 20;
+const TTS_AUDIO_SOURCE_QUEUE_MS = 120_000;
 const AGENT_VOICE_TRACK_NAME = "agent-voice";
 const TTS_CONNECT_TIMEOUT_MS = 5000;
 const TTS_SYNTH_TIMEOUT_MS = 30_000;
 const LIVEKIT_RECONNECT_DELAY_MS = 1000;
 const LIVEKIT_CONNECT_TIMEOUT_MS = 7000;
+const LIVEKIT_PLAYOUT_TIMEOUT_GRACE_MS = 1000;
+const STT_CONNECT_TIMEOUT_MS = 5000;
+const STT_CONNECT_ATTEMPTS = 2;
+const TTS_ATTEMPTS = 2;
 
 export interface VoiceAgentConfig {
   livekitUrl: string;
@@ -45,6 +57,9 @@ interface PlayerSttSession {
    *  ends. The server rejects empty commit control frames. */
   lastSentChunk: Int16Array | null;
   active: boolean;
+  /** Transcript preserved after a microphone track has ended but before the
+   * player clicks the button that completes the speech turn. */
+  completedText: string;
 }
 
 export interface VoiceTranscriptUpdate {
@@ -73,9 +88,9 @@ interface PlayerVoiceIdentityBinding {
  *  • Publishes a single shared "agent voice" track at 16 kHz mono — TTS
  *    chunks (requested as pcm_16000) are pushed straight into it without
  *    any decoding
- *  • speak(text) resolves after generated PCM has been handed to the LiveKit
- *    audio track. The caller can then submit the speech turn immediately; it
- *    does not wait for client-side playout.
+ *  • speak(text) resolves after generated PCM has been framed into the LiveKit
+ *    audio track and the local AudioSource playout queue has drained. The
+ *    caller can then submit the speech turn without overlapping the next turn.
  */
 export class VoiceAgentService {
   private room: Room | null = null;
@@ -99,6 +114,7 @@ export class VoiceAgentService {
   /** Serializes speak() so two simultaneous utterances don't interleave
    *  PCM into the shared audio track. */
   private speakQueue: Promise<unknown> = Promise.resolve();
+  private mp3Decoder: MPEGDecoder | null = null;
 
   constructor(gameRoomId: string, config: VoiceAgentConfig) {
     this.gameRoomId = gameRoomId;
@@ -225,7 +241,8 @@ export class VoiceAgentService {
 
       const source = new AudioSource(
         TTS_AUDIO_SOURCE_SAMPLE_RATE,
-        TTS_AUDIO_SOURCE_CHANNELS
+        TTS_AUDIO_SOURCE_CHANNELS,
+        TTS_AUDIO_SOURCE_QUEUE_MS
       );
       this.audioSource = source;
       const track = LocalAudioTrack.createAudioTrack(AGENT_VOICE_TRACK_NAME, source);
@@ -289,6 +306,13 @@ export class VoiceAgentService {
     const session = this.playerSessions.get(playerId);
     if (!session) return "";
 
+    if (!session.active) {
+      const text = session.completedText.trim();
+      session.completedText = "";
+      this.playerSessions.delete(playerId);
+      return text;
+    }
+
     if (session.lastSentChunk && session.lastSentChunk.length > 0) {
       try {
         session.client.sendFinalAudio(session.lastSentChunk, STT_TARGET_SAMPLE_RATE);
@@ -298,7 +322,12 @@ export class VoiceAgentService {
     } else {
       // No audio ever sent — nothing to commit. Skip the grace wait and
       // return whatever (likely empty) transcript we have.
-      return session.client.transcriptText;
+      const text = this.mergeTranscriptText(
+        session.completedText,
+        session.client.transcriptText || session.client.partialText
+      );
+      session.completedText = "";
+      return text;
     }
 
     let text = "";
@@ -306,8 +335,10 @@ export class VoiceAgentService {
       text = await session.client.flush(gracePeriodMs);
     } catch (err) {
       console.error("[VoiceAgent] flush failed:", err);
-      text = session.client.transcriptText;
+      text = session.client.transcriptText || session.client.partialText;
     }
+    text = this.mergeTranscriptText(session.completedText, text);
+    session.completedText = "";
     session.client.resetBuffer();
     session.lastSentChunk = null;
     return text;
@@ -318,6 +349,10 @@ export class VoiceAgentService {
     if (!session) return;
     session.client.resetBuffer();
     session.lastSentChunk = null;
+    session.completedText = "";
+    if (!session.active) {
+      this.playerSessions.delete(playerId);
+    }
   }
 
   /**
@@ -342,6 +377,14 @@ export class VoiceAgentService {
     return next;
   }
 
+  async playAudioFiles(filePaths: string[]): Promise<boolean> {
+    const playable = filePaths.filter(Boolean);
+    if (playable.length === 0) return false;
+    const next = this.speakQueue.then(() => this.playAudioFilesWithTimeout(playable));
+    this.speakQueue = next.catch(() => undefined);
+    return next;
+  }
+
   /**
    * Hard ceiling on a single speak() call. The TTS WebSocket has its own short
    * timeout, but the LiveKit native AudioSource can occasionally hang on
@@ -350,6 +393,24 @@ export class VoiceAgentService {
    * agent turn chains off speakQueue and would stall the whole game.
    */
   private static readonly SPEAK_HARD_TIMEOUT_MS = 90_000;
+
+  private async playAudioFilesWithTimeout(filePaths: string[]): Promise<boolean> {
+    const inner = this.playAudioFilesImpl(filePaths);
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<boolean>((resolve) => {
+      timeoutId = setTimeout(() => {
+        console.error(
+          `[VoiceAgent] GM audio hard timeout (${VoiceAgentService.SPEAK_HARD_TIMEOUT_MS}ms) — abandoning narration`
+        );
+        resolve(false);
+      }, VoiceAgentService.SPEAK_HARD_TIMEOUT_MS);
+    });
+    try {
+      return await Promise.race([inner, timeout]);
+    } finally {
+      if (timeoutId) clearTimeout(timeoutId);
+    }
+  }
 
   private async speakImpl(
     text: string,
@@ -373,6 +434,77 @@ export class VoiceAgentService {
     }
   }
 
+  private async playAudioFilesImpl(filePaths: string[]): Promise<boolean> {
+    try {
+      await this.connect();
+    } catch (err) {
+      console.error("[VoiceAgent] reconnect before GM audio failed:", err);
+      this.scheduleReconnect("GM audio connect failed");
+      return false;
+    }
+    if (!this.connected || !this.audioSource) {
+      this.scheduleReconnect("GM audio without connected audio source");
+      return false;
+    }
+
+    let capturedAny = false;
+    let sourceNeedsPlayout = false;
+    console.info("[VoiceAgent] GM audio start", {
+      gameRoomId: this.gameRoomId,
+      fileCount: filePaths.length,
+    });
+    for (const filePath of filePaths) {
+      try {
+        const pcm = await this.decodeMp3FileToPcm(filePath);
+        const captured = await this.captureTtsPcmFrames(
+          pcm,
+          TTS_AUDIO_SOURCE_SAMPLE_RATE
+        );
+        if (captured) {
+          capturedAny = true;
+          sourceNeedsPlayout = true;
+        }
+      } catch (err) {
+        console.error("[VoiceAgent] GM audio file failed:", {
+          gameRoomId: this.gameRoomId,
+          filePath,
+          err,
+        });
+      }
+    }
+    if (capturedAny && sourceNeedsPlayout) {
+      await this.waitForTtsPlayout();
+    }
+    console.info("[VoiceAgent] GM audio complete", {
+      gameRoomId: this.gameRoomId,
+      fileCount: filePaths.length,
+      capturedAny,
+    });
+    return capturedAny;
+  }
+
+  private async decodeMp3FileToPcm(filePath: string): Promise<Int16Array> {
+    const decoder = await this.getMp3Decoder();
+    const data = await readFile(filePath);
+    await decoder.reset();
+    const decoded = decoder.decode(new Uint8Array(data));
+    const mono = mixToMono(decoded.channelData, decoded.samplesDecoded);
+    const pcm = floatToInt16(mono);
+    return resamplePcmSampleRate(
+      pcm,
+      decoded.sampleRate,
+      TTS_AUDIO_SOURCE_SAMPLE_RATE
+    );
+  }
+
+  private async getMp3Decoder(): Promise<MPEGDecoder> {
+    if (!this.mp3Decoder) {
+      this.mp3Decoder = new MPEGDecoder();
+      await this.mp3Decoder.ready;
+    }
+    return this.mp3Decoder;
+  }
+
   private async speakImplInner(
     text: string,
     playerId?: string | null,
@@ -380,6 +512,14 @@ export class VoiceAgentService {
   ): Promise<boolean> {
     const trimmed = text.trim();
     if (!trimmed) return false;
+    const startedAtMs = Date.now();
+    let livekitConnectMs = 0;
+    let ttsConnectMs = 0;
+    let ttsSynthesizeMs = 0;
+    let captureDrainMs = 0;
+    let playoutMs = 0;
+    let firstChunkMs: number | null = null;
+    let generatedAudioMs = 0;
     console.info("[VoiceAgent] speak start", {
       gameRoomId: this.gameRoomId,
       playerId: playerId ?? null,
@@ -388,7 +528,9 @@ export class VoiceAgentService {
       playbackRate,
     });
     try {
+      const connectStartedAtMs = Date.now();
       await this.connect();
+      livekitConnectMs = Date.now() - connectStartedAtMs;
     } catch (err) {
       console.error("[VoiceAgent] reconnect before speak failed:", err);
       this.scheduleReconnect("speak connect failed");
@@ -407,7 +549,7 @@ export class VoiceAgentService {
     // frame", so we feed PCM chunks one at a time through a Promise chain.
     let captureChain: Promise<void> = Promise.resolve();
 
-    const ttsClient = new TtsWebSocketClient({
+    const ttsClientOptions: TtsClientOptions = {
       apiBaseUrl: this.config.unsealApiBaseUrl,
       agentId: this.resolveTtsAgentId(playerId),
       apiKey: this.config.unsealApiKey,
@@ -418,10 +560,12 @@ export class VoiceAgentService {
         if (int16Length <= 0) return;
         if (!firstChunkLogged) {
           firstChunkLogged = true;
+          firstChunkMs = Date.now() - startedAtMs;
           console.info("[VoiceAgent] first TTS audio chunk", {
             gameRoomId: this.gameRoomId,
             playerId: playerId ?? null,
             matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+            firstChunkMs,
             byteLength: chunk.byteLength,
             frameRate: rate,
           });
@@ -432,33 +576,52 @@ export class VoiceAgentService {
           int16[i] = chunk.readInt16LE(i * Int16Array.BYTES_PER_ELEMENT);
         }
         const playbackSamples = resamplePcmForPlaybackRate(int16, playbackRate);
+        generatedAudioMs += Math.round((playbackSamples.length / rate) * 1000);
         captureChain = captureChain
           .then(async () => {
-            const cap = this.publishTtsPcm(playbackSamples, rate);
-            if (cap && (await cap)) {
+            if (await this.captureTtsPcmFrames(playbackSamples, rate)) {
               capturedAny = true;
             }
           })
           .catch(() => undefined);
       },
       onError: (err) => console.error("[VoiceAgent] TTS error:", err),
-    });
+    };
 
-    try {
-      await ttsClient.connect();
-      await ttsClient.synthesize(trimmed, {
-        outputFormat: TTS_OUTPUT_FORMAT,
-        modelId: "eleven_multilingual_v2",
-        flush: true,
-        timeoutMs: TTS_SYNTH_TIMEOUT_MS,
-      });
-      // Wait for the serialized capture chain so every PCM frame from the
-      // completed TTS WebSocket response is handed to the AudioSource.
-      await captureChain;
-    } catch (err) {
-      console.error("[VoiceAgent] speak failed:", err);
-    } finally {
-      ttsClient.close();
+    for (let attempt = 1; attempt <= TTS_ATTEMPTS; attempt += 1) {
+      const ttsClient = this.createTtsClient(ttsClientOptions);
+      try {
+        const ttsConnectStartedAtMs = Date.now();
+        await ttsClient.connect();
+        ttsConnectMs = Date.now() - ttsConnectStartedAtMs;
+        const synthStartedAtMs = Date.now();
+        await ttsClient.synthesize(trimmed, {
+          outputFormat: TTS_OUTPUT_FORMAT,
+          modelId: "eleven_multilingual_v2",
+          flush: true,
+          timeoutMs: TTS_SYNTH_TIMEOUT_MS,
+        });
+        ttsSynthesizeMs = Date.now() - synthStartedAtMs;
+        // Wait for the serialized capture chain so every PCM frame from the
+        // completed TTS WebSocket response is handed to the AudioSource.
+        const captureDrainStartedAtMs = Date.now();
+        await captureChain;
+        captureDrainMs = Date.now() - captureDrainStartedAtMs;
+        if (capturedAny) {
+          const playoutStartedAtMs = Date.now();
+          await this.waitForTtsPlayout();
+          playoutMs = Date.now() - playoutStartedAtMs;
+        }
+        break;
+      } catch (err) {
+        console.error("[VoiceAgent] speak failed:", {
+          attempt,
+          maxAttempts: TTS_ATTEMPTS,
+          err,
+        });
+      } finally {
+        ttsClient.close();
+      }
     }
 
     console.info("[VoiceAgent] speak complete", {
@@ -467,13 +630,27 @@ export class VoiceAgentService {
       matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
       capturedAny,
       firstChunkLogged,
+      firstChunkMs,
+      livekitConnectMs,
+      ttsConnectMs,
+      ttsSynthesizeMs,
+      captureDrainMs,
+      playoutMs,
+      generatedAudioMs,
+      totalMs: Date.now() - startedAtMs,
     });
 
-    // At this point the generated PCM has been handed to the LiveKit audio
-    // track. The game turn can be submitted immediately; do not wait for
-    // client-side playout here.
+    // At this point the generated PCM has drained from the local LiveKit
+    // AudioSource queue. The game turn can finish without overlapping the
+    // next speaker; no client-side acknowledgement is required.
     void sampleRate;
     return capturedAny;
+  }
+
+  private createTtsClient(
+    opts: ConstructorParameters<typeof TtsWebSocketClient>[0]
+  ): TtsWebSocketClient {
+    return new TtsWebSocketClient(opts);
   }
 
   private async handlePlayerTrack(
@@ -496,6 +673,7 @@ export class VoiceAgentService {
       trackSid: track.sid ?? null,
     });
     const prior = this.playerSessions.get(playerId);
+    const completedText = prior?.completedText ?? "";
     if (prior) {
       prior.active = false;
       prior.client.close();
@@ -506,6 +684,8 @@ export class VoiceAgentService {
       apiBaseUrl: this.config.unsealApiBaseUrl,
       agentId: matrixUserId,
       apiKey: this.config.unsealApiKey,
+      connectTimeoutMs: STT_CONNECT_TIMEOUT_MS,
+      maxConnectAttempts: STT_CONNECT_ATTEMPTS,
       onPartialTranscript: (text) => {
         this.transcriptHandler?.({
           gameRoomId: this.gameRoomId,
@@ -547,6 +727,7 @@ export class VoiceAgentService {
       resamplerInputRate: 0,
       lastSentChunk: null,
       active: true,
+      completedText,
     };
     this.playerSessions.set(playerId, session);
 
@@ -608,9 +789,70 @@ export class VoiceAgentService {
           });
         }
       }
+      await this.finalizePlayerSttSession(session, playerId, matrixUserId);
       session.client.close();
-      this.playerSessions.delete(playerId);
+      session.active = false;
     }
+  }
+
+  private async finalizePlayerSttSession(
+    session: PlayerSttSession,
+    playerId: string,
+    matrixUserId: string,
+    gracePeriodMs = 3000
+  ): Promise<string> {
+    if (!session.lastSentChunk || session.lastSentChunk.length === 0) {
+      session.completedText = this.mergeTranscriptText(
+        session.completedText,
+        session.client.transcriptText || session.client.partialText
+      );
+      return session.completedText;
+    }
+
+    try {
+      session.client.sendFinalAudio(session.lastSentChunk, STT_TARGET_SAMPLE_RATE);
+    } catch (err) {
+      console.error("[VoiceAgent] sendFinalAudio on track end failed:", {
+        gameRoomId: this.gameRoomId,
+        playerId,
+        matrixUserId,
+        err,
+      });
+    }
+
+    let text = "";
+    try {
+      text = await session.client.flush(gracePeriodMs);
+    } catch (err) {
+      console.error("[VoiceAgent] track-end flush failed:", {
+        gameRoomId: this.gameRoomId,
+        playerId,
+        matrixUserId,
+        err,
+      });
+      text = session.client.transcriptText || session.client.partialText;
+    }
+
+    session.completedText = this.mergeTranscriptText(session.completedText, text);
+    session.client.resetBuffer();
+    session.lastSentChunk = null;
+    console.info("[VoiceAgent] finalized player STT track", {
+      gameRoomId: this.gameRoomId,
+      playerId,
+      matrixUserId,
+      textLength: session.completedText.length,
+    });
+    return session.completedText;
+  }
+
+  private mergeTranscriptText(existing: string, next: string): string {
+    const previous = existing.trim();
+    const incoming = next.trim();
+    if (!previous) return incoming;
+    if (!incoming) return previous;
+    if (previous === incoming) return previous;
+    if (incoming.startsWith(previous)) return incoming;
+    return `${previous} ${incoming}`;
   }
 
   private subscribeExistingPlayerAudioTracks(): void {
@@ -652,27 +894,64 @@ export class VoiceAgentService {
     return session.resampler.push(frame);
   }
 
-  private publishTtsPcm(
+  private async publishTtsPcm(
     samples: Int16Array,
     sampleRate: number
-  ): Promise<boolean> | null {
-    if (!this.audioSource || samples.length === 0) return null;
-    const frame = new AudioFrame(
-      samples,
-      sampleRate,
-      TTS_AUDIO_SOURCE_CHANNELS,
-      samples.length
+  ): Promise<boolean> {
+    const captured = await this.captureTtsPcmFrames(samples, sampleRate);
+    if (!captured) return false;
+    await this.waitForTtsPlayout();
+    return true;
+  }
+
+  private async captureTtsPcmFrames(
+    samples: Int16Array,
+    sampleRate: number
+  ): Promise<boolean> {
+    const source = this.audioSource;
+    if (!source || samples.length === 0) return false;
+    const frameSamples = Math.max(
+      1,
+      Math.floor((sampleRate * TTS_AUDIO_FRAME_DURATION_MS) / 1000)
     );
-    return this.audioSource
-      .captureFrame(frame)
-      .then(() => true)
-      .catch((err) => {
+    for (const chunk of chunkInt16(samples, frameSamples)) {
+      const frame = new AudioFrame(
+        chunk,
+        sampleRate,
+        TTS_AUDIO_SOURCE_CHANNELS,
+        chunk.length
+      );
+      try {
+        await source.captureFrame(frame);
+      } catch (err) {
         console.error("[VoiceAgent] captureFrame error:", err);
         this.connected = false;
         this.audioSource = null;
         this.scheduleReconnect("TTS captureFrame failed");
         return false;
-      });
+      }
+    }
+    return true;
+  }
+
+  private async waitForTtsPlayout(): Promise<void> {
+    const source = this.audioSource;
+    if (!source) return;
+    const timeoutMs =
+      Math.max(0, Math.ceil(source.queuedDuration)) +
+      LIVEKIT_PLAYOUT_TIMEOUT_GRACE_MS;
+    try {
+      await withTimeout(
+        source.waitForPlayout(),
+        timeoutMs,
+        "LiveKit TTS playout timed out"
+      );
+    } catch (err) {
+      console.error("[VoiceAgent] waitForPlayout failed:", err);
+      this.connected = false;
+      this.audioSource = null;
+      this.scheduleReconnect("TTS playout wait failed");
+    }
   }
 
   private scheduleReconnect(reason: string): void {
@@ -700,6 +979,58 @@ function withTimeout<T>(
   return Promise.race([promise, timeout]).finally(() => {
     if (timeoutId) clearTimeout(timeoutId);
   });
+}
+
+function mixToMono(channels: Float32Array[], samplesDecoded: number): Float32Array {
+  const mono = new Float32Array(samplesDecoded);
+  if (channels.length === 0) return mono;
+  for (let sample = 0; sample < samplesDecoded; sample += 1) {
+    let sum = 0;
+    for (const channel of channels) {
+      sum += channel[sample] ?? 0;
+    }
+    mono[sample] = sum / channels.length;
+  }
+  return mono;
+}
+
+function floatToInt16(samples: Float32Array): Int16Array {
+  const pcm = new Int16Array(samples.length);
+  for (let index = 0; index < samples.length; index += 1) {
+    const clamped = Math.max(-1, Math.min(1, samples[index] ?? 0));
+    pcm[index] = Math.round(clamped * 32767);
+  }
+  return pcm;
+}
+
+function resamplePcmSampleRate(
+  samples: Int16Array,
+  fromSampleRate: number,
+  toSampleRate: number
+): Int16Array {
+  if (fromSampleRate === toSampleRate || samples.length === 0) return samples;
+  const ratio = fromSampleRate / toSampleRate;
+  const outputLength = Math.max(1, Math.floor(samples.length / ratio));
+  const output = new Int16Array(outputLength);
+  for (let index = 0; index < outputLength; index += 1) {
+    const sourceIndex = index * ratio;
+    const leftIndex = Math.floor(sourceIndex);
+    const rightIndex = Math.min(samples.length - 1, leftIndex + 1);
+    const t = sourceIndex - leftIndex;
+    output[index] = Math.round(
+      (samples[leftIndex] ?? 0) * (1 - t) + (samples[rightIndex] ?? 0) * t
+    );
+  }
+  return output;
+}
+
+function chunkInt16(samples: Int16Array, chunkSize: number): Int16Array[] {
+  const chunks: Int16Array[] = [];
+  const size = Math.max(1, Math.floor(chunkSize));
+  for (let offset = 0; offset < samples.length; offset += size) {
+    chunks.push(samples.slice(offset, offset + size));
+  }
+  return chunks;
 }
 
 /** One VoiceAgentService per game room. */

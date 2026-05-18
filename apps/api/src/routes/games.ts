@@ -336,6 +336,48 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     }
   });
 
+  app.get("/:gameRoomId/events/:eventId/stream", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const room = deps.games.snapshot(c.req.param("gameRoomId"));
+      const eventId = c.req.param("eventId");
+      const event = room.events.find((candidate) => candidate.id === eventId);
+      if (!event || event.type !== "stream") {
+        throw new AppError("not_found", "Stream event not found", 404);
+      }
+      const myPlayer = room.players.find(
+        (p) => p.userId === user.id && !p.leftAt
+      );
+      const myPrivateState = myPlayer
+        ? room.privateStates.find((s) => s.playerId === myPlayer.id)
+        : undefined;
+      const visible = filterEventsForUser(
+        [event],
+        myPlayer?.id,
+        Boolean(myPrivateState?.team === "wolf" && myPrivateState.alive),
+        room.status === "ended" || room.projection?.status === "ended"
+      );
+      if (visible.length === 0) {
+        throw new AppError("not_found", "Stream event not found", 404);
+      }
+      return c.json({
+        eventId: event.id,
+        seq: event.seq,
+        kind: event.payload.kind ?? "stream",
+        text: String(event.payload.text ?? ""),
+        final: Boolean(event.payload.final),
+        source: event.payload.source ?? null,
+        updatedAt: event.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
   app.get("/:gameRoomId", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);

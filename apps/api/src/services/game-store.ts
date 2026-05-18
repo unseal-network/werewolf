@@ -205,6 +205,17 @@ export class GameStore {
       });
   }
 
+  async updateEventPayload(
+    roomId: string,
+    eventId: string,
+    payload: GameEvent["payload"]
+  ): Promise<void> {
+    await this.db
+      .update(gameEvents)
+      .set({ payload })
+      .where(and(eq(gameEvents.gameRoomId, roomId), eq(gameEvents.id, eventId)));
+  }
+
   /**
    * Persist a complete room snapshot and optional newly assigned events in one
    * DB transaction. This is the durable boundary for the runtime: replay data
@@ -332,8 +343,15 @@ export class GameStore {
               createdAt: new Date(event.createdAt),
             }))
           )
-          .onConflictDoNothing({
+          .onConflictDoUpdate({
             target: [gameEvents.gameRoomId, gameEvents.seq],
+            set: {
+              type: rawSql`excluded.type`,
+              visibility: rawSql`excluded.visibility`,
+              actorId: rawSql`excluded.actor_id`,
+              subjectId: rawSql`excluded.subject_id`,
+              payload: rawSql`excluded.payload`,
+            },
           });
       }
     });

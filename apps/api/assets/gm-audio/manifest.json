@@ -1,0 +1,510 @@
+{
+  "voiceId": "4VZIsMPtgggwNg7OXbPY",
+  "count": 72,
+  "files": [
+    {
+      "index": 1,
+      "lang": "zh",
+      "file": "01_zh.mp3",
+      "text": "天黑请闭眼",
+      "bytes": 25539
+    },
+    {
+      "index": 2,
+      "lang": "zh",
+      "file": "02_zh.mp3",
+      "text": "守卫请睁眼，请选择你要保护的人",
+      "bytes": 60648
+    },
+    {
+      "index": 3,
+      "lang": "zh",
+      "file": "03_zh.mp3",
+      "text": "狼人请睁眼，请选择今晚的目标",
+      "bytes": 56050
+    },
+    {
+      "index": 4,
+      "lang": "zh",
+      "file": "04_zh.mp3",
+      "text": "女巫请睁眼，今晚阵亡的是 ta，你要使用解药吗？",
+      "bytes": 78202
+    },
+    {
+      "index": 5,
+      "lang": "zh",
+      "file": "05_zh.mp3",
+      "text": "今晚，你要使用毒药吗？",
+      "bytes": 40586
+    },
+    {
+      "index": 6,
+      "lang": "zh",
+      "file": "06_zh.mp3",
+      "text": "预言家请睁眼，你要洞悉谁的身份？",
+      "bytes": 60648
+    },
+    {
+      "index": 7,
+      "lang": "zh",
+      "file": "07_zh.mp3",
+      "text": "天亮请睁眼，今晚是平安夜",
+      "bytes": 48527
+    },
+    {
+      "index": 8,
+      "lang": "zh",
+      "file": "08_zh.mp3",
+      "text": "天亮请睁眼，今晚死亡的是",
+      "bytes": 52288
+    },
+    {
+      "index": 9,
+      "lang": "zh",
+      "file": "09_zh.mp3",
+      "text": "1 号玩家",
+      "bytes": 21777
+    },
+    {
+      "index": 10,
+      "lang": "zh",
+      "file": "10_zh.mp3",
+      "text": "2 号玩家",
+      "bytes": 21777
+    },
+    {
+      "index": 11,
+      "lang": "zh",
+      "file": "11_zh.mp3",
+      "text": "3 号玩家",
+      "bytes": 20524
+    },
+    {
+      "index": 12,
+      "lang": "zh",
+      "file": "12_zh.mp3",
+      "text": "4 号玩家",
+      "bytes": 21777
+    },
+    {
+      "index": 13,
+      "lang": "zh",
+      "file": "13_zh.mp3",
+      "text": "5 号玩家",
+      "bytes": 22613
+    },
+    {
+      "index": 14,
+      "lang": "zh",
+      "file": "14_zh.mp3",
+      "text": "6 号玩家",
+      "bytes": 23449
+    },
+    {
+      "index": 15,
+      "lang": "zh",
+      "file": "15_zh.mp3",
+      "text": "7 号玩家",
+      "bytes": 20524
+    },
+    {
+      "index": 16,
+      "lang": "zh",
+      "file": "16_zh.mp3",
+      "text": "8 号玩家",
+      "bytes": 24285
+    },
+    {
+      "index": 17,
+      "lang": "zh",
+      "file": "17_zh.mp3",
+      "text": "9 号玩家",
+      "bytes": 20942
+    },
+    {
+      "index": 18,
+      "lang": "zh",
+      "file": "18_zh.mp3",
+      "text": "10 号玩家",
+      "bytes": 20942
+    },
+    {
+      "index": 19,
+      "lang": "zh",
+      "file": "19_zh.mp3",
+      "text": "11 号玩家",
+      "bytes": 21777
+    },
+    {
+      "index": 20,
+      "lang": "zh",
+      "file": "20_zh.mp3",
+      "text": "12 号玩家",
+      "bytes": 25539
+    },
+    {
+      "index": 21,
+      "lang": "zh",
+      "file": "21_zh.mp3",
+      "text": "1 号玩家和",
+      "bytes": 23449
+    },
+    {
+      "index": 22,
+      "lang": "zh",
+      "file": "22_zh.mp3",
+      "text": "2 号玩家和",
+      "bytes": 23449
+    },
+    {
+      "index": 23,
+      "lang": "zh",
+      "file": "23_zh.mp3",
+      "text": "3 号玩家和",
+      "bytes": 23449
+    },
+    {
+      "index": 24,
+      "lang": "zh",
+      "file": "24_zh.mp3",
+      "text": "4 号玩家和",
+      "bytes": 24703
+    },
+    {
+      "index": 25,
+      "lang": "zh",
+      "file": "25_zh.mp3",
+      "text": "5 号玩家和",
+      "bytes": 23449
+    },
+    {
+      "index": 26,
+      "lang": "zh",
+      "file": "26_zh.mp3",
+      "text": "6 号玩家和",
+      "bytes": 22613
+    },
+    {
+      "index": 27,
+      "lang": "zh",
+      "file": "27_zh.mp3",
+      "text": "7 号玩家和",
+      "bytes": 24703
+    },
+    {
+      "index": 28,
+      "lang": "zh",
+      "file": "28_zh.mp3",
+      "text": "8 号玩家和",
+      "bytes": 21777
+    },
+    {
+      "index": 29,
+      "lang": "zh",
+      "file": "29_zh.mp3",
+      "text": "9 号玩家和",
+      "bytes": 23449
+    },
+    {
+      "index": 30,
+      "lang": "zh",
+      "file": "30_zh.mp3",
+      "text": "10 号玩家和",
+      "bytes": 25539
+    },
+    {
+      "index": 31,
+      "lang": "zh",
+      "file": "31_zh.mp3",
+      "text": "11 号玩家和",
+      "bytes": 26375
+    },
+    {
+      "index": 32,
+      "lang": "zh",
+      "file": "32_zh.mp3",
+      "text": "12 号玩家和",
+      "bytes": 24703
+    },
+    {
+      "index": 33,
+      "lang": "zh",
+      "file": "33_zh.mp3",
+      "text": "发言结束，进入投票。现在，请做出你的判断。",
+      "bytes": 90323
+    },
+    {
+      "index": 34,
+      "lang": "zh",
+      "file": "34_zh.mp3",
+      "text": "投票结束，今天被放逐的对象是",
+      "bytes": 54378
+    },
+    {
+      "index": 35,
+      "lang": "zh",
+      "file": "35_zh.mp3",
+      "text": "游戏结束，村民获胜，村庄迎来了胜利。",
+      "bytes": 79874
+    },
+    {
+      "index": 36,
+      "lang": "zh",
+      "file": "36_zh.mp3",
+      "text": "游戏结束，狼人获胜，夜色占据了村庄。",
+      "bytes": 78202
+    },
+    {
+      "index": 1,
+      "lang": "en",
+      "file": "01_en.mp3",
+      "text": "Night falls. Everyone, close your eyes.",
+      "bytes": 45601
+    },
+    {
+      "index": 2,
+      "lang": "en",
+      "file": "02_en.mp3",
+      "text": "Guard, open your eyes. Choose the player you want to protect.",
+      "bytes": 70261
+    },
+    {
+      "index": 3,
+      "lang": "en",
+      "file": "03_en.mp3",
+      "text": "Werewolves, open your eyes. Choose tonight's target.",
+      "bytes": 61066
+    },
+    {
+      "index": 4,
+      "lang": "en",
+      "file": "04_en.mp3",
+      "text": "Witch, open your eyes. The player who died tonight is ta. Do you want to use your antidote?",
+      "bytes": 104533
+    },
+    {
+      "index": 5,
+      "lang": "en",
+      "file": "05_en.mp3",
+      "text": "Tonight, do you want to use your poison?",
+      "bytes": 37660
+    },
+    {
+      "index": 6,
+      "lang": "en",
+      "file": "06_en.mp3",
+      "text": "Seer, open your eyes. Whose identity do you want to discover?",
+      "bytes": 72351
+    },
+    {
+      "index": 7,
+      "lang": "en",
+      "file": "07_en.mp3",
+      "text": "Day breaks. Open your eyes. Tonight was a peaceful night.",
+      "bytes": 69425
+    },
+    {
+      "index": 8,
+      "lang": "en",
+      "file": "08_en.mp3",
+      "text": "Day breaks. Open your eyes. The player who died tonight is",
+      "bytes": 75276
+    },
+    {
+      "index": 9,
+      "lang": "en",
+      "file": "09_en.mp3",
+      "text": "Player 1",
+      "bytes": 16762
+    },
+    {
+      "index": 10,
+      "lang": "en",
+      "file": "10_en.mp3",
+      "text": "Player 2",
+      "bytes": 17598
+    },
+    {
+      "index": 11,
+      "lang": "en",
+      "file": "11_en.mp3",
+      "text": "Player 3",
+      "bytes": 18016
+    },
+    {
+      "index": 12,
+      "lang": "en",
+      "file": "12_en.mp3",
+      "text": "Player 4",
+      "bytes": 18016
+    },
+    {
+      "index": 13,
+      "lang": "en",
+      "file": "13_en.mp3",
+      "text": "Player 5",
+      "bytes": 15926
+    },
+    {
+      "index": 14,
+      "lang": "en",
+      "file": "14_en.mp3",
+      "text": "Player 6",
+      "bytes": 19688
+    },
+    {
+      "index": 15,
+      "lang": "en",
+      "file": "15_en.mp3",
+      "text": "Player 7",
+      "bytes": 18852
+    },
+    {
+      "index": 16,
+      "lang": "en",
+      "file": "16_en.mp3",
+      "text": "Player 8",
+      "bytes": 18016
+    },
+    {
+      "index": 17,
+      "lang": "en",
+      "file": "17_en.mp3",
+      "text": "Player 9",
+      "bytes": 18016
+    },
+    {
+      "index": 18,
+      "lang": "en",
+      "file": "18_en.mp3",
+      "text": "Player 10",
+      "bytes": 17598
+    },
+    {
+      "index": 19,
+      "lang": "en",
+      "file": "19_en.mp3",
+      "text": "Player 11",
+      "bytes": 18016
+    },
+    {
+      "index": 20,
+      "lang": "en",
+      "file": "20_en.mp3",
+      "text": "Player 12",
+      "bytes": 18016
+    },
+    {
+      "index": 21,
+      "lang": "en",
+      "file": "21_en.mp3",
+      "text": "Player 1 and",
+      "bytes": 17598
+    },
+    {
+      "index": 22,
+      "lang": "en",
+      "file": "22_en.mp3",
+      "text": "Player 2 and",
+      "bytes": 18852
+    },
+    {
+      "index": 23,
+      "lang": "en",
+      "file": "23_en.mp3",
+      "text": "Player 3 and",
+      "bytes": 18016
+    },
+    {
+      "index": 24,
+      "lang": "en",
+      "file": "24_en.mp3",
+      "text": "Player 4 and",
+      "bytes": 20524
+    },
+    {
+      "index": 25,
+      "lang": "en",
+      "file": "25_en.mp3",
+      "text": "Player 5 and",
+      "bytes": 18852
+    },
+    {
+      "index": 26,
+      "lang": "en",
+      "file": "26_en.mp3",
+      "text": "Player 6 and",
+      "bytes": 20524
+    },
+    {
+      "index": 27,
+      "lang": "en",
+      "file": "27_en.mp3",
+      "text": "Player 7 and",
+      "bytes": 18852
+    },
+    {
+      "index": 28,
+      "lang": "en",
+      "file": "28_en.mp3",
+      "text": "Player 8 and",
+      "bytes": 18016
+    },
+    {
+      "index": 29,
+      "lang": "en",
+      "file": "29_en.mp3",
+      "text": "Player 9 and",
+      "bytes": 20942
+    },
+    {
+      "index": 30,
+      "lang": "en",
+      "file": "30_en.mp3",
+      "text": "Player 10 and",
+      "bytes": 20524
+    },
+    {
+      "index": 31,
+      "lang": "en",
+      "file": "31_en.mp3",
+      "text": "Player 11 and",
+      "bytes": 20524
+    },
+    {
+      "index": 32,
+      "lang": "en",
+      "file": "32_en.mp3",
+      "text": "Player 12 and",
+      "bytes": 20524
+    },
+    {
+      "index": 33,
+      "lang": "en",
+      "file": "33_en.mp3",
+      "text": "Discussion has ended. Voting now begins. Make your judgment.",
+      "bytes": 68589
+    },
+    {
+      "index": 34,
+      "lang": "en",
+      "file": "34_en.mp3",
+      "text": "Voting has ended. The player exiled today is",
+      "bytes": 55214
+    },
+    {
+      "index": 35,
+      "lang": "en",
+      "file": "35_en.mp3",
+      "text": "Game over. The villagers win, and victory returns to the village.",
+      "bytes": 71515
+    },
+    {
+      "index": 36,
+      "lang": "en",
+      "file": "36_en.mp3",
+      "text": "Game over. The werewolves win, and night claims the village.",
+      "bytes": 73186
+    }
+  ]
+}

@@ -4,6 +4,14 @@ export interface SttClientOptions {
   apiBaseUrl: string; // e.g. https://un-server.dev-excel-alt.pagepeek.org/api
   agentId: string;
   apiKey: string;
+  /** @default 5000 */
+  connectTimeoutMs?: number;
+  /** @default 1 */
+  maxConnectAttempts?: number;
+  webSocketFactory?: (
+    url: string,
+    opts: { headers: Record<string, string> }
+  ) => WebSocket;
   onCommittedTranscript?: (text: string) => void;
   onPartialTranscript?: (text: string) => void;
   onError?: (error: string) => void;
@@ -64,12 +72,40 @@ export class SttWebSocketClient {
   }
 
   async connect(): Promise<void> {
+    const attempts = Math.max(1, this.opts.maxConnectAttempts ?? 1);
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        await this.connectOnce();
+        return;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private async connectOnce(): Promise<void> {
     const wsUrl = this.buildWsUrl();
     return new Promise((resolve, reject) => {
-      const ws = new WebSocket(wsUrl, {
+      const factory =
+        this.opts.webSocketFactory ??
+        ((url: string, opts: { headers: Record<string, string> }) =>
+          new WebSocket(url, opts));
+      const ws = factory(wsUrl, {
         headers: { "x-api-key": this.opts.apiKey },
       });
       this.ws = ws;
+      const timer = setTimeout(() => {
+        cleanupHandshake();
+        try {
+          ws.terminate();
+        } catch {
+          // ignore
+        }
+        if (this.ws === ws) this.ws = null;
+        reject(new Error("STT websocket connect timed out"));
+      }, this.opts.connectTimeoutMs ?? 5000);
 
       const onOpen = () => {
         cleanupHandshake();
@@ -77,9 +113,11 @@ export class SttWebSocketClient {
       };
       const onError = (err: Error) => {
         cleanupHandshake();
+        if (this.ws === ws) this.ws = null;
         reject(err);
       };
       const cleanupHandshake = () => {
+        clearTimeout(timer);
         ws.off("open", onOpen);
         ws.off("error", onError);
       };
@@ -141,7 +179,7 @@ export class SttWebSocketClient {
     return new Promise((resolve) => {
       if (this.pendingFlush) {
         if (this.pendingFlush.timer) clearTimeout(this.pendingFlush.timer);
-        this.pendingFlush.resolve(this.transcriptText);
+        this.pendingFlush.resolve(this.transcriptText || this.latestPartial.trim());
         this.pendingFlush = null;
       }
       const finish = () => {
@@ -164,7 +202,7 @@ export class SttWebSocketClient {
   close(): void {
     if (this.pendingFlush) {
       if (this.pendingFlush.timer) clearTimeout(this.pendingFlush.timer);
-      this.pendingFlush.resolve(this.transcriptText);
+      this.pendingFlush.resolve(this.transcriptText || this.latestPartial.trim());
       this.pendingFlush = null;
     }
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
@@ -237,7 +275,7 @@ export class SttWebSocketClient {
   private handleClose(): void {
     if (this.pendingFlush) {
       if (this.pendingFlush.timer) clearTimeout(this.pendingFlush.timer);
-      this.pendingFlush.resolve(this.transcriptText);
+      this.pendingFlush.resolve(this.transcriptText || this.latestPartial.trim());
       this.pendingFlush = null;
     }
   }

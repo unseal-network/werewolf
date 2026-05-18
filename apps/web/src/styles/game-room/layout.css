@@ -1,24 +1,24 @@
 /* Region layout: root shell, scene layer, table rails, and center info. */
 .game-layout-root {
   --ww-ui-base: "/assets/werewolf-ui/final";
-  --art-ring-normal: url("/assets/werewolf-ui/final/avatar/frame-default.png");
-  --art-ring-selected: url("/assets/werewolf-ui/final/avatar/frame-selected.png");
-  --art-ring-speaking: url("/assets/werewolf-ui/final/avatar/frame-speaking.png");
-  --art-ring-dead: url("/assets/werewolf-ui/final/avatar/frame-dead.png");
-  --art-avatar-glow-selected: url("/assets/werewolf-ui/final/avatar/glow-selected.png");
-  --art-avatar-selected-glow-effect: url("/assets/werewolf-ui/final/effect/avatar-selected-glow.png");
-  --art-avatar-portrait-hooded: url("/assets/werewolf-ui/final/avatar/portrait-hooded.png");
-  --art-avatar-speaking-pulse: url("/assets/werewolf-ui/final/effect/avatar-speaking-pulse.png");
-  --art-avatar-vote-target: url("/assets/werewolf-ui/final/effect/vote-target-ring.png");
-  --art-avatar-dead-overlay: url("/assets/werewolf-ui/final/avatar/dead-overlay.png");
-  --art-badge-blade: url("/assets/werewolf-ui/final/badge/blade.png");
-  --art-badge-eye: url("/assets/werewolf-ui/final/badge/eye.png");
-  --art-badge-moon: url("/assets/werewolf-ui/final/badge/moon.png");
-  --art-badge-people: url("/assets/werewolf-ui/final/badge/people.png");
-  --art-badge-shield: url("/assets/werewolf-ui/final/badge/shield.png");
-  --art-badge-star: url("/assets/werewolf-ui/final/badge/star.png");
-  --layout-bg-image: url("/assets/werewolf-ui/final/background/night-village.png");
-  --layout-vignette-image: url("/assets/werewolf-ui/final/background/vignette-overlay.png");
+  --art-ring-normal: url("/assets/werewolf-ui/final/avatar/frame-default.webp");
+  --art-ring-selected: url("/assets/werewolf-ui/final/avatar/frame-selected.webp");
+  --art-ring-speaking: url("/assets/werewolf-ui/final/avatar/frame-speaking.webp");
+  --art-ring-dead: url("/assets/werewolf-ui/final/avatar/frame-dead.webp");
+  --art-avatar-glow-selected: url("/assets/werewolf-ui/final/avatar/glow-selected.webp");
+  --art-avatar-selected-glow-effect: url("/assets/werewolf-ui/final/effect/avatar-selected-glow.webp");
+  --art-avatar-portrait-hooded: url("/assets/werewolf-ui/final/avatar/portrait-hooded.webp");
+  --art-avatar-speaking-pulse: url("/assets/werewolf-ui/final/effect/avatar-speaking-pulse.webp");
+  --art-avatar-vote-target: url("/assets/werewolf-ui/final/effect/vote-target-ring.webp");
+  --art-avatar-dead-overlay: url("/assets/werewolf-ui/final/avatar/dead-overlay.webp");
+  --art-badge-blade: url("/assets/werewolf-ui/final/badge/blade.webp");
+  --art-badge-eye: url("/assets/werewolf-ui/final/badge/eye.webp");
+  --art-badge-moon: url("/assets/werewolf-ui/final/badge/moon.webp");
+  --art-badge-people: url("/assets/werewolf-ui/final/badge/people.webp");
+  --art-badge-shield: url("/assets/werewolf-ui/final/badge/shield.webp");
+  --art-badge-star: url("/assets/werewolf-ui/final/badge/star.webp");
+  --layout-bg-image: url("/assets/werewolf-ui/final/background/night-village.avif");
+  --layout-vignette-image: url("/assets/werewolf-ui/final/background/vignette-overlay.avif");
   --layout-bg-position: center top;
   --layout-bg-overlay:
     linear-gradient(180deg, rgba(1, 6, 9, 0.10), rgba(0, 0, 0, 0.58)),
@@ -47,7 +47,7 @@
 
 @media (min-width: 760px) {
   .game-layout-root {
-    --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-desktop.png");
+    --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-desktop.avif");
     --layout-bg-position: center center;
   }
 }
@@ -75,7 +75,7 @@
 }
 
 .game-room-root.game-layout-root[data-scene="day"] {
-  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-day.png");
+  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-day.avif");
   --layout-bg-position: center center;
   --layout-bg-overlay:
     linear-gradient(180deg, rgba(10, 12, 18, 0.06), rgba(0, 0, 0, 0.42)),
@@ -85,7 +85,7 @@
 
 .game-room-root.game-layout-root[data-scene="vote"],
 .game-room-root.game-layout-root[data-scene="tie"] {
-  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-vote.png");
+  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-vote.avif");
   --layout-bg-position: center center;
   --layout-bg-overlay:
     linear-gradient(180deg, rgba(24, 6, 10, 0.10), rgba(0, 0, 0, 0.55)),
@@ -94,7 +94,7 @@
 }
 
 .game-room-root.game-layout-root[data-scene="end"] {
-  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-good-victory.png");
+  --layout-bg-image: url("/assets/world/backgrounds/moonlit-village-good-victory.avif");
   --layout-bg-position: center center;
   --layout-bg-overlay:
     linear-gradient(180deg, rgba(15, 10, 2, 0.08), rgba(0, 0, 0, 0.48)),

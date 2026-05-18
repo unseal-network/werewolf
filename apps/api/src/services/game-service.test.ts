@@ -106,6 +106,45 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("registers voice identities even when GM audio has no files", async () => {
+    const games = new InMemoryGameService();
+    const registrations: Array<{ playerId: string; matrixUserId: string }> = [];
+    (games as any).gmAudio = { resolve: () => [] };
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: (playerId: string, matrixUserId: string) => {
+          registrations.push({ playerId, matrixUserId });
+        },
+        playAudioFiles: vi.fn(),
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Rules",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 6)) {
+      games.join(room.id, userId, name);
+    }
+
+    games.start(room.id, players[0][0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(registrations).toEqual(
+      expect.arrayContaining([
+        { playerId: "player_1", matrixUserId: "@alice:example.com" },
+        { playerId: "player_2", matrixUserId: "@bob:example.com" },
+      ])
+    );
+  });
+
   it("emits lobby player join events for humans and agents", () => {
     const games = new InMemoryGameService();
     const { room } = games.createGame(
@@ -1086,13 +1125,104 @@ describe("InMemoryGameService rules", () => {
 
     expect(room.events.at(-1)).toEqual(
       expect.objectContaining({
-        type: "speech_transcript_delta",
+        type: "stream",
         visibility: "public",
         actorId: speaker.id,
         payload: expect.objectContaining({
+          kind: "speech",
           stream: true,
           final: false,
+          source: "human",
           text: "I think seat 2 is suspicious",
+        }),
+      })
+    );
+  });
+
+  it("persists stream transcript updates through the snapshot path", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+    let resolveFirstSave: () => void = () => undefined;
+    const firstSave = new Promise<void>((resolve) => {
+      resolveFirstSave = resolve;
+    });
+    const saveSnapshot = vi.fn(() =>
+      saveSnapshot.mock.calls.length === 1 ? firstSave : Promise.resolve()
+    );
+    const updateEventPayload = vi.fn(async () => undefined);
+    games.setStore({
+      saveSnapshot,
+      updateEventPayload,
+    } as any);
+
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: speaker.id,
+    };
+
+    games.recordSpeechTranscript(gameRoomId, {
+      playerId: speaker.id,
+      text: "我是预言家，",
+      final: false,
+    });
+    games.recordSpeechTranscript(gameRoomId, {
+      playerId: speaker.id,
+      text: "我是预言家，昨晚查验了5号。",
+      final: false,
+    });
+
+    expect(updateEventPayload).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(saveSnapshot).toHaveBeenCalledTimes(1));
+
+    resolveFirstSave();
+    await vi.waitFor(() => expect(saveSnapshot).toHaveBeenCalledTimes(2));
+  });
+
+  it("submits the latest live STT subtitle when final flush has no transcript", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const speaker = room.players[0]!;
+
+    games.setRunAgentTurn(passAgentTurn);
+    games.setVoiceAgents({
+      get: () => ({
+        flushPlayerTranscript: async () => "",
+        resetPlayerTranscript: () => undefined,
+      }),
+      setTranscriptHandler: () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      day: 1,
+      currentSpeakerPlayerId: speaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [speaker.id];
+
+    games.recordSpeechTranscript(gameRoomId, {
+      playerId: speaker.id,
+      text: "我是预言家，",
+      final: false,
+    });
+    games.recordSpeechTranscript(gameRoomId, {
+      playerId: speaker.id,
+      text: "我是预言家，昨晚查验了5号，是狼人。",
+      final: false,
+    });
+
+    const event = await games.submitAction(gameRoomId, speaker.id, {
+      kind: "speechComplete",
+    });
+
+    expect(event).toEqual(
+      expect.objectContaining({
+        type: "speech_submitted",
+        actorId: speaker.id,
+        payload: expect.objectContaining({
+          speech: "我是预言家，昨晚查验了5号，是狼人。",
         }),
       })
     );
@@ -1601,7 +1731,7 @@ describe("InMemoryGameService rules", () => {
       expect(
         room.events.some(
           (event) =>
-            event.type === "speech_transcript_delta" &&
+            event.type === "stream" &&
             event.actorId === agentSpeaker.id
         )
       ).toBe(true);
@@ -1622,7 +1752,7 @@ describe("InMemoryGameService rules", () => {
       (event) => event.actorId === agentSpeaker.id
     );
     const deltaEvents = agentEvents.filter(
-      (event) => event.type === "speech_transcript_delta"
+      (event) => event.type === "stream"
     );
     const speechEventIndex = room.events.findIndex(
       (event) =>
@@ -1635,22 +1765,22 @@ describe("InMemoryGameService rules", () => {
         .reverse()
         .findIndex(
           (event) =>
-            event.type === "speech_transcript_delta" &&
+            event.type === "stream" &&
             event.actorId === agentSpeaker.id
         );
 
-    expect(deltaEvents.length).toBeGreaterThanOrEqual(2);
+    expect(deltaEvents).toHaveLength(1);
     expect(deltaEvents[0]).toMatchObject({
       visibility: "public",
       payload: {
+        kind: "speech",
         day: room.projection.day,
         phase: "day_speak",
         final: false,
         source: "agent",
       },
     });
-    expect(String(deltaEvents[0]!.payload.text)).toBe("我先说结论。");
-    expect(String(deltaEvents.at(-1)!.payload.text)).toBe(
+    expect(String(deltaEvents[0]!.payload.text)).toBe(
       "我先说结论。3号这轮发言偏防守，我今天会先归3号。"
     );
     expect(lastDeltaIndex).toBeGreaterThan(-1);
@@ -1688,7 +1818,7 @@ describe("InMemoryGameService rules", () => {
     expect(
       room.events.some(
         (event) =>
-          event.type === "speech_transcript_delta" &&
+          event.type === "stream" &&
           event.actorId === agentSpeaker.id
       )
     ).toBe(true);
@@ -1780,7 +1910,7 @@ describe("InMemoryGameService rules", () => {
     expect(
       room.events.some(
         (event) =>
-          event.type === "speech_transcript_delta" &&
+          event.type === "stream" &&
           event.actorId === agentSpeaker.id
       )
     ).toBe(false);
@@ -1897,6 +2027,47 @@ describe("InMemoryGameService rules", () => {
       })
     );
     expect(new Date(room.projection.deadlineAt!).getTime()).toBeGreaterThan(Date.now());
+  });
+
+  it("waits for GM narration before opening the next action phase", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const firstSpeaker = room.players[0]!;
+    let resolveNarration: () => void = () => undefined;
+    const narrationDone = new Promise<void>((resolve) => {
+      resolveNarration = resolve;
+    });
+    const playAudioFiles = vi.fn(() => narrationDone);
+
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: () => undefined,
+        playAudioFiles,
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    room.projection = {
+      ...room.projection!,
+      phase: "night_resolution",
+      deadlineAt: new Date(Date.now() - 1000).toISOString(),
+    };
+    room.pendingNightActions = [];
+
+    const advance = games.advanceGame(gameRoomId, passAgentTurn);
+    await vi.waitFor(() => expect(playAudioFiles).toHaveBeenCalled());
+
+    expect(room.projection.phase).toBe("night_resolution");
+    await expect(
+      games.submitAction(gameRoomId, firstSpeaker.id, { kind: "pass" })
+    ).rejects.toThrow("Server narration is still playing");
+
+    resolveNarration();
+    await advance;
+
+    expect(room.projection.phase).toBe("day_speak");
+    expect(room.projection.currentSpeakerPlayerId).toBe(firstSpeaker.id);
   });
 
   it("ends immediately during night resolution when witch poison kills the last wolf", async () => {

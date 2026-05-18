@@ -42,14 +42,15 @@ export function GameButton({
       data-loading={loading ? "true" : "false"}
       disabled={disabled || loading}
     >
+      <span className="ww-game-button__chrome" aria-hidden="true" />
       <span className="ww-game-button__content">
         {loading ? (
-          <>
+          <span className="ww-game-button__label">
             <span className="ww-game-button__spinner" aria-hidden="true" />
             <span>{loadingLabel}</span>
-          </>
+          </span>
         ) : (
-          label
+          <span className="ww-game-button__label">{label}</span>
         )}
       </span>
     </button>

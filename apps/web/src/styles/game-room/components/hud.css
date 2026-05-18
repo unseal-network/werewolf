@@ -32,9 +32,9 @@
 
 .game-layout-root .hud-region::before {
   background:
-    url("/assets/werewolf-ui/final/hud/rail-top-line.png") top center / 100% 16px repeat-x,
-    url("/assets/werewolf-ui/final/hud/rail-bottom-line.png") bottom center / 100% 16px repeat-x,
-    url("/assets/werewolf-ui/final/hud/rail-fill.png") center / 100% 100% no-repeat;
+    url("/assets/werewolf-ui/final/hud/rail-top-line.webp") top center / 100% 16px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-bottom-line.webp") bottom center / 100% 16px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-fill.webp") center / 100% 100% no-repeat;
   opacity: 0.92;
 }
 
@@ -110,7 +110,7 @@
   height: calc(15px * var(--layout-hud-scale, 1));
   margin-right: calc(3px * var(--layout-hud-scale, 1));
   display: inline-block;
-  background: url("/assets/werewolf-ui/final/hud/icon-people.png") center / contain no-repeat;
+  background: url("/assets/werewolf-ui/final/hud/icon-people.webp") center / contain no-repeat;
   opacity: 0.68;
 }
 

@@ -64,7 +64,7 @@ describe("CenterInfoPanel", () => {
       players: [speaker],
       events: [
         event({
-          type: "speech_transcript_delta",
+          type: "stream",
           actorId: speaker.id,
           payload: { text: "我觉得三号需要解释。" },
         }),
@@ -95,7 +95,7 @@ describe("CenterInfoPanel", () => {
         players: [agent],
         events: [
           event({
-            type: "speech_transcript_delta",
+            type: "stream",
             actorId: agent.id,
             payload: { delta: "这轮我先看四号的票型。" },
           }),
@@ -109,7 +109,7 @@ describe("CenterInfoPanel", () => {
         players: [human],
         events: [
           event({
-            type: "speech_transcript_delta",
+            type: "stream",
             actorId: human.id,
             payload: { day: 2, phase: "day_speak", text: "我是好人，先不要归我。" },
           }),
@@ -132,7 +132,7 @@ describe("CenterInfoPanel", () => {
         event({
           id: "previous-speaker-current-day",
           seq: 1,
-          type: "speech_transcript_delta",
+          type: "stream",
           actorId: previousSpeaker.id,
           payload: {
             day: 2,
@@ -143,7 +143,7 @@ describe("CenterInfoPanel", () => {
         event({
           id: "current-speaker-old-day",
           seq: 2,
-          type: "speech_transcript_delta",
+          type: "stream",
           actorId: currentSpeaker.id,
           payload: {
             day: 1,
@@ -168,7 +168,7 @@ describe("CenterInfoPanel", () => {
         event({
           id: "current-speaker-live",
           seq: 3,
-          type: "speech_transcript_delta",
+          type: "stream",
           actorId: currentSpeaker.id,
           payload: {
             day: 2,

@@ -83,21 +83,32 @@ export function appendTimelineEvent(
   timeline: GameEventDto[],
   event: GameEventDto
 ): GameEventDto[] {
-  if (timeline.some((candidate) => candidate.id === event.id)) return timeline;
+  if (timeline.some((candidate) => candidate.id === event.id)) {
+    if (event.type !== "stream") return timeline;
+    return timeline.map((candidate) =>
+      candidate.id === event.id ? event : candidate
+    );
+  }
+  const streamKind = (candidate: GameEventDto) =>
+    candidate.payload.kind === undefined ? "speech" : candidate.payload.kind;
   const sameSpeechStream = (candidate: GameEventDto) =>
-    candidate.type === "speech_transcript_delta" &&
+    (candidate.type === "stream" || candidate.type === "speech_transcript_delta") &&
     candidate.actorId === event.actorId &&
+    streamKind(candidate) === (event.payload.kind ?? "speech") &&
     candidate.payload.day === event.payload.day &&
     candidate.payload.phase === event.payload.phase;
   const next =
-    event.type === "speech_transcript_delta"
+    event.type === "stream" || event.type === "speech_transcript_delta"
       ? [...timeline.filter((candidate) => !sameSpeechStream(candidate)), event]
       : event.type === "speech_submitted"
         ? [
             ...timeline.filter(
               (candidate) =>
                 !(
-                  candidate.type === "speech_transcript_delta" &&
+                  (candidate.type === "stream" ||
+                    candidate.type === "speech_transcript_delta") &&
+                  (candidate.payload.kind === undefined ||
+                    candidate.payload.kind === "speech") &&
                   candidate.actorId === event.actorId &&
                   candidate.payload.day === event.payload.day
                 )
@@ -108,18 +119,28 @@ export function appendTimelineEvent(
   return next.length <= 260 ? next : next.slice(-260);
 }
 
+export function collapseStreamingTimelineEvents(
+  events: GameEventDto[]
+): GameEventDto[] {
+  return events.reduce(
+    (timeline, event) => appendTimelineEvent(timeline, event),
+    [] as GameEventDto[]
+  );
+}
+
 export function applySubscribeMessage(
   state: SnapshotSseState,
   message: SubscribeMessage | undefined
 ): SnapshotSseState {
   if (!message) return state;
   if (message.kind === "snapshot") {
+    const timeline = collapseStreamingTimelineEvents(message.snapshot.events);
     return {
       roomSnapshot: message.snapshot.room,
       projectionSnapshot: message.snapshot.projection,
       privateStates: message.snapshot.privateStates,
-      timeline: message.snapshot.events,
-      timelineBaseSeq: computeTimelineBaseSeq(message.snapshot.events),
+      timeline,
+      timelineBaseSeq: computeTimelineBaseSeq(timeline),
     };
   }
   const timeline = appendTimelineEvent(state.timeline, message.event);

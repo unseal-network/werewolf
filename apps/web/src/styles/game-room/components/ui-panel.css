@@ -25,58 +25,58 @@
   isolation: isolate;
   background: none;
   --ui-panel-fill-layer:
-    url("/assets/werewolf-ui/final/panel-9slice/fill.png")
+    url("/assets/werewolf-ui/final/panel-9slice/fill.webp")
       center /
       128px
       128px
       repeat;
   --ui-panel-frame-layer:
-    url("/assets/werewolf-ui/final/panel-9slice/ornament-top.png")
+    url("/assets/werewolf-ui/final/panel-9slice/ornament-top.webp")
       center top calc(-17px * var(--ui-panel-scale)) /
       calc(128px * var(--ui-panel-scale))
       calc(128px * var(--ui-panel-scale))
       no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/ornament-bottom.png")
+    url("/assets/werewolf-ui/final/panel-9slice/ornament-bottom.webp")
       center bottom calc(-16px * var(--ui-panel-scale)) /
       calc(128px * var(--ui-panel-scale))
       calc(128px * var(--ui-panel-scale))
       no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/corner-tl.png")
+    url("/assets/werewolf-ui/final/panel-9slice/corner-tl.webp")
       left top /
       var(--ui-panel-corner)
       var(--ui-panel-corner)
       no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/corner-tr.png")
+    url("/assets/werewolf-ui/final/panel-9slice/corner-tr.webp")
       right top /
       var(--ui-panel-corner)
       var(--ui-panel-corner)
       no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/corner-bl.png")
+    url("/assets/werewolf-ui/final/panel-9slice/corner-bl.webp")
       left bottom /
       var(--ui-panel-corner)
       var(--ui-panel-corner)
       no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/corner-br.png")
+    url("/assets/werewolf-ui/final/panel-9slice/corner-br.webp")
       right bottom /
       var(--ui-panel-corner)
       var(--ui-panel-corner)
       no-repeat,
-    url("/assets/werewolf-ui/final/panel-9slice/edge-top.png")
+    url("/assets/werewolf-ui/final/panel-9slice/edge-top.webp")
       center var(--ui-panel-edge-top-y) /
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
       var(--ui-panel-edge)
       repeat-x,
-    url("/assets/werewolf-ui/final/panel-9slice/edge-bottom.png")
+    url("/assets/werewolf-ui/final/panel-9slice/edge-bottom.webp")
       center bottom var(--ui-panel-edge-bottom-y) /
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
       var(--ui-panel-edge)
       repeat-x,
-    url("/assets/werewolf-ui/final/panel-9slice/edge-left.png")
+    url("/assets/werewolf-ui/final/panel-9slice/edge-left.webp")
       left var(--ui-panel-edge-left-x) top calc(var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) /
       var(--ui-panel-edge)
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)
       repeat-y,
-    url("/assets/werewolf-ui/final/panel-9slice/edge-right.png")
+    url("/assets/werewolf-ui/final/panel-9slice/edge-right.webp")
       right var(--ui-panel-edge-right-x) top calc(var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) /
       var(--ui-panel-edge)
       calc(100% - (var(--ui-panel-corner) - var(--ui-panel-edge-overlap)) * 2)

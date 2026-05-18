@@ -88,12 +88,12 @@ function formatEventWith(
         }),
       };
     }
-    if (event.type === "speech_transcript_delta") {
+    if (event.type === "stream" || event.type === "speech_transcript_delta") {
       return {
         typeKey: "speech",
         text: t("timeline.evt.transcript", {
           actor: playerLabel(event.actorId),
-          text: String(event.payload.text ?? ""),
+          text: String(event.payload.text ?? event.payload.delta ?? ""),
         }),
       };
     }

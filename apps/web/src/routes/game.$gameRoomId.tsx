@@ -24,6 +24,7 @@ import {
   upsertRoomPlayers,
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
+import { buildActionExpectation } from "../game/actionExpectation";
 import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
   DEMO_DISPLAY_NAME,
@@ -97,11 +98,11 @@ function normalizeRoleId(roleId: string | undefined): string {
 }
 
 function roleCardFrontUrl(roleId: string | undefined): string {
-  return `${roleAssetBase}/${normalizeRoleId(roleId)}.png`;
+  return `${roleAssetBase}/${normalizeRoleId(roleId)}.avif`;
 }
 
 function roleCardBackUrl(): string {
-  return `${roleAssetBase}/card-back.png`;
+  return `${roleAssetBase}/card-back.avif`;
 }
 
 function stripPayloadFromEvent(raw: string): string {
@@ -1297,17 +1298,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   }
 
   function actionExpectation() {
-    const expectation: {
-      expectedPhase?: string | null;
-      expectedDay?: number;
-      expectedVersion?: number;
-    } = {};
-    if (projection?.phase !== undefined) expectation.expectedPhase = projection.phase;
-    if (projection?.day !== undefined) expectation.expectedDay = projection.day;
-    if (projection?.version !== undefined) {
-      expectation.expectedVersion = projection.version;
-    }
-    return expectation;
+    return buildActionExpectation(projection);
   }
 
   async function onConfirmTarget(explicitTargetId?: string) {

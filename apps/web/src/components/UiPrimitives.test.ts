@@ -57,7 +57,7 @@ describe("new UI primitives", () => {
     expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) 128px");
     expect(css).toContain("overflow-x: hidden");
     expect(css).toContain(".agent-add-button.ww-game-button");
-    expect(css).toContain("--ww-button-width: 128px");
+    expect(css).toContain("--ww-agent-add-size: 44px");
   });
 
   it("renders decision buttons with live text and verified 9-slice variants", () => {
@@ -78,16 +78,25 @@ describe("new UI primitives", () => {
     expect(html).toContain("ww-game-button--primary");
     expect(html).toContain("ww-game-button--confirm");
     expect(html).toContain("ww-game-button--secondary");
+    expect(html).toContain("ww-game-button__chrome");
+    expect(html).toContain("ww-game-button__label");
     expect(html).toContain(">Start<");
-    expect(css).toContain("submit-button-9slice.png");
-    expect(css).toContain("confirm-button-9slice.png");
-    expect(css).toContain("cancel-button-9slice.png");
+    expect(css).toContain("submit-button-9slice.webp");
+    expect(css).toContain("confirm-button-9slice.webp");
+    expect(css).toContain("cancel-button-9slice.webp");
     expect(css).toContain(".game-layout-root .ww-game-button--primary");
     expect(css).toContain("color: #fff7d8");
     expect(css).toContain("background: transparent");
     expect(css).toContain("box-sizing: border-box");
-    expect(css).toContain("border-image-slice: 76 168");
-    expect(css).toContain("border-image-slice: 40 64");
+    expect(css).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp\")");
+    expect(css).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp\")");
+    expect(css).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/cancel-button-9slice.webp\")");
+    expect(css).toContain("--ww-button-chrome-slice: 76 168");
+    expect(css).toContain("--ww-button-chrome-slice: 40 64");
+    expect(css).toContain("border-image-source: var(--ww-button-chrome-image)");
+    expect(css).toContain("border-image-slice: var(--ww-button-chrome-slice)");
+    expect(css).toContain("background-image: none");
+    expect(css).toContain("--ww-button-label-optical-y");
     expect(css).not.toContain("border-image-slice: 76 168 fill");
     expect(css).not.toContain("border-image-slice: 40 64 fill");
   });
@@ -116,5 +125,7 @@ describe("new UI primitives", () => {
     expect(css).toContain("display: none !important");
     expect(css).toContain(".game-layout-root .action-region .stage-action-button.is-pressed");
     expect(css).not.toContain(".game-layout-root .action-region .stage-action-button__content");
+    expect(css).not.toContain("--ww-button-content-offset-y");
+    expect(css).not.toContain("line-height: 1 !important");
   });
 });

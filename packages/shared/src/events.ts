@@ -5,6 +5,7 @@ export const eventTypeSchema = z.enum([
   "roles_assigned",
   "phase_started",
   "turn_started",
+  "stream",
   "speech_transcript_delta",
   "speech_submitted",
   "wolf_vote_submitted",

@@ -162,8 +162,8 @@ describe("runtime tick API", () => {
     expect(["good", "wolf"]).toContain(winner);
     expect(internalEventTypes).toContain("night_action_submitted");
     expect(internalEventTypes).toContain("wolf_vote_resolved");
-    expect(internalEventTypes).toContain("agent_llm_requested");
-    expect(internalEventTypes).toContain("agent_llm_completed");
+    expect(internalEventTypes).not.toContain("agent_llm_requested");
+    expect(internalEventTypes).not.toContain("agent_llm_completed");
     expect(responseEventTypes).not.toContain("agent_llm_requested");
     expect(responseEventTypes).not.toContain("agent_llm_completed");
     expect(responseEventTypes.length).toBeGreaterThan(0);

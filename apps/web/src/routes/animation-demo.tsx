@@ -55,10 +55,10 @@ class AnimationDemoScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image("village-stage-night", `${assetBase}/animation-demo/village-stage-unified.png`);
-    this.load.image("village-stage-day", `${assetBase}/animation-demo/village-stage-day.png`);
-    this.load.image("role-card-back", `${assetBase}/role-cards/card-back.png`);
-    this.load.image("role-villager", `${assetBase}/role-cards/villager.png`);
+    this.load.image("village-stage-night", `${assetBase}/animation-demo/village-stage-unified.avif`);
+    this.load.image("village-stage-day", `${assetBase}/animation-demo/village-stage-day.avif`);
+    this.load.image("role-card-back", `${assetBase}/role-cards/card-back.avif`);
+    this.load.image("role-villager", `${assetBase}/role-cards/villager.avif`);
   }
 
   create(data?: Partial<AnimationDemoState>) {

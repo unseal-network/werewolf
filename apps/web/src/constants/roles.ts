@@ -19,12 +19,12 @@ export type DisplayPhase =
 const roleCardAssetBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/role-cards`;
 
 export const ROLE_IMG: Record<DisplayRole, string> = {
-  villager: `${roleCardAssetBase}/villager.png`,
-  guard: `${roleCardAssetBase}/guard.png`,
-  hunter: `${roleCardAssetBase}/villager.png`,
-  seer: `${roleCardAssetBase}/seer.png`,
-  werewolf: `${roleCardAssetBase}/werewolf.png`,
-  witch: `${roleCardAssetBase}/witch.png`,
+  villager: `${roleCardAssetBase}/villager.avif`,
+  guard: `${roleCardAssetBase}/guard.avif`,
+  hunter: `${roleCardAssetBase}/villager.avif`,
+  seer: `${roleCardAssetBase}/seer.avif`,
+  werewolf: `${roleCardAssetBase}/werewolf.avif`,
+  witch: `${roleCardAssetBase}/witch.avif`,
 };
 
 export const ROLE_LABEL: Record<DisplayRole, string> = {

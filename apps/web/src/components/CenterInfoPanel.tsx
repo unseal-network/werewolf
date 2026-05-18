@@ -64,6 +64,7 @@ function latestSpeechEvent(
     .find(
       (event) => {
         if (
+          event.type !== "stream" &&
           event.type !== "speech_transcript_delta" &&
           event.type !== "speech_submitted"
         ) {
@@ -90,7 +91,7 @@ function latestSpeechEvent(
 
 function speechText(event: GameEventDto | undefined): string {
   if (!event) return "";
-  if (event.type === "speech_transcript_delta") {
+  if (event.type === "stream" || event.type === "speech_transcript_delta") {
     return String(event.payload.text ?? event.payload.delta ?? "").trim();
   }
   return String(event.payload.speech ?? "").trim();

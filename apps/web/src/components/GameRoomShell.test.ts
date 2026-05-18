@@ -123,10 +123,10 @@ describe("game room seat layout", () => {
       "utf8"
     );
 
-    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-default.png");
-    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-dead.png");
-    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-selected.png");
-    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-speaking.png");
+    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-default.webp");
+    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-dead.webp");
+    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-selected.webp");
+    expect(layoutCss).toContain("werewolf-ui/final/avatar/frame-speaking.webp");
     expect(layoutCss).not.toContain("avatar-rings-atlas");
     expect(seatCss).toContain("seat-state-ready");
     expect(seatCss).toContain("seat-state-alive");
@@ -213,7 +213,7 @@ describe("game room seat layout", () => {
     expect(entry).toContain('components/ui-primitives.css');
     expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel");
     expect(primitiveCss).toContain("--ww-panel-corner: calc(192px * var(--ww-panel-scale))");
-    expect(primitiveCss).toContain("panel-9slice/fill.png");
+    expect(primitiveCss).toContain("panel-9slice/fill.webp");
     expect(shell).toContain("center-info-region");
     expect(shell).toContain("{centerInfo}");
     expect(shell).not.toContain("{rawPhase ?? scene}");
@@ -233,11 +233,11 @@ describe("game room seat layout", () => {
       "utf8"
     );
 
-    expect(hudCss).not.toContain("socket-left.png");
-    expect(hudCss).not.toContain("socket-right.png");
-    expect(hudCss).not.toContain("moon-medallion.png");
-    expect(hudCss).toContain("rail-top-line.png");
-    expect(hudCss).toContain("rail-bottom-line.png");
+    expect(hudCss).not.toContain("socket-left.webp");
+    expect(hudCss).not.toContain("socket-right.webp");
+    expect(hudCss).not.toContain("moon-medallion.webp");
+    expect(hudCss).toContain("rail-top-line.webp");
+    expect(hudCss).toContain("rail-bottom-line.webp");
   });
 
   it("wires the remaining usable werewolf-ui final assets into runtime surfaces", () => {
@@ -287,14 +287,14 @@ describe("game room seat layout", () => {
     );
 
     for (const asset of [
-      "avatar/portrait-hooded.png",
-      "badge/blade.png",
-      "badge/eye.png",
-      "badge/moon.png",
-      "badge/people.png",
-      "badge/shield.png",
-      "badge/star.png",
-      "effect/avatar-selected-glow.png",
+      "avatar/portrait-hooded.webp",
+      "badge/blade.webp",
+      "badge/eye.webp",
+      "badge/moon.webp",
+      "badge/people.webp",
+      "badge/shield.webp",
+      "badge/star.webp",
+      "effect/avatar-selected-glow.webp",
     ]) {
       expect(`${layoutCss}\n${seatCss}`).toContain(`werewolf-ui/final/${asset}`);
     }
@@ -306,10 +306,21 @@ describe("game room seat layout", () => {
     expect(centerInfoCss).toContain("--ww-panel-scale");
     expect(centerInfoCss).not.toMatch(/center-info-panel\.ui-panel[\s\S]*panel-9slice\/fill\.png[\s\S]*repeat !important/);
 
-    expect(legacyCss).not.toContain("werewolf-ui/final/effect/radial-picker-ring.png");
+    expect(legacyCss).not.toContain("werewolf-ui/final/effect/radial-picker-ring.webp");
     expect(legacyCss).toContain("var(--player-picker-slice-deg)");
     expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel__edge--top");
     expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel__corner--tl");
+    expect(primitiveCss).toContain("--ww-panel-fill-top: calc(var(--ww-panel-edge-top-y) + var(--ww-panel-edge))");
+    expect(primitiveCss).toContain("--ww-panel-fill-right: calc(var(--ww-panel-edge-right-x) + var(--ww-panel-edge))");
+    expect(primitiveCss).toContain("--ww-panel-fill-bottom: calc(var(--ww-panel-edge-bottom-y) + var(--ww-panel-edge))");
+    expect(primitiveCss).toContain("--ww-panel-fill-left: calc(var(--ww-panel-edge-left-x) + var(--ww-panel-edge))");
+    expect(primitiveCss).toContain("top: var(--ww-panel-fill-top)");
+    expect(primitiveCss).toContain("right: var(--ww-panel-fill-right)");
+    expect(primitiveCss).toContain("bottom: var(--ww-panel-fill-bottom)");
+    expect(primitiveCss).toContain("left: var(--ww-panel-fill-left)");
+    expect(primitiveCss).toContain("center / 100% 100%");
+    expect(primitiveCss).toContain("no-repeat");
+    expect(primitiveCss).not.toContain("inset: var(--ww-panel-fill-inset)");
     expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
     expect(seatAvatar).toContain("seatBadgeId");
     expect(seatAvatar).toContain("seat-hooded-portrait");
@@ -347,15 +358,17 @@ describe("game room seat layout", () => {
     expect(shell).toContain("compact ? 380");
     expect(buttonCss).toContain("--ww-button-aspect-ratio");
     expect(buttonCss).toContain("aspect-ratio: var(--ww-button-aspect-ratio)");
-    expect(buttonCss).toContain("--ww-button-bg-image");
-    expect(buttonCss).toContain("button/decision/cancel-button-9slice.png");
-    expect(buttonCss).toContain("button/decision/submit-button-9slice.png");
-    expect(buttonCss).not.toContain("log-fill.png");
+    expect(buttonCss).toContain("background-image: none");
+    expect(buttonCss).toContain("button/decision/cancel-button-9slice.webp");
+    expect(buttonCss).toContain("button/decision/submit-button-9slice.webp");
+    expect(buttonCss).not.toContain("log-fill.webp");
     expect(buttonCss).not.toContain("--ww-button-fill");
     expect(buttonCss).not.toContain("background-size: 100% 100%");
     expect(buttonCss).not.toContain(".game-layout-root .ww-game-button::before");
     expect(buttonCss).not.toContain("--ww-button-label-plate-cover");
-    expect(buttonCss).toContain("border-image-source: none");
+    expect(buttonCss).toContain(".game-layout-root .ww-game-button__chrome");
+    expect(buttonCss).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp\")");
+    expect(buttonCss).toContain("border-image-source: var(--ww-button-chrome-image)");
     expect(buttonCss).not.toContain("border-image-slice: 76 168 fill");
     expect(buttonCss).not.toContain("border-image-slice: 40 64 fill");
     expect(buttonCss).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button");
@@ -378,14 +391,29 @@ describe("game room seat layout", () => {
     expect(actionCss).toContain(".game-layout-root .action-region .voice-text-bubble .speech-textarea");
     expect(actionCss).toContain(".game-layout-root .action-region .voice-bubble");
     expect(actionCss).toContain("calc(100% - (var(--layout-rail-width) * 2)");
-    expect(actionCss).toContain("button/log-corner-tl.png");
-    expect(actionCss).toContain("button/log-edge-horizontal.png");
+    expect(actionCss).toContain("button/log-corner-tl.webp");
+    expect(actionCss).toContain("button/log-edge-horizontal.webp");
     expect(actionCss).toContain("box-shadow: none !important");
     expect(actionCss).toContain("grid-area: action");
     expect(actionCss).not.toContain(".stage-confirm.use-confirm-asset");
     expect(actionCss).toContain("--ww-button-scale: var(--layout-action-scale, 1)");
     expect(actionCss).not.toContain("background-size: 100% 100%");
     expect(voicePanel).not.toContain("autoFocus");
+  });
+
+  it("stops the microphone before submitting voice speech completion", () => {
+    const voicePanel = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoicePanel.tsx"),
+      "utf8"
+    );
+    const finishStart = voicePanel.indexOf("async function finishVoiceSpeech()");
+    const finishEnd = voicePanel.indexOf("async function handleTextMode()", finishStart);
+    const finishBody = voicePanel.slice(finishStart, finishEnd);
+
+    expect(finishBody.indexOf("await voice.disableMicrophone()")).toBeGreaterThan(-1);
+    expect(finishBody.indexOf("await voice.disableMicrophone()")).toBeLessThan(
+      finishBody.indexOf("await onSpeechComplete()")
+    );
   });
 
   it("keeps the closed timeline sheet from blocking action controls", () => {
