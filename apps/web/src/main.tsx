@@ -111,9 +111,12 @@ function App() {
         ]);
         if (cancelled) return;
 
-        if (matrixToken) {
-          writeMatrixToken(matrixToken);
+        const hostToken = matrixToken.trim();
+        if (!hostToken) {
+          throw new Error("未从 Unseal app 获取到登录 token，请重新打开游戏");
         }
+
+        writeMatrixToken(hostToken);
         if (info.userId) {
           writeMatrixIdentity(info.userId, info.displayName ?? info.userId);
         }
@@ -130,10 +133,16 @@ function App() {
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
         const unsealBase = unsealBaseFromStreamUrl(info.config?.streamURL);
-        if (unsealBase && matrixToken) {
+        if (unsealBase) {
           unsealClient = createUnsealClient(unsealBase);
-          const entered = await unsealClient.enter(matrixToken);
+          const entered = await unsealClient.enter(hostToken);
           unsealJwt = entered.token;
+          if (entered.user?.userId) {
+            writeMatrixIdentity(
+              entered.user.userId,
+              entered.user.displayName ?? entered.user.userId
+            );
+          }
           if (hostRoomId) {
             try {
               const room = await unsealClient.getRoom(hostRoomId, unsealJwt);

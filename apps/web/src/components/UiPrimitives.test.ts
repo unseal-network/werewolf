@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GameButton } from "./GameButton";
+import { StageActionButton } from "./StageActionButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 describe("new UI primitives", () => {
@@ -42,6 +43,23 @@ describe("new UI primitives", () => {
     expect(css).toContain("bottom: calc(var(--ww-panel-corner) - var(--ww-panel-edge-overlap))");
   });
 
+  it("keeps framed modal content bounded inside the panel", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
+      "utf8"
+    );
+
+    expect(css).toContain("max-width: calc(100vw - 24px)");
+    expect(css).toContain("max-height: calc(100dvh - 24px)");
+    expect(css).toContain(".game-layout-root .ww-ui-panel__content");
+    expect(css).toContain("overflow: hidden");
+    expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-row");
+    expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) minmax(96px, auto)");
+    expect(css).toContain("overflow-x: hidden");
+    expect(css).toContain(".agent-picker-button");
+    expect(css).toContain(".agent-add-button.agent-picker-button");
+  });
+
   it("renders decision buttons with live text and verified 9-slice variants", () => {
     const html = renderToStaticMarkup(
       createElement(
@@ -64,7 +82,21 @@ describe("new UI primitives", () => {
     expect(css).toContain("submit-button-9slice.png");
     expect(css).toContain("confirm-button-9slice.png");
     expect(css).toContain("cancel-button-9slice.png");
+    expect(css).toContain(".game-layout-root .ww-game-button--primary");
+    expect(css).toContain("color: #fff7d8");
     expect(css).toContain("border-image-slice: 76 168 fill");
     expect(css).toContain("border-image-slice: 40 64 fill");
+  });
+
+  it("maps the room start action to the primary button skin", () => {
+    const html = renderToStaticMarkup(
+      createElement(StageActionButton, {
+        className: "stage-start",
+        label: "Start",
+      })
+    );
+
+    expect(html).toContain("ww-game-button--primary");
+    expect(html).not.toContain("ww-game-button--confirm");
   });
 });

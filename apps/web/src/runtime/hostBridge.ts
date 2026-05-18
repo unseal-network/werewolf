@@ -1,3 +1,5 @@
+import { co } from "@unseal-network/mobile-sdk";
+
 export interface HostGameInfo {
   roomId?: string | undefined;
   gameRoomId?: string | undefined;
@@ -37,6 +39,7 @@ export function isHostRuntime(): boolean {
   return Boolean(
     window.__WEREWOLF_HOST_BRIDGE__ ||
       window.iframeMessage ||
+      co.isMobile ||
       isInIframe() ||
       import.meta.env.VITE_HOST_RUNTIME === "1"
   );
@@ -45,7 +48,33 @@ export function isHostRuntime(): boolean {
 export function createHostBridge(): HostBridge {
   const realBridge = window.__WEREWOLF_HOST_BRIDGE__ ?? window.iframeMessage;
   if (realBridge) return realBridge;
+  if (co.isMobile) return createMobileHostBridge();
   return createMockHostBridge();
+}
+
+function normalizeHostToken(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return "";
+  const token = value as Record<string, unknown>;
+  const accessToken = token.accessToken ?? token.access_token ?? token.token;
+  return typeof accessToken === "string" ? accessToken : "";
+}
+
+function normalizeHostInfo(value: unknown): HostGameInfo {
+  return value && typeof value === "object" ? (value as HostGameInfo) : {};
+}
+
+export function createMobileHostBridge(): HostBridge {
+  return {
+    getInfo: async () => normalizeHostInfo(await co.getGameInfo()),
+    getToken: async () => normalizeHostToken(await co.getToken()),
+    closeApp: () => {
+      void co.back();
+    },
+    hideApp: () => {
+      void co.back();
+    },
+  };
 }
 
 export function createMockHostBridge(): HostBridge {
