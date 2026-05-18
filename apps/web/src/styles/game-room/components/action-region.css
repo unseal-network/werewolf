@@ -83,6 +83,20 @@
   pointer-events: auto;
 }
 
+.game-layout-root .action-region .stage-action-button::before,
+.game-layout-root .action-region .stage-action-button::after,
+.game-layout-root .action-region .player-picker-action::before,
+.game-layout-root .action-region .player-picker-action::after {
+  content: none !important;
+  display: none !important;
+}
+
+.game-layout-root .action-region .stage-action-button.is-pressed,
+.game-layout-root .action-region .player-picker-action.is-pressed {
+  filter: none !important;
+  box-shadow: none !important;
+}
+
 .game-layout-root .action-region .voice-panel {
   box-sizing: border-box;
   width: min(100%, 360px);

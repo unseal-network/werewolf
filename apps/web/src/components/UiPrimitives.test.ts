@@ -101,4 +101,17 @@ describe("new UI primitives", () => {
     expect(html).toContain("ww-game-button--primary");
     expect(html).not.toContain("ww-game-button--confirm");
   });
+
+  it("removes legacy action button press overlays from the new button skins", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
+
+    expect(css).toContain(".game-layout-root .action-region .stage-action-button::after");
+    expect(css).toContain(".game-layout-root .action-region .player-picker-action::after");
+    expect(css).toContain("content: none !important");
+    expect(css).toContain("display: none !important");
+    expect(css).toContain(".game-layout-root .action-region .stage-action-button.is-pressed");
+  });
 });
