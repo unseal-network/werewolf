@@ -54,10 +54,10 @@ describe("new UI primitives", () => {
     expect(css).toContain(".game-layout-root .ww-ui-panel__content");
     expect(css).toContain("overflow: hidden");
     expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-row");
-    expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) minmax(96px, auto)");
+    expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) 128px");
     expect(css).toContain("overflow-x: hidden");
-    expect(css).toContain(".agent-picker-button");
-    expect(css).toContain(".agent-add-button.agent-picker-button");
+    expect(css).toContain(".agent-add-button.ww-game-button");
+    expect(css).toContain("--ww-button-width: 128px");
   });
 
   it("renders decision buttons with live text and verified 9-slice variants", () => {
@@ -84,8 +84,12 @@ describe("new UI primitives", () => {
     expect(css).toContain("cancel-button-9slice.png");
     expect(css).toContain(".game-layout-root .ww-game-button--primary");
     expect(css).toContain("color: #fff7d8");
-    expect(css).toContain("border-image-slice: 76 168 fill");
-    expect(css).toContain("border-image-slice: 40 64 fill");
+    expect(css).toContain("background: transparent");
+    expect(css).toContain("box-sizing: border-box");
+    expect(css).toContain("border-image-slice: 76 168");
+    expect(css).toContain("border-image-slice: 40 64");
+    expect(css).not.toContain("border-image-slice: 76 168 fill");
+    expect(css).not.toContain("border-image-slice: 40 64 fill");
   });
 
   it("maps the room start action to the primary button skin", () => {
@@ -98,5 +102,19 @@ describe("new UI primitives", () => {
 
     expect(html).toContain("ww-game-button--primary");
     expect(html).not.toContain("ww-game-button--confirm");
+  });
+
+  it("removes legacy action button press overlays from the new button skins", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
+
+    expect(css).toContain(".game-layout-root .action-region .stage-action-button::after");
+    expect(css).toContain(".game-layout-root .action-region .player-picker-action::after");
+    expect(css).toContain("content: none !important");
+    expect(css).toContain("display: none !important");
+    expect(css).toContain(".game-layout-root .action-region .stage-action-button.is-pressed");
+    expect(css).not.toContain(".game-layout-root .action-region .stage-action-button__content");
   });
 });

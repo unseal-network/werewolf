@@ -9,9 +9,9 @@
   },
   "dependencies": {
     "@tanstack/react-router": "^1.140.0",
-    "@unseal-network/game-sdk": "^0.0.10",
+    "@unseal-network/game-sdk": "^0.0.11",
     "@unseal-network/mobile-log": "^0.0.9",
-    "@unseal-network/mobile-sdk": "^0.0.1",
+    "@unseal-network/mobile-sdk": "^0.0.2",
     "@vitejs/plugin-react": "^5.0.0",
     "@werewolf/shared": "workspace:*",
     "livekit-client": "^2.18.9",

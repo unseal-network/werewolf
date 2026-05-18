@@ -17,7 +17,7 @@
   justify-items: center;
   pointer-events: auto;
   --action-button-width: min(100%, calc(280px * var(--layout-action-scale, 1)));
-  --action-primary-button-width: min(100%, calc(320px * var(--layout-action-scale, 1)));
+  --action-primary-button-width: min(100%, calc(390px * var(--layout-action-scale, 1)));
   --action-secondary-button-width: min(100%, calc(260px * var(--layout-action-scale, 1)));
   --ww-button-scale: var(--layout-action-scale, 1);
 }
@@ -81,6 +81,20 @@
 .game-layout-root .action-region .stage-action-button,
 .game-layout-root .action-region .player-picker-action {
   pointer-events: auto;
+}
+
+.game-layout-root .action-region .stage-action-button::before,
+.game-layout-root .action-region .stage-action-button::after,
+.game-layout-root .action-region .player-picker-action::before,
+.game-layout-root .action-region .player-picker-action::after {
+  content: none !important;
+  display: none !important;
+}
+
+.game-layout-root .action-region .stage-action-button.is-pressed,
+.game-layout-root .action-region .player-picker-action.is-pressed {
+  filter: none !important;
+  box-shadow: none !important;
 }
 
 .game-layout-root .action-region .voice-panel {
@@ -272,10 +286,7 @@
 .game-layout-root .action-region .stage-start {
   width: var(--action-primary-button-width) !important;
   max-width: var(--action-primary-button-width) !important;
-}
-
-.game-layout-root .action-region .stage-action-button__content {
-  display: contents;
+  font-size: calc(18px * var(--layout-action-scale, 1)) !important;
 }
 
 .game-layout-root .action-region .stage-confirm,

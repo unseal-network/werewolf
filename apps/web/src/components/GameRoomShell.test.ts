@@ -317,7 +317,7 @@ describe("game room seat layout", () => {
     expect(seatAvatar).toContain("seat-role-badge");
     expect(agentPicker).toContain("UiPanelFrame");
     expect(agentPicker).toContain("agent-picker open");
-    expect(agentPicker).toContain("AgentPickerButton");
+    expect(agentPicker).toContain("GameButton");
     expect(userInfoPanel).toContain("UiPanelFrame");
     expect(userInfoPanel).toContain("profile-dialog open");
     expect(seerResultDialog).toContain("UiPanelFrame");

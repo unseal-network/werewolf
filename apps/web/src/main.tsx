@@ -138,8 +138,6 @@ function App() {
         const admin = (gameInfo.powerLevel ?? 0) >= 100;
         setIsAdmin(admin);
         un.log("[werewolf] run: admin =", admin, "hostRoomId =", hostRoomId);
-
-        // ── Step 3: Unseal client (optional — needs streamURL) ─────────────
         let linkRoomId: string | null = gameInfo.linkRoomId || null;
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
