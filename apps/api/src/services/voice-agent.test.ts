@@ -121,6 +121,28 @@ describe("TTS playback rate resampling", () => {
 });
 
 describe("VoiceAgentService TTS LiveKit framing", () => {
+  it("backs off repeated LiveKit reconnect failures instead of retrying every second", async () => {
+    vi.useFakeTimers();
+    try {
+      const agent = new VoiceAgentService("game_1", config);
+      const connect = vi
+        .spyOn(agent, "connect")
+        .mockRejectedValue(new Error("rate limited"));
+
+      (agent as any).scheduleReconnect("first failure");
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connect).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connect).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(connect).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("abandons GM audio playback when the audio source hangs", async () => {
     vi.useFakeTimers();
     try {

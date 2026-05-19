@@ -32,7 +32,8 @@ const TTS_AUDIO_SOURCE_QUEUE_MS = 120_000;
 const AGENT_VOICE_TRACK_NAME = "agent-voice";
 const TTS_CONNECT_TIMEOUT_MS = 5000;
 const TTS_SYNTH_TIMEOUT_MS = 30_000;
-const LIVEKIT_RECONNECT_DELAY_MS = 1000;
+const LIVEKIT_RECONNECT_INITIAL_DELAY_MS = 1000;
+const LIVEKIT_RECONNECT_MAX_DELAY_MS = 30_000;
 const LIVEKIT_CONNECT_TIMEOUT_MS = 7000;
 const LIVEKIT_PLAYOUT_TIMEOUT_GRACE_MS = 1000;
 const STT_CONNECT_TIMEOUT_MS = 5000;
@@ -109,6 +110,7 @@ export class VoiceAgentService {
   private connected = false;
   private connectPromise: Promise<void> | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectAttempt = 0;
   private intentionalDisconnect = false;
   private transcriptHandler: VoiceTranscriptHandler | null = null;
   private activePlayerAudioTrackKeys = new Set<string>();
@@ -166,9 +168,14 @@ export class VoiceAgentService {
   async connect(): Promise<void> {
     if (this.connected && this.room && this.audioSource) return;
     if (this.connectPromise) return this.connectPromise;
-    this.connectPromise = this.connectInner().finally(() => {
+    const connectPromise = this.connectInner().finally(() => {
       this.connectPromise = null;
     });
+    // Background reconnects must never become process-level unhandled
+    // rejections if a caller misses a catch; callers still receive the same
+    // rejecting promise returned below.
+    connectPromise.catch(() => undefined);
+    this.connectPromise = connectPromise;
     return this.connectPromise;
   }
 
@@ -239,6 +246,7 @@ export class VoiceAgentService {
         "LiveKit voice-agent connect timed out"
       );
       this.connected = true;
+      this.reconnectAttempt = 0;
 
       const source = new AudioSource(
         TTS_AUDIO_SOURCE_SAMPLE_RATE,
@@ -276,6 +284,7 @@ export class VoiceAgentService {
 
   async disconnect(): Promise<void> {
     this.intentionalDisconnect = true;
+    this.reconnectAttempt = 0;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -989,14 +998,22 @@ export class VoiceAgentService {
 
   private scheduleReconnect(reason: string): void {
     if (this.intentionalDisconnect || this.reconnectTimer) return;
-    console.error(`[VoiceAgent] scheduling reconnect: ${reason}`);
+    const delayMs = Math.min(
+      LIVEKIT_RECONNECT_INITIAL_DELAY_MS * 2 ** this.reconnectAttempt,
+      LIVEKIT_RECONNECT_MAX_DELAY_MS
+    );
+    this.reconnectAttempt += 1;
+    console.error(`[VoiceAgent] scheduling reconnect: ${reason}`, {
+      delayMs,
+      reconnectAttempt: this.reconnectAttempt,
+    });
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       this.connect().catch((err) => {
         console.error("[VoiceAgent] reconnect failed:", err);
         this.scheduleReconnect("reconnect failed");
       });
-    }, LIVEKIT_RECONNECT_DELAY_MS);
+    }, delayMs);
   }
 }
 
@@ -1006,12 +1023,26 @@ function withTimeout<T>(
   message: string
 ): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  let timedOut = false;
+  const guardedPromise = promise.catch((err) => {
+    if (timedOut) {
+      return new Promise<T>(() => undefined);
+    }
+    throw err;
   });
-  return Promise.race([promise, timeout]).finally(() => {
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      timedOut = true;
+      reject(new Error(message));
+    }, timeoutMs);
+  });
+  timeout.catch(() => undefined);
+  guardedPromise.catch(() => undefined);
+  const raced = Promise.race([guardedPromise, timeout]).finally(() => {
     if (timeoutId) clearTimeout(timeoutId);
   });
+  raced.catch(() => undefined);
+  return raced;
 }
 
 function mixToMono(channels: Float32Array[], samplesDecoded: number): Float32Array {

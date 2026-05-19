@@ -245,11 +245,10 @@ export function VoiceRoomProvider({
 
     setState("connecting");
     setErrorMessage(null);
-    console.info("[VoiceRoom] preparing connection", {
+    console.info("[VoiceRoom] connecting", {
       hasServerUrl: Boolean(serverUrl),
       hasToken: Boolean(token),
     });
-    void lkRoom.prepareConnection(serverUrl, token).catch(() => {});
     eagerStartAudio();
 
     void lkRoom

@@ -438,6 +438,16 @@ describe("game room seat layout", () => {
     expect(gameRoute).toContain("if (!room || !matrixUserId || !myPlayerId)");
   });
 
+  it("does not preflight LiveKit immediately before connecting", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(voiceRoom).not.toContain("prepareConnection(serverUrl, token)");
+    expect(voiceRoom).toContain(".connect(serverUrl, token");
+  });
+
   it("keeps the closed timeline sheet from blocking action controls", () => {
     const utilityCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/utility-region.css"),
