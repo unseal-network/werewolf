@@ -6,10 +6,11 @@ function room() {
   return {
     id: "game_1",
     status: "waiting",
+    events: [{ id: "legacy_event" }],
     players: [],
     privateStates: [],
     pendingNightActions: [],
-    pendingVotes: [],
+    pendingVotes: [{ events: [{ id: "nested_legacy_event" }] }],
     speechQueue: [],
     tiePlayerIds: [],
   };
@@ -41,7 +42,45 @@ describe("RoomRuntime", () => {
     } as RoomCommand);
 
     expect(runtime.snapshot()).toEqual(before);
-    expect(staged.events.length).toBeGreaterThanOrEqual(0);
+    expect(staged.events).toHaveLength(1);
+    expect(staged.events[0]).not.toHaveProperty("seq");
     expect(staged.canonicalState).not.toHaveProperty("events");
+    expect(JSON.stringify(staged.canonicalState)).not.toContain("legacy_event");
+  });
+
+  it("prebuilds raw SSE payloads with event ids and advances snapshot event id on commit", () => {
+    let nextId = 1;
+    const runtime = new RoomRuntime(room(), () =>
+      String(nextId++).padStart(4, "0")
+    );
+
+    const first = runtime.stage({
+      commandId: "cmd_join",
+      gameRoomId: "game_1",
+      actorUserId: "@alice:example.com",
+      kind: "join",
+      displayName: "Alice",
+      seatNo: 1,
+    });
+
+    expect(first.events[0]).toMatchObject({ id: "0001" });
+    expect(first.rawSsePayloads).toEqual([
+      `id: 0001\ndata: ${JSON.stringify(first.events[0])}\n\n`,
+    ]);
+
+    runtime.commit(first);
+    const second = runtime.stage({
+      commandId: "cmd_leave",
+      gameRoomId: "game_1",
+      actorUserId: "@alice:example.com",
+      kind: "leave",
+    });
+
+    expect(second.baseSnapshotEventId).toBe("0001");
+    expect(second.events[0]).toMatchObject({ id: "0002" });
+    expect(second.displayState).toMatchObject({
+      room: { lastCommandKind: "leave" },
+    });
+    expect(JSON.stringify(second.displayState)).not.toContain("events");
   });
 });

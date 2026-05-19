@@ -27,7 +27,9 @@ export class RoomRuntime {
       actorUserId: command.actorUserId,
       baseSnapshotEventId: this.snapshotEventId,
       events,
-      rawSsePayloads: events.map((event) => `data: ${JSON.stringify(event)}\n\n`),
+      rawSsePayloads: events.map(
+        (event) => `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`
+      ),
       canonicalState,
       displayState,
       result: { kind: `${command.kind}Accepted` },
