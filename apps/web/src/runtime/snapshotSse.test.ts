@@ -4,6 +4,7 @@ import {
   appendTimelineEvent,
   applySubscribeMessage,
   collapseStreamingTimelineEvents,
+  computeTimelineBaseEventId,
   parseSubscribeMessage,
   type SnapshotSseState,
 } from "./snapshotSse";
@@ -72,6 +73,31 @@ describe("snapshot-first SSE state", () => {
     expect(next.timelineBaseSeq).toBe(3);
   });
 
+  it("accepts snapshot-first messages without an embedded timeline", () => {
+    const parsed = parseSubscribeMessage(
+      JSON.stringify({
+        snapshot: {
+          snapshotEventId: "evt_9",
+          latestEventId: "evt_9",
+          displayState: {
+            room,
+            projection,
+            privateStates: [privateState],
+          },
+        },
+        timelineCursor: { after: "evt_9" },
+      })
+    );
+
+    const next = applySubscribeMessage(emptyState(), parsed);
+
+    expect(next.roomSnapshot?.id).toBe("game_1");
+    expect(next.projectionSnapshot?.phase).toBe("day_speak");
+    expect(next.privateStates).toEqual([privateState]);
+    expect(next.timeline).toEqual([]);
+    expect(next.timelineBaseEventId).toBe("evt_9");
+  });
+
   it("deduplicates replayed live events by id after a snapshot", () => {
     const state = {
       ...emptyState(),
@@ -120,6 +146,25 @@ describe("snapshot-first SSE state", () => {
     expect(next.timeline).toEqual([latest]);
     expect(next.timelineBaseSeq).toBe(59);
   });
+
+  it("tracks event id cursors when live events do not carry seq", () => {
+    const noSeqEvent = {
+      id: "evt_10",
+      gameRoomId: "game_1",
+      type: "phase_started",
+      visibility: "public",
+      payload: { phase: "night_guard" },
+      createdAt: "2026-05-14T00:00:10.000Z",
+    } satisfies GameEventDto;
+
+    const next = applySubscribeMessage(emptyState(), {
+      kind: "event",
+      event: noSeqEvent,
+    });
+
+    expect(computeTimelineBaseEventId(next.timeline)).toBe("evt_10");
+    expect(next.timelineBaseEventId).toBe("evt_10");
+  });
 });
 
 function transcriptEvent(seq: number, text: string): GameEventDto {
@@ -148,5 +193,6 @@ function emptyState(): SnapshotSseState {
     privateStates: [],
     timeline: [],
     timelineBaseSeq: 0,
+    timelineBaseEventId: "",
   };
 }

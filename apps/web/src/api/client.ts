@@ -38,7 +38,7 @@ export interface JoinedPlayer {
 export interface GameEventDto {
   id: string;
   gameRoomId?: string;
-  seq: number;
+  seq?: number;
   type: string;
   actorId?: string;
   subjectId?: string;
@@ -87,7 +87,41 @@ export interface RoomProjection {
   currentSpeakerPlayerId: string | null;
   winner: "wolf" | "good" | null;
   alivePlayerIds: string[];
-  version: number;
+  version: number | string;
+}
+
+export interface TimelineDisplayFactsDto {
+  tieCandidateIds: string[];
+  seerCheckedTargetIdsBySeerId: Record<string, string[]>;
+  latestSeerResultBySeerDay: Record<string, unknown>;
+  witchKillTargetIdByDay: Record<string, string>;
+  guardProtectTargetIdByActorDay: Record<string, string>;
+  voteSubmittedByActorDay: string[];
+  nightActionSubmittedByActorPhaseDay: string[];
+}
+
+export interface GameReadSnapshot {
+  snapshotEventId: string;
+  latestEventId: string;
+  displayState: {
+    room: GameRoom;
+    projection: RoomProjection | null;
+    privateStates: PlayerPrivateState[];
+    displayFacts?: TimelineDisplayFactsDto;
+  };
+}
+
+export interface GameReadResponse {
+  snapshot: GameReadSnapshot;
+  timelineCursor: { after: string };
+}
+
+export interface TimelinePageResponse {
+  events: GameEventDto[];
+  cursor: {
+    before: string | null;
+    after: string | null;
+  };
 }
 
 export interface PlayerPrivateState {
@@ -163,6 +197,17 @@ function appBasePath(): string {
   return leading.endsWith("/") ? leading : `${leading}/`;
 }
 
+function createCommandId(kind: string): string {
+  const random =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  return `${kind}-${random}`;
+}
+
+function idempotentHeaders(kind: string): Record<string, string> {
+  return { "x-command-id": createCommandId(kind) };
+}
+
 export function defaultApiBaseUrl(): string {
   const explicit = import.meta.env.VITE_API_BASE_URL?.trim();
   if (explicit) return trimTrailingSlash(explicit);
@@ -211,12 +256,14 @@ export function createApiClient(options: ApiClientOptions) {
     joinGame(gameRoomId: string, seatNo?: number) {
       return request<JoinedPlayer>(`/games/${gameRoomId}/join`, {
         method: "POST",
+        headers: idempotentHeaders("join"),
         body: JSON.stringify(seatNo ? { seatNo } : {}),
       });
     },
     leaveGame(gameRoomId: string) {
       return request<{ player: RoomPlayer }>(`/games/${gameRoomId}/leave`, {
         method: "POST",
+        headers: idempotentHeaders("leave"),
       });
     },
     swapSeat(gameRoomId: string, seatNo: number) {
@@ -224,6 +271,7 @@ export function createApiClient(options: ApiClientOptions) {
         `/games/${gameRoomId}/seat`,
         {
           method: "POST",
+          headers: idempotentHeaders("swapSeat"),
           body: JSON.stringify({ seatNo }),
         }
       );
@@ -236,12 +284,28 @@ export function createApiClient(options: ApiClientOptions) {
         events: GameEventDto[];
       }>(`/games/${gameRoomId}/start`, {
         method: "POST",
+        headers: idempotentHeaders("start"),
       });
     },
     runRuntimeTick(gameRoomId: string) {
       return request<RuntimeTickDto>(`/games/${gameRoomId}/runtime/tick`, {
         method: "POST",
+        headers: idempotentHeaders("runtimeTick"),
       });
+    },
+    getGame(gameRoomId: string) {
+      return request<GameReadResponse>(`/games/${gameRoomId}`);
+    },
+    getTimeline(
+      gameRoomId: string,
+      params: { after?: string; before?: string; limit?: number } = {}
+    ) {
+      const search = new URLSearchParams();
+      if (params.after) search.set("after", params.after);
+      if (params.before) search.set("before", params.before);
+      if (params.limit !== undefined) search.set("limit", String(params.limit));
+      const suffix = search.toString() ? `?${search.toString()}` : "";
+      return request<TimelinePageResponse>(`/games/${gameRoomId}/timeline${suffix}`);
     },
     listAgentCandidates(gameRoomId: string) {
       return request<AgentCandidatesResponse>(
@@ -256,13 +320,14 @@ export function createApiClient(options: ApiClientOptions) {
     ) {
       return request<{ player: RoomPlayer }>(`/games/${gameRoomId}/agents`, {
         method: "POST",
+        headers: idempotentHeaders("addAgent"),
         body: JSON.stringify({ agentUserId, displayName, avatarUrl }),
       });
     },
     removePlayer(gameRoomId: string, matrixUserId: string) {
       return request<{ player: RoomPlayer }>(
         `/games/${gameRoomId}/players/${encodeURIComponent(matrixUserId)}`,
-        { method: "DELETE" }
+        { method: "DELETE", headers: idempotentHeaders("removePlayer") }
       );
     },
     submitAction(
@@ -280,6 +345,7 @@ export function createApiClient(options: ApiClientOptions) {
         `/games/${gameRoomId}/actions`,
         {
           method: "POST",
+          headers: idempotentHeaders(`action-${body.kind}`),
           body: JSON.stringify(body),
         }
       );

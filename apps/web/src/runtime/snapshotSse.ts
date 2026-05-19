@@ -2,16 +2,21 @@ import { useCallback, useEffect, useRef } from "react";
 import type {
   GameEventDto,
   GameRoom,
+  GameReadSnapshot,
   PlayerPrivateState,
   RoomProjection,
 } from "../api/client";
-import { computeTimelineBaseSeq } from "../game/timelineState";
+import {
+  computeTimelineBaseEventId,
+  computeTimelineBaseSeq,
+} from "../game/timelineState";
 
 export interface SubscribeSnapshot {
   room: GameRoom;
   projection: RoomProjection | null;
   privateStates: PlayerPrivateState[];
   events: GameEventDto[];
+  snapshotEventId?: string;
 }
 
 export type SubscribeMessage =
@@ -24,6 +29,7 @@ export interface SnapshotSseState {
   privateStates: PlayerPrivateState[];
   timeline: GameEventDto[];
   timelineBaseSeq: number;
+  timelineBaseEventId: string;
 }
 
 export function stripPayloadFromEvent(raw: string): string {
@@ -69,7 +75,9 @@ export function parseSubscribeMessage(raw: string): SubscribeMessage | undefined
     if ("snapshot" in candidate) {
       return {
         kind: "snapshot",
-        snapshot: (candidate as { snapshot: SubscribeSnapshot }).snapshot,
+        snapshot: normalizeSubscribeSnapshot(
+          (candidate as { snapshot: SubscribeSnapshot | GameReadSnapshot }).snapshot
+        ),
       };
     }
     const event = parseSseEvent(payload);
@@ -135,20 +143,49 @@ export function applySubscribeMessage(
   if (!message) return state;
   if (message.kind === "snapshot") {
     const timeline = collapseStreamingTimelineEvents(message.snapshot.events);
+    const timelineBaseEventId =
+      message.snapshot.snapshotEventId ?? computeTimelineBaseEventId(timeline);
     return {
       roomSnapshot: message.snapshot.room,
       projectionSnapshot: message.snapshot.projection,
       privateStates: message.snapshot.privateStates,
       timeline,
       timelineBaseSeq: computeTimelineBaseSeq(timeline),
+      timelineBaseEventId,
     };
   }
   const timeline = appendTimelineEvent(state.timeline, message.event);
   return {
     ...state,
     timeline,
-    timelineBaseSeq: Math.max(state.timelineBaseSeq, message.event.seq),
+    timelineBaseSeq: Math.max(state.timelineBaseSeq, message.event.seq ?? 0),
+    timelineBaseEventId: computeTimelineBaseEventId(timeline),
   };
+}
+
+export { computeTimelineBaseEventId };
+
+function normalizeSubscribeSnapshot(
+  snapshot: SubscribeSnapshot | GameReadSnapshot
+): SubscribeSnapshot {
+  if ("displayState" in snapshot) {
+    return {
+      room: snapshot.displayState.room,
+      projection:
+        snapshot.displayState.projection ?? snapshot.displayState.room.projection,
+      privateStates: snapshot.displayState.privateStates,
+      events: [],
+      snapshotEventId: snapshot.snapshotEventId,
+    };
+  }
+  const normalized: SubscribeSnapshot = {
+    ...snapshot,
+    events: snapshot.events ?? [],
+  };
+  if (snapshot.snapshotEventId !== undefined) {
+    normalized.snapshotEventId = snapshot.snapshotEventId;
+  }
+  return normalized;
 }
 
 export interface UseSnapshotSseOptions {

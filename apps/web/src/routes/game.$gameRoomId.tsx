@@ -18,8 +18,9 @@ import type { EngineGameState } from "../engine/GameEngine";
 import {
   actorDayKey,
   actorPhaseDayKey,
+  compareGameEventIdStrings,
   deriveTimelineDisplayState,
-  computeTimelineBaseSeq,
+  computeTimelineBaseEventId,
   seerDayKey,
   upsertRoomPlayers,
 } from "../game/timelineState";
@@ -103,69 +104,6 @@ function roleCardFrontUrl(roleId: string | undefined): string {
 
 function roleCardBackUrl(): string {
   return `${roleAssetBase}/card-back.avif`;
-}
-
-function stripPayloadFromEvent(raw: string): string {
-  if (raw.startsWith("data:")) {
-    return raw.slice(5).trim();
-  }
-  return raw;
-}
-
-function parseSseEvent(raw: string): GameEventDto | undefined {
-  if (!raw.trim()) return undefined;
-  try {
-    const candidate = JSON.parse(raw) as unknown;
-    if (!candidate || typeof candidate !== "object") {
-      return undefined;
-    }
-    if ("event" in candidate) {
-      const wrapped = (candidate as { event?: unknown }).event;
-      if (
-        wrapped &&
-        typeof wrapped === "object" &&
-        "id" in wrapped &&
-        "type" in wrapped
-      ) {
-        return wrapped as GameEventDto;
-      }
-    }
-    if ("id" in candidate && "type" in candidate) {
-      return candidate as GameEventDto;
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
-}
-
-interface SubscribeSnapshot {
-  room: GameRoom;
-  projection: RoomProjection | null;
-  privateStates: PlayerPrivateState[];
-  events: GameEventDto[];
-}
-
-type SubscribeMessage =
-  | { kind: "snapshot"; snapshot: SubscribeSnapshot }
-  | { kind: "event"; event: GameEventDto };
-
-function parseSubscribeMessage(raw: string): SubscribeMessage | undefined {
-  if (!raw.trim()) return undefined;
-  try {
-    const candidate = JSON.parse(raw) as unknown;
-    if (!candidate || typeof candidate !== "object") return undefined;
-    if ("snapshot" in candidate) {
-      return {
-        kind: "snapshot",
-        snapshot: (candidate as { snapshot: SubscribeSnapshot }).snapshot,
-      };
-    }
-    const event = parseSseEvent(raw);
-    return event ? { kind: "event", event } : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 /**
@@ -466,7 +404,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     useState<RoomProjection | null>(null);
   const [privateStates, setPrivateStates] = useState<PlayerPrivateState[]>([]);
   const [timeline, setTimeline] = useState<GameEventDto[]>([]);
-  const [timelineBaseSeq, setTimelineBaseSeq] = useState(0);
+  const [timelineBaseEventId, setTimelineBaseEventId] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [runtimeInProgress, setRuntimeInProgress] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -497,10 +435,10 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         roomSnapshot,
         projectionSnapshot,
         timeline,
-        timelineBaseSeq,
+        timelineBaseEventId,
         matrixUserId
       ),
-    [roomSnapshot, projectionSnapshot, timeline, timelineBaseSeq, matrixUserId]
+    [roomSnapshot, projectionSnapshot, timeline, timelineBaseEventId, matrixUserId]
   );
   const room = timelineDisplayState.room;
   const projection = timelineDisplayState.projection;
@@ -561,17 +499,52 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     autoTickPhaseRef.current = "";
   }, [gameRoomId]);
 
-  // Page-scoped read model: /subscribe is the only game-room read source.
-  // On refresh, the SSE route sends a snapshot first; that snapshot rebuilds
-  // room/projection/private state and the timeline without a separate GET.
+  useEffect(() => {
+    let cancelled = false;
+    void client
+      .getGame(gameRoomId)
+      .then(async (readModel) => {
+        if (cancelled) return;
+        const display = readModel.snapshot.displayState;
+        setRoomSnapshot(display.room);
+        setProjectionSnapshot(display.projection ?? display.room.projection);
+        setPrivateStates(display.privateStates);
+        setTimelineBaseEventId(readModel.snapshot.snapshotEventId);
+        const timelinePage = await client.getTimeline(gameRoomId, {
+          after: readModel.timelineCursor.after,
+          limit: 100,
+        });
+        if (cancelled) return;
+        setTimeline((current) => {
+          const byId = new Map(current.map((event) => [event.id, event]));
+          for (const event of timelinePage.events) byId.set(event.id, event);
+          return Array.from(byId.values()).slice(-260);
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setErrorMessage(err instanceof Error ? err.message : String(err));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [client, gameRoomId]);
+
+  // Page-scoped live updates. New servers may send snapshot-first messages
+  // without timeline history; older servers still include `events` here.
   useSnapshotSse({
     subscribeUrl: client.subscribeUrl(gameRoomId),
     onSnapshot(snapshot) {
       setRoomSnapshot(snapshot.room);
       setProjectionSnapshot(snapshot.projection);
       setPrivateStates(snapshot.privateStates);
-      setTimeline(snapshot.events);
-      setTimelineBaseSeq(computeTimelineBaseSeq(snapshot.events));
+      if (snapshot.events.length > 0) {
+        setTimeline(snapshot.events);
+      }
+      setTimelineBaseEventId(
+        snapshot.snapshotEventId ?? computeTimelineBaseEventId(snapshot.events)
+      );
     },
     onEvent(event) {
       if (sseEventVisibleToMe(event, myPrivateStateRef.current)) {
@@ -1169,15 +1142,10 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         }
         return Array.from(byId.values()).slice(-260);
       });
-      setTimelineBaseSeq((current) =>
-        Math.max(
-          current,
-          started.events.reduce(
-            (maxSeq, event) => Math.max(maxSeq, event.seq),
-            started.projection.version
-          )
-        )
-      );
+      setTimelineBaseEventId((current) => {
+        const fromEvents = computeTimelineBaseEventId(started.events);
+        return compareGameEventIdStrings(fromEvents, current) > 0 ? fromEvents : current;
+      });
       setShowFillPrompt(false);
       setShowAgentPicker(false);
       return started;

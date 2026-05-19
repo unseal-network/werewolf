@@ -9,13 +9,17 @@ import { UiPanelFrame } from "./UiPanelFrame";
 
 interface GameEventLike {
   id: string;
-  seq: number;
+  seq?: number;
   type: string;
   actorId?: string;
   subjectId?: string;
   visibility: string;
   payload: Record<string, unknown>;
   createdAt: string;
+}
+
+function eventLabel(event: GameEventLike): string {
+  return event.seq !== undefined ? `#${event.seq}` : event.id;
 }
 
 interface TimelinePlayerLike {
@@ -346,6 +350,7 @@ export function TimelineCapsule({
                 {group.events.map((event) => {
                   const formatted = formatEvent(event);
                   const isExpanded = expandedIds.has(event.id);
+                  const label = eventLabel(event);
                   return (
                     <div
                       className={`log-row ${isExpanded ? "is-expanded" : ""}`}
@@ -357,12 +362,12 @@ export function TimelineCapsule({
                         <div className="log-text">{formatted.text}</div>
                         {isExpanded ? (
                           <div className="log-meta">
-                            #{event.seq} · {event.actorId ? `${event.actorId} · ` : ""}
+                            {label} · {event.actorId ? `${event.actorId} · ` : ""}
                             {new Date(event.createdAt).toLocaleTimeString()}
                           </div>
                         ) : null}
                       </div>
-                      <div className="log-time">#{event.seq}</div>
+                      <div className="log-time">{label}</div>
                     </div>
                   );
                 })}
