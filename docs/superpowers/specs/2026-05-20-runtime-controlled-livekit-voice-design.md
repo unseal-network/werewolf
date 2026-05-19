@@ -85,6 +85,7 @@ The runtime should sync meeting state whenever one of these changes happens:
 
 - game starts
 - phase starts
+- before GM/system narration is played
 - speech queue begins
 - current speaker advances
 - wolf discussion window opens or closes
@@ -92,10 +93,15 @@ The runtime should sync meeting state whenever one of these changes happens:
 - player times out
 - player leaves
 - player dies
+- LiveKit participant joins or reconnects
+- LiveKit participant publishes an audio track
+- LiveKit participant unpublishes an audio track
 - game ends
 - process recovers active rooms after restart
 
-Sync should be idempotent. Repeated calls with the same game state should not create new rooms, new tokens, or new client connections.
+Sync should be idempotent and ordered per room. Repeated calls with the same game state should not create new rooms, new tokens, or new client connections. Older, slower sync work must not be able to restore stale publish or subscription permissions after the game moves to a newer phase/version.
+
+LiveKit subscription updates are track-SID based. Because player microphone tracks may be published after the runtime grants permission, the server must resync on track publication instead of relying only on phase transitions.
 
 ## Client Behavior
 
