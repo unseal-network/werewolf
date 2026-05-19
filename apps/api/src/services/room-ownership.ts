@@ -107,7 +107,7 @@ export class InMemoryRoomOwnership implements RoomOwnership {
   ): Promise<void> {
     const current = this.owners.get(gameRoomId);
     if (current?.ownerId === ownerId && current.fencingToken === fencingToken) {
-      this.owners.delete(gameRoomId);
+      current.leaseExpiresAt = new Date(0);
     }
   }
 
@@ -221,8 +221,13 @@ export class PostgresRoomOwnership implements RoomOwnership {
     ownerId: string,
     fencingToken: bigint
   ): Promise<void> {
+    const now = new Date();
     await this.db
-      .delete(roomOwnership)
+      .update(roomOwnership)
+      .set({
+        leaseExpiresAt: now,
+        updatedAt: now,
+      })
       .where(
         and(
           eq(roomOwnership.gameRoomId, gameRoomId),

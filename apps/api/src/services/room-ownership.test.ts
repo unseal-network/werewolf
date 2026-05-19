@@ -53,6 +53,29 @@ describe("RoomOwnership", () => {
     });
   });
 
+  it("preserves fencing across release and ignores stale released tokens", async () => {
+    const ownership = new InMemoryRoomOwnership();
+
+    const first = await ownership.acquire("game_1", "worker_a", 1000);
+    expect(first).toMatchObject({ acquired: true, fencingToken: 1n });
+
+    await ownership.release("game_1", "worker_a", 1n);
+    const second = await ownership.acquire("game_1", "worker_b", 1000);
+    expect(second).toMatchObject({ acquired: true, fencingToken: 2n });
+
+    await expect(
+      ownership.renew("game_1", "worker_a", 1n, 1000)
+    ).resolves.toBe(false);
+    await ownership.release("game_1", "worker_a", 1n);
+
+    await expect(
+      ownership.acquire("game_1", "worker_c", 1000)
+    ).resolves.toMatchObject({
+      acquired: false,
+      currentOwnerId: "worker_b",
+    });
+  });
+
   it("returns copied dates that cannot mutate internal ownership state", async () => {
     const ownership = new InMemoryRoomOwnership();
 
