@@ -23,7 +23,7 @@ export function createEventIdFactory(options: EventIdFactoryOptions) {
     if (timestampMs === lastMs) {
       sequence += 1;
       if (sequence > MAX_SEQUENCE) {
-        timestampMs = waitNextMs(lastMs);
+        timestampMs = lastMs + 1;
         sequence = 0;
       }
     } else {
@@ -54,10 +54,4 @@ export function createEventId(nowMs = Date.now()): string {
     workerId: readRequiredWorkerIdFromEnv(),
   });
   return defaultCreateEventId(nowMs);
-}
-
-function waitNextMs(previousMs: number): number {
-  let next = Date.now();
-  while (next <= previousMs) next = Date.now();
-  return next;
 }

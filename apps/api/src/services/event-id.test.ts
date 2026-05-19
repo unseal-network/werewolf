@@ -24,6 +24,21 @@ describe("snowflake event ids", () => {
     expect(ids.size).toBe(2000);
   });
 
+  it("advances logical milliseconds on sequence overflow without waiting for wall clock", () => {
+    const createEventId = createEventIdFactory({ workerId: 1 });
+    const ids = Array.from({ length: 4098 }, () => createEventId(1_900_000_000_000));
+
+    expect(new Set(ids).size).toBe(ids.length);
+    expect([...ids].sort((a, b) => a.localeCompare(b))).toEqual(ids);
+  });
+
+  it("survives clock rollback by preserving monotonic order", () => {
+    const createEventId = createEventIdFactory({ workerId: 3 });
+    const first = createEventId(1_900_000_000_010);
+    const second = createEventId(1_900_000_000_000);
+    expect(first < second).toBe(true);
+  });
+
   it("rejects invalid worker ids loudly", () => {
     expect(() => validateWorkerId(-1)).toThrow("workerId");
     expect(() => validateWorkerId(1024)).toThrow("workerId");
