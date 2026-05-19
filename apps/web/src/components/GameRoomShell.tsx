@@ -7,6 +7,7 @@ import { RoleRevealEngine } from "./RoleRevealEngine";
 import { computeVisibleSeatCount, splitSeatsIntoRails } from "../game/seatLayout";
 import { co } from "@unseal-network/mobile-sdk";
 import { MobileHeader } from "./MobileHeader";
+import { GameIconButton } from "./GameIconButton";
 
 export type SceneId = "lobby" | "deal" | "night" | "day" | "vote" | "tie" | "end" | "waiting";
 
@@ -75,15 +76,35 @@ function useResponsiveGameLayoutVars(railSlotCount: number) {
       const narrow = width <= 760;
       const railRows = Math.max(1, railSlotCount);
       const hudSafeHeight = compact ? height * 0.145 : narrow ? height * 0.13 : height * 0.14;
+      const actionReservedHeight = clampValue(
+        height * (compact ? 0.24 : narrow ? 0.22 : 0.2),
+        compact ? 168 : narrow ? 180 : 190,
+        compact ? 240 : narrow ? 250 : 270
+      );
+      const utilityReservedHeight = clampValue(
+        height * (compact ? 0.09 : narrow ? 0.085 : 0.08),
+        compact ? 64 : 70,
+        compact ? 92 : narrow ? 96 : 104
+      );
+      const railActionGap = clampValue(
+        height * (compact ? 0.018 : narrow ? 0.022 : 0.026),
+        compact ? 12 : 16,
+        compact ? 24 : narrow ? 30 : 36
+      );
       const tableTopGap = clampValue(
         height * (compact ? 0.024 : 0.028),
         compact ? 16 : 20,
         compact ? 28 : 38
       );
+      const availableRailHeight = Math.max(
+        220,
+        height - hudSafeHeight - actionReservedHeight - utilityReservedHeight - tableTopGap - railActionGap
+      );
+      const railHeightMin = Math.min(compact ? 300 : narrow ? 340 : 360, availableRailHeight);
       const railHeight = clampValue(
         compact ? height * 0.56 : narrow ? height * 0.6 : height * 0.62,
-        compact ? 360 : 450,
-        compact ? height - hudSafeHeight - 230 : narrow ? height - hudSafeHeight - 250 : height - hudSafeHeight - 290
+        railHeightMin,
+        availableRailHeight
       );
       const seatFromHeight = (railHeight / railRows - (compact ? 10 : 14)) / (compact ? 1.04 : 0.98);
       const seatFromWidth = compact ? width * 0.164 : narrow ? width * 0.115 : width * 0.058;
@@ -129,6 +150,7 @@ function useResponsiveGameLayoutVars(railSlotCount: number) {
         ["--layout-table-top-gap" as string]: `${tableTopGap.toFixed(2)}px`,
         ["--layout-action-width" as string]: `${actionWidth.toFixed(2)}px`,
         ["--layout-action-bottom" as string]: `${actionBottom.toFixed(2)}px`,
+        ["--layout-rail-action-gap" as string]: `${railActionGap.toFixed(2)}px`,
       });
     };
 
@@ -286,14 +308,13 @@ export function GameRoomShell({
         ) : null}
 
         <header className="hud-region" aria-label="room-meta">
-          <button
-            type="button"
+          <GameIconButton
             className="hud-back-button"
             onClick={onHomeClick}
             aria-label={t("common.back")}
-          >
-            ←
-          </button>
+            label="←"
+            size="lg"
+          />
           <div className="hud-status">
             <div className="hud-phase-line">
               {phaseLabel}

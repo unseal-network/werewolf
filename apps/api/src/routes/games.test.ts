@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createApp } from "../app";
 import { createTestDeps } from "../test-utils";
 
@@ -311,6 +313,19 @@ describe("games API", () => {
     expect(body.identity).toBe("@alice:example.com");
     expect(body.identity).not.toBe(player.id);
     expect(body.canPublish).toBe(true);
+  });
+
+  it("keeps LiveKit room creation cached instead of creating the room for every token", () => {
+    const livekitRoute = readFileSync(
+      resolve(process.cwd(), "apps/api/src/routes/livekit.ts"),
+      "utf8"
+    );
+
+    expect(livekitRoute).toContain("const ensuredLivekitRooms = new Set<string>()");
+    expect(livekitRoute).toContain("const ensuringLivekitRooms = new Map<string, Promise<void>>()");
+    expect(livekitRoute).toContain("async function ensureLivekitRoom");
+    expect(livekitRoute).toContain("if (ensuredLivekitRooms.has(gameRoomId)) return");
+    expect(livekitRoute).toContain("await ensureLivekitRoom(gameRoomId)");
   });
 
   it("downloads a visible transcript event by id", async () => {

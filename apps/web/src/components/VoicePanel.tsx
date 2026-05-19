@@ -14,6 +14,8 @@ export interface VoicePanelProps {
   onTextChange: (value: string) => void;
   onSubmitText: (text: string) => void; // submits {kind:"speech", speech: text}
   onSpeechComplete: () => void | Promise<void>; // submits {kind:"speechComplete"}
+  canPublishVoice?: boolean | undefined;
+  onRequestPublishVoice?: (() => Promise<void>) | undefined;
   actionLoading: boolean;
   submitLabel: string;
   placeholder: string;
@@ -34,6 +36,8 @@ export function VoicePanel({
   onTextChange,
   onSubmitText,
   onSpeechComplete,
+  canPublishVoice = true,
+  onRequestPublishVoice,
   actionLoading,
   submitLabel,
   placeholder,
@@ -49,6 +53,7 @@ export function VoicePanel({
   const [modePulse, setModePulse] = useState<SpeechInputMode | null>(null);
   const micPressActiveRef = useRef(false);
   const micPressTokenRef = useRef(0);
+  const pendingMicStartRef = useRef(false);
 
   const canToggleMic =
     enabled && voice.state === "connected" && Boolean(voice.room) && !actionLoading;
@@ -62,6 +67,20 @@ export function VoicePanel({
     return () => window.clearTimeout(timer);
   }, [modePulse]);
 
+  useEffect(() => {
+    if (
+      !pendingMicStartRef.current ||
+      !micPressActiveRef.current ||
+      !canToggleMic ||
+      !canPublishVoice ||
+      isMicOn
+    ) {
+      return;
+    }
+    pendingMicStartRef.current = false;
+    void startMicrophone();
+  }, [canToggleMic, canPublishVoice, isMicOn]);
+
   async function startMicrophone() {
     if (!canToggleMic) return;
     const pressToken = micPressTokenRef.current + 1;
@@ -70,6 +89,11 @@ export function VoicePanel({
     setMicPressing(true);
     setMicError(null);
     try {
+      if (!canPublishVoice && onRequestPublishVoice) {
+        pendingMicStartRef.current = true;
+        await onRequestPublishVoice();
+        return;
+      }
       if (!isMicOn) {
         await voice.enableMicrophone();
       }

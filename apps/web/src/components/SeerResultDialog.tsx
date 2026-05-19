@@ -1,4 +1,5 @@
 import { useT } from "../i18n/I18nProvider";
+import { GameIconButton } from "./GameIconButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 interface SeerResultDialogProps {
@@ -31,14 +32,13 @@ export function SeerResultDialog({
         role="dialog"
         aria-modal="true"
       >
-        <button
-          type="button"
+        <GameIconButton
           className="seer-result-close"
           onClick={onClose}
           aria-label={t("user.close")}
-        >
-          ×
-        </button>
+          label="×"
+          size="sm"
+        />
         <div className="seer-result-kicker">{t("role.seer")}</div>
         <div className="seer-result-seat">{t("seat.numberLabel", { n: seatNo })}</div>
         <div className={`seer-result-alignment ${alignment}`}>

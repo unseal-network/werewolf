@@ -165,6 +165,12 @@ export class TtsWebSocketClient {
       }, timeoutMs);
       this.currentRequest = { resolve, reject, timer, sampleRate };
       this.send(payload);
+      this.send({ message_type: "finalize" });
+      console.debug("[TtsWebSocketClient] sent TTS finalize control message", {
+        agentId: this.opts.agentId,
+        outputFormat,
+        timeoutMs,
+      });
     });
   }
 
@@ -206,8 +212,19 @@ export class TtsWebSocketClient {
     if (!parsed || typeof parsed !== "object") return;
     const msg = parsed as Record<string, unknown>;
 
-    if (msg.type === "error") {
-      const err = String(msg.error ?? "unknown");
+    const isTypedError = msg.type === "error";
+    const isUpstreamError =
+      typeof msg.error === "string" &&
+      (typeof msg.code === "number" || typeof msg.message === "string");
+    if (isTypedError || isUpstreamError) {
+      const err = String(msg.error ?? msg.message ?? "unknown");
+      console.warn("[TtsWebSocketClient] received TTS error frame", {
+        agentId: this.opts.agentId,
+        error: err,
+        code: msg.code,
+        message: msg.message,
+        typed: isTypedError,
+      });
       if (this.opts.onError) this.opts.onError(err);
       if (this.currentRequest) {
         if (this.currentRequest.timer) clearTimeout(this.currentRequest.timer);
@@ -235,6 +252,9 @@ export class TtsWebSocketClient {
     }
 
     if (msg.isFinal === true || msg.is_final === true) {
+      console.debug("[TtsWebSocketClient] received TTS final frame", {
+        agentId: this.opts.agentId,
+      });
       if (this.currentRequest) {
         if (this.currentRequest.timer) clearTimeout(this.currentRequest.timer);
         const req = this.currentRequest;

@@ -19,7 +19,6 @@
   --action-button-width: min(100%, calc(280px * var(--layout-action-scale, 1)));
   --action-primary-button-width: min(100%, calc(390px * var(--layout-action-scale, 1)));
   --action-secondary-button-width: min(100%, calc(260px * var(--layout-action-scale, 1)));
-  --ww-button-scale: var(--layout-action-scale, 1);
 }
 
 .game-layout-root .action-region .phase-card {
@@ -60,12 +59,11 @@
   grid-template-columns: minmax(0, 1fr);
   justify-items: stretch;
   align-items: center;
-}
-
-.game-layout-root .action-region .action-mode-switch {
-  width: min(100%, 360px);
-  justify-self: center;
-  margin-inline: auto;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 .game-layout-root .action-region .player-picker {
@@ -128,12 +126,8 @@
     url("/assets/werewolf-ui/final/button/log-corner-br.webp") right bottom / var(--voice-corner-size) var(--voice-corner-size) no-repeat,
     url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") top center / var(--voice-edge-span) var(--voice-edge-width) repeat-x,
     url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") bottom center / var(--voice-edge-span) var(--voice-edge-width) repeat-x;
-  --voice-fill-layer:
-    linear-gradient(180deg, rgba(7, 13, 15, 0.44), rgba(3, 8, 10, 0.34)) center / var(--voice-fill-span-x) var(--voice-fill-span-y) no-repeat,
-    rgba(3, 8, 10, 0.20);
-  --voice-active-fill-layer:
-    linear-gradient(180deg, rgba(34, 30, 22, 0.48), rgba(8, 9, 10, 0.36)) center / var(--voice-fill-span-x) var(--voice-fill-span-y) no-repeat,
-    rgba(3, 8, 10, 0.20);
+  --voice-fill-layer: transparent;
+  --voice-active-fill-layer: transparent;
 }
 
 .game-layout-root .action-region .voice-bubble {
@@ -255,9 +249,7 @@
 .game-layout-root .action-region .voice-bubble.recording {
   border: 0 !important;
   background: var(--voice-frame-layer), var(--voice-active-fill-layer) !important;
-  box-shadow:
-    inset 0 3px 8px rgba(0, 0, 0, 0.52),
-    inset 0 -1px 0 rgba(255, 235, 176, 0.10) !important;
+  box-shadow: none !important;
   color: #fff7d8 !important;
   transform: translateY(calc(3px * var(--layout-action-scale, 1))) scale(0.985) !important;
 }
@@ -317,11 +309,28 @@
 .game-layout-root .action-region .stage-confirm,
 .game-layout-root .action-region .stage-skip,
 .game-layout-root .action-region .player-picker-action {
+  appearance: auto;
+  -webkit-appearance: auto;
   box-sizing: border-box;
   position: relative;
   width: var(--action-button-width) !important;
   min-width: 0 !important;
   max-width: var(--action-button-width) !important;
+  height: auto !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: none !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: inherit;
+  font: inherit;
+  line-height: normal;
+  text-shadow: none !important;
+  filter: none !important;
+  transform: none !important;
+  transition: none !important;
   pointer-events: auto;
 }
 
@@ -329,7 +338,6 @@
 .game-layout-root .action-region .player-picker-action.stage-skip {
   width: var(--action-secondary-button-width) !important;
   max-width: var(--action-secondary-button-width) !important;
-  --ww-button-font-size: calc(16px * var(--layout-action-scale, 1));
 }
 
 .game-layout-root .action-region .player-picker {
@@ -365,24 +373,6 @@
   display: none !important;
 }
 
-.game-layout-root .action-region .stage-start,
-.game-layout-root .action-region .stage-confirm,
-.game-layout-root .action-region .stage-skip,
-.game-layout-root .action-region .target-chip {
-  border-radius: 999px;
-}
-
-.game-layout-root .action-region .stage-start,
-.game-layout-root .action-region .stage-confirm,
-.game-layout-root .action-region .stage-skip,
-.game-layout-root .action-region .player-picker-action {
-  box-shadow: none;
-  overflow: visible;
-  text-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.82),
-    0 0 12px rgba(0, 0, 0, 0.52);
-}
-
 .game-layout-root .action-region .stage-start {
   width: var(--action-primary-button-width) !important;
   max-width: var(--action-primary-button-width) !important;
@@ -396,23 +386,6 @@
 .game-layout-root .action-region .stage-skip,
 .game-layout-root .action-region .player-picker-action.stage-skip {
   width: var(--action-secondary-button-width) !important;
-}
-
-.game-layout-root .action-region .stage-add-player {
-  --ww-button-content-inset-x: 0px;
-  --ww-button-label-optical-y: 0px;
-}
-
-.game-layout-root .action-region .stage-add-player .ww-game-button__content,
-.game-layout-root .action-region .stage-add-player .ww-game-button__label {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-}
-
-.game-layout-root .action-region .stage-add-player .ww-game-button__label {
-  transform: none;
 }
 
 .game-layout-root .action-region .phase-card > .stage-identity,

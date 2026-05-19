@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { LOGO_IMG, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG, ROLE_LABEL } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
+import { GameSegmentedControl } from "./GameSegmentedControl";
 import { PlayerRadialPicker } from "./PlayerRadialPicker";
 import { StageActionButton } from "./StageActionButton";
 import { UiPanelFrame } from "./UiPanelFrame";
@@ -58,8 +59,10 @@ export interface CenterStageProps {
   totalCount?: number | undefined;
   isMyTurnToSpeak?: boolean;
   speechInput?: string;
+  canPublishVoice?: boolean | undefined;
   actionLoading?: boolean;
   onStart: () => void;
+  onExitGame?: () => void;
   /** Open the agent picker. Shown in lobby alongside the start button. */
   onAddAgent?: () => void;
   onRunRuntime?: () => void;
@@ -68,6 +71,7 @@ export interface CenterStageProps {
   onConfirmTarget: (playerId?: string) => void;
   onSpeak: (speech?: string) => void;
   onSpeechChange?: (text: string) => void;
+  onRequestPublishVoice?: (() => Promise<void>) | undefined;
   onSpeechComplete?: () => void;
   onSkip: () => void;
 }
@@ -177,8 +181,10 @@ export function CenterStage({
   totalCount,
   isMyTurnToSpeak,
   speechInput,
+  canPublishVoice,
   actionLoading,
   onStart,
+  onExitGame,
   onAddAgent,
   onRunRuntime,
   onTargetSelect,
@@ -186,6 +192,7 @@ export function CenterStage({
   onConfirmTarget,
   onSpeak,
   onSpeechChange,
+  onRequestPublishVoice,
   onSpeechComplete,
   onSkip,
 }: CenterStageProps) {
@@ -332,6 +339,14 @@ export function CenterStage({
         <div className="endgame-title">{title}</div>
         {winnerText ? <div className="endgame-winner">{winnerText}</div> : null}
         {copy ? <div className="endgame-copy">{copy}</div> : null}
+        {onExitGame ? (
+          <StageActionButton
+            className="endgame-exit-button"
+            label={t("stage.exitGame")}
+            variant="primary"
+            onClick={onExitGame}
+          />
+        ) : null}
       </UiPanelFrame>
     );
   }
@@ -382,6 +397,8 @@ export function CenterStage({
       onTextChange={(value) => onSpeechChange?.(value)}
       onSubmitText={(text) => onSpeak(text)}
       onSpeechComplete={() => (onSpeechComplete ? onSpeechComplete() : onSpeak())}
+      canPublishVoice={canPublishVoice}
+      onRequestPublishVoice={onRequestPublishVoice}
       actionLoading={Boolean(actionLoading)}
       submitLabel={t("stage.submitSpeech")}
       placeholder={t("stage.speakPlaceholder")}
@@ -432,22 +449,15 @@ export function CenterStage({
 
         {!showLockedDrawer && showWolfCombinedActions ? (
           <>
-            <div className="action-mode-switch" role="group" aria-label="wolf-actions">
-              <button
-                type="button"
-                className={wolfActionMode === "target" ? "active" : ""}
-                onClick={() => setWolfActionMode("target")}
-              >
-                {t("stage.selectPlayer")}
-              </button>
-              <button
-                type="button"
-                className={wolfActionMode === "speech" ? "active" : ""}
-                onClick={() => setWolfActionMode("speech")}
-              >
-                {t("stage.speakButton")}
-              </button>
-            </div>
+            <GameSegmentedControl
+              aria-label="wolf-actions"
+              value={wolfActionMode}
+              options={[
+                { value: "target", label: t("stage.selectPlayer") },
+                { value: "speech", label: t("stage.speakButton") },
+              ]}
+              onChange={setWolfActionMode}
+            />
             {wolfActionMode === "target" ? pickerControl : voiceControl}
           </>
         ) : null}

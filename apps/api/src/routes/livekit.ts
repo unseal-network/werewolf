@@ -17,6 +17,13 @@ export interface LivekitRouteDeps {
 const LIVEKIT_URL = process.env.LIVEKIT_URL || "ws://localhost:7880";
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "devkey";
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "secret";
+const ensuredLivekitRooms = new Set<string>();
+const ensuringLivekitRooms = new Map<string, Promise<void>>();
+
+export function clearEnsuredLivekitRoomsForTests(): void {
+  ensuredLivekitRooms.clear();
+  ensuringLivekitRooms.clear();
+}
 
 export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
   const app = new Hono();
@@ -25,6 +32,33 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
     LIVEKIT_API_KEY,
     LIVEKIT_API_SECRET
   );
+
+  async function ensureLivekitRoom(gameRoomId: string): Promise<void> {
+    if (ensuredLivekitRooms.has(gameRoomId)) return;
+    const existing = ensuringLivekitRooms.get(gameRoomId);
+    if (existing) return existing;
+    const pending = roomService
+      .createRoom({
+        name: gameRoomId,
+        emptyTimeout: 30 * 60,
+        maxParticipants: 20,
+      })
+      .then(() => {
+        ensuredLivekitRooms.add(gameRoomId);
+      })
+      .catch((err) => {
+        if (err instanceof Error && err.message.toLowerCase().includes("already")) {
+          ensuredLivekitRooms.add(gameRoomId);
+          return;
+        }
+        throw err;
+      })
+      .finally(() => {
+        ensuringLivekitRooms.delete(gameRoomId);
+      });
+    ensuringLivekitRooms.set(gameRoomId, pending);
+    return pending;
+  }
 
   function appErrorResponse(error: AppError): Response {
     return new Response(
@@ -69,18 +103,10 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         canPublish: isPlayer,
       });
 
-      // Ensure the LiveKit room exists before the client tries to connect.
       try {
-        await roomService.createRoom({
-          name: gameRoomId,
-          emptyTimeout: 30 * 60,
-          maxParticipants: 20,
-        });
+        await ensureLivekitRoom(gameRoomId);
       } catch (err) {
-        // Room may already exist — ignore conflict errors
-        if (err instanceof Error && !err.message.toLowerCase().includes("already")) {
-          console.error("[LiveKit] createRoom failed:", err);
-        }
+        console.error("[LiveKit] createRoom failed:", err);
       }
 
       return c.json({
@@ -106,16 +132,9 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       const gameRoomId = c.req.param("gameRoomId");
       deps.games.snapshot(gameRoomId);
       try {
-        await roomService.createRoom({
-          name: gameRoomId,
-          emptyTimeout: 30 * 60,
-          maxParticipants: 20,
-        });
+        await ensureLivekitRoom(gameRoomId);
       } catch (err) {
-        // Room may already exist — ignore conflict errors
-        if (err instanceof Error && !err.message.toLowerCase().includes("already")) {
-          throw err;
-        }
+        throw err;
       }
       return c.json({ success: true, room: gameRoomId });
     } catch (error) {

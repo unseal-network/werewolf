@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   authenticateRequest,
+  clearAuthTokenCacheForTests,
   type CachedMatrixProfile,
   type MatrixProfileCache,
 } from "./auth";
@@ -24,7 +25,20 @@ function memoryCache(profile: CachedMatrixProfile | null): MatrixProfileCache {
 }
 
 describe("authenticateRequest profile cache", () => {
+  it("reuses recently authenticated Matrix tokens without repeating whoami", async () => {
+    clearAuthTokenCacheForTests();
+    const whoami = vi.fn(async () => ({ user_id: "@alice:example.com" }));
+
+    const first = await authenticateRequest(request(), { whoami });
+    const second = await authenticateRequest(request(), { whoami });
+
+    expect(first.id).toBe("@alice:example.com");
+    expect(second.id).toBe("@alice:example.com");
+    expect(whoami).toHaveBeenCalledTimes(1);
+  });
+
   it("uses cached Matrix profile data when it was synced within three days", async () => {
+    clearAuthTokenCacheForTests();
     const profile = vi.fn();
     const user = await authenticateRequest(
       request(),
@@ -48,6 +62,7 @@ describe("authenticateRequest profile cache", () => {
   });
 
   it("refreshes Matrix profile data when the cache is older than three days", async () => {
+    clearAuthTokenCacheForTests();
     const upsert = vi.fn();
     const user = await authenticateRequest(
       request(),

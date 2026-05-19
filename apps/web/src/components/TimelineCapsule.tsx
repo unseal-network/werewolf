@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import { useT } from "../i18n/I18nProvider";
+import { GameIconButton } from "./GameIconButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 interface GameEventLike {
@@ -327,14 +328,13 @@ export function TimelineCapsule({
             <div className="sheet-title">{t("timeline.title")}</div>
             <div className="sheet-sub">{t("timeline.sub")}</div>
           </div>
-          <button
-            type="button"
+          <GameIconButton
             className="sheet-close"
             onClick={() => setOpen(false)}
             aria-label={t("user.close")}
-          >
-            ×
-          </button>
+            label="×"
+            size="md"
+          />
         </div>
         <div className="log-grid">
           {visibleEvents.length === 0 ? (

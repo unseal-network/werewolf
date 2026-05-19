@@ -71,6 +71,7 @@ export interface VoiceTranscriptUpdate {
 }
 
 export type VoiceTranscriptHandler = (update: VoiceTranscriptUpdate) => void;
+export type AgentSpeechProgressHandler = (text: string) => void;
 
 interface PlayerVoiceIdentityBinding {
   playerId: string;
@@ -379,10 +380,11 @@ export class VoiceAgentService {
   async speak(
     text: string,
     playerId?: string | null,
-    playbackRate = 1
+    playbackRate = 1,
+    onProgress?: AgentSpeechProgressHandler
   ): Promise<boolean> {
     const next = this.speakQueue.then(() =>
-      this.speakImpl(text, playerId, playbackRate)
+      this.speakImpl(text, playerId, playbackRate, onProgress)
     );
     this.speakQueue = next.catch(() => undefined);
     return next;
@@ -426,9 +428,10 @@ export class VoiceAgentService {
   private async speakImpl(
     text: string,
     playerId?: string | null,
-    playbackRate = 1
+    playbackRate = 1,
+    onProgress?: AgentSpeechProgressHandler
   ): Promise<boolean> {
-    const inner = this.speakImplInner(text, playerId, playbackRate);
+    const inner = this.speakImplInner(text, playerId, playbackRate, onProgress);
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<boolean>((resolve) => {
       timeoutId = setTimeout(() => {
@@ -519,7 +522,8 @@ export class VoiceAgentService {
   private async speakImplInner(
     text: string,
     playerId?: string | null,
-    playbackRate = 1
+    playbackRate = 1,
+    onProgress?: AgentSpeechProgressHandler
   ): Promise<boolean> {
     const trimmed = text.trim();
     if (!trimmed) return false;
@@ -531,6 +535,55 @@ export class VoiceAgentService {
     let playoutMs = 0;
     let firstChunkMs: number | null = null;
     let generatedAudioMs = 0;
+    let ttsCaptureStartedAtMs: number | null = null;
+    let mergedAlignment: TtsSpeechAlignment | null = null;
+    let speechProgressCheckpoints: SpeechProgressCheckpoint[] = [];
+    let scheduledSpeechProgressCount = 0;
+    let lastSpeechProgressText = "";
+    const speechProgressTimers = new Set<ReturnType<typeof setTimeout>>();
+    const normalizedPlaybackRate = normalizeSpeechPlaybackRate(playbackRate);
+    const clearSpeechProgressTimers = () => {
+      for (const timer of speechProgressTimers) clearTimeout(timer);
+      speechProgressTimers.clear();
+    };
+    const emitSpeechProgress = (
+      nextText: string,
+      targetAudioMs: number | null
+    ) => {
+      const progressText = nextText.trim();
+      if (!onProgress || !progressText || progressText === lastSpeechProgressText) {
+        return;
+      }
+      lastSpeechProgressText = progressText;
+      console.debug("[VoiceAgent] TTS speech progress", {
+        gameRoomId: this.gameRoomId,
+        playerId: playerId ?? null,
+        matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+        textLength: progressText.length,
+        targetAudioMs,
+      });
+      onProgress(progressText);
+    };
+    const scheduleSpeechProgress = () => {
+      if (!onProgress || ttsCaptureStartedAtMs === null) return;
+      for (
+        let index = scheduledSpeechProgressCount;
+        index < speechProgressCheckpoints.length;
+        index += 1
+      ) {
+        const checkpoint = speechProgressCheckpoints[index]!;
+        const delayMs = Math.max(
+          0,
+          ttsCaptureStartedAtMs + checkpoint.audioMs - Date.now()
+        );
+        const timer = setTimeout(() => {
+          speechProgressTimers.delete(timer);
+          emitSpeechProgress(checkpoint.text, checkpoint.audioMs);
+        }, delayMs);
+        speechProgressTimers.add(timer);
+      }
+      scheduledSpeechProgressCount = speechProgressCheckpoints.length;
+    };
     console.info("[VoiceAgent] speak start", {
       gameRoomId: this.gameRoomId,
       playerId: playerId ?? null,
@@ -590,49 +643,93 @@ export class VoiceAgentService {
         generatedAudioMs += Math.round((playbackSamples.length / rate) * 1000);
         captureChain = captureChain
           .then(async () => {
+            ttsCaptureStartedAtMs ??= Date.now();
+            scheduleSpeechProgress();
             if (await this.captureTtsPcmFrames(playbackSamples, rate)) {
               capturedAny = true;
             }
           })
           .catch(() => undefined);
       },
+      onAlignment: (event) => {
+        const alignment = parseTtsSpeechAlignment(event);
+        if (!alignment) return;
+        mergedAlignment = mergeTtsSpeechAlignment(mergedAlignment, alignment);
+        speechProgressCheckpoints = buildSpeechProgressCheckpoints(
+          mergedAlignment,
+          trimmed,
+          normalizedPlaybackRate
+        );
+        console.debug("[VoiceAgent] TTS alignment progress checkpoints", {
+          gameRoomId: this.gameRoomId,
+          playerId: playerId ?? null,
+          matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+          alignmentChars: mergedAlignment.chars.length,
+          checkpointCount: speechProgressCheckpoints.length,
+          lastAudioMs:
+            speechProgressCheckpoints[speechProgressCheckpoints.length - 1]
+              ?.audioMs ?? null,
+        });
+        scheduleSpeechProgress();
+      },
       onError: (err) => console.error("[VoiceAgent] TTS error:", err),
     };
 
-    for (let attempt = 1; attempt <= TTS_ATTEMPTS; attempt += 1) {
-      const ttsClient = this.createTtsClient(ttsClientOptions);
-      try {
-        const ttsConnectStartedAtMs = Date.now();
-        await ttsClient.connect();
-        ttsConnectMs = Date.now() - ttsConnectStartedAtMs;
-        const synthStartedAtMs = Date.now();
-        await ttsClient.synthesize(trimmed, {
-          outputFormat: TTS_OUTPUT_FORMAT,
-          modelId: "eleven_multilingual_v2",
-          flush: true,
-          timeoutMs: TTS_SYNTH_TIMEOUT_MS,
-        });
-        ttsSynthesizeMs = Date.now() - synthStartedAtMs;
-        // Wait for the serialized capture chain so every PCM frame from the
-        // completed TTS WebSocket response is handed to the AudioSource.
-        const captureDrainStartedAtMs = Date.now();
-        await captureChain;
-        captureDrainMs = Date.now() - captureDrainStartedAtMs;
-        if (capturedAny) {
-          const playoutStartedAtMs = Date.now();
-          await this.waitForTtsPlayout();
-          playoutMs = Date.now() - playoutStartedAtMs;
+    try {
+      for (let attempt = 1; attempt <= TTS_ATTEMPTS; attempt += 1) {
+        const ttsClient = this.createTtsClient(ttsClientOptions);
+        try {
+          const ttsConnectStartedAtMs = Date.now();
+          await ttsClient.connect();
+          ttsConnectMs = Date.now() - ttsConnectStartedAtMs;
+          const synthStartedAtMs = Date.now();
+          await ttsClient.synthesize(trimmed, {
+            outputFormat: TTS_OUTPUT_FORMAT,
+            modelId: "eleven_multilingual_v2",
+            flush: true,
+            timeoutMs: TTS_SYNTH_TIMEOUT_MS,
+          });
+          ttsSynthesizeMs = Date.now() - synthStartedAtMs;
+          // Wait for the serialized capture chain so every PCM frame from the
+          // completed TTS WebSocket response is handed to the AudioSource.
+          const captureDrainStartedAtMs = Date.now();
+          await captureChain;
+          captureDrainMs = Date.now() - captureDrainStartedAtMs;
+          if (capturedAny) {
+            const playoutStartedAtMs = Date.now();
+            await this.waitForTtsPlayout(generatedAudioMs, ttsCaptureStartedAtMs);
+            playoutMs = Date.now() - playoutStartedAtMs;
+            emitSpeechProgress(trimmed, generatedAudioMs);
+          }
+          break;
+        } catch (err) {
+          console.error("[VoiceAgent] speak failed:", {
+            attempt,
+            maxAttempts: TTS_ATTEMPTS,
+            err,
+          });
+          const captureDrainStartedAtMs = Date.now();
+          await captureChain;
+          captureDrainMs = Date.now() - captureDrainStartedAtMs;
+          if (capturedAny) {
+            console.warn("[VoiceAgent] TTS failed after audio was captured; skipping retry", {
+              gameRoomId: this.gameRoomId,
+              playerId: playerId ?? null,
+              matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+              attempt,
+            });
+            const playoutStartedAtMs = Date.now();
+            await this.waitForTtsPlayout(generatedAudioMs, ttsCaptureStartedAtMs);
+            playoutMs = Date.now() - playoutStartedAtMs;
+            emitSpeechProgress(trimmed, generatedAudioMs);
+            break;
+          }
+        } finally {
+          ttsClient.close();
         }
-        break;
-      } catch (err) {
-        console.error("[VoiceAgent] speak failed:", {
-          attempt,
-          maxAttempts: TTS_ATTEMPTS,
-          err,
-        });
-      } finally {
-        ttsClient.close();
       }
+    } finally {
+      clearSpeechProgressTimers();
     }
 
     console.info("[VoiceAgent] speak complete", {
@@ -648,6 +745,8 @@ export class VoiceAgentService {
       captureDrainMs,
       playoutMs,
       generatedAudioMs,
+      alignmentChars: countTtsSpeechAlignmentChars(mergedAlignment),
+      speechProgressCheckpoints: speechProgressCheckpoints.length,
       totalMs: Date.now() - startedAtMs,
     });
 
@@ -976,18 +1075,36 @@ export class VoiceAgentService {
     return true;
   }
 
-  private async waitForTtsPlayout(): Promise<void> {
+  private async waitForTtsPlayout(
+    generatedAudioMs = 0,
+    captureStartedAtMs: number | null = null
+  ): Promise<void> {
     const source = this.audioSource;
     if (!source) return;
+    const localRemainingMs =
+      captureStartedAtMs === null
+        ? 0
+        : Math.max(0, generatedAudioMs - (Date.now() - captureStartedAtMs));
     const timeoutMs =
-      Math.max(0, Math.ceil(source.queuedDuration)) +
+      Math.max(0, Math.ceil(source.queuedDuration), localRemainingMs) +
       LIVEKIT_PLAYOUT_TIMEOUT_GRACE_MS;
     try {
-      await withTimeout(
+      const nativePlayout = withTimeout(
         source.waitForPlayout(),
         timeoutMs,
         "LiveKit TTS playout timed out"
       );
+      if (localRemainingMs > 0) {
+        console.debug("[VoiceAgent] waiting for local TTS playout duration", {
+          gameRoomId: this.gameRoomId,
+          generatedAudioMs,
+          localRemainingMs,
+          livekitQueuedDurationMs: Math.ceil(source.queuedDuration),
+        });
+        await Promise.all([nativePlayout, sleep(localRemainingMs)]);
+      } else {
+        await nativePlayout;
+      }
     } catch (err) {
       console.error("[VoiceAgent] waitForPlayout failed:", err);
       this.connected = false;
@@ -1015,6 +1132,165 @@ export class VoiceAgentService {
       });
     }, delayMs);
   }
+}
+
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface TtsSpeechAlignment {
+  chars: string[];
+  charStartTimesMs: number[];
+  charDurationsMs: number[];
+}
+
+interface SpeechProgressCheckpoint {
+  text: string;
+  audioMs: number;
+}
+
+function parseTtsSpeechAlignment(
+  event: Record<string, unknown>
+): TtsSpeechAlignment | null {
+  const rawAlignment = isRecord(event.alignment) ? event.alignment : null;
+  if (!rawAlignment) return null;
+  const chars = rawAlignment.chars;
+  const starts = rawAlignment.charStartTimesMs;
+  const durations = rawAlignment.charDurationsMs;
+  if (!Array.isArray(chars) || !Array.isArray(starts) || !Array.isArray(durations)) {
+    return null;
+  }
+  if (chars.length === 0 || chars.length !== starts.length || chars.length !== durations.length) {
+    return null;
+  }
+  const parsedChars: string[] = [];
+  const parsedStarts: number[] = [];
+  const parsedDurations: number[] = [];
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    const start = starts[index];
+    const duration = durations[index];
+    if (
+      typeof char !== "string" ||
+      typeof start !== "number" ||
+      typeof duration !== "number" ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(duration)
+    ) {
+      return null;
+    }
+    parsedChars.push(char);
+    parsedStarts.push(Math.max(0, start));
+    parsedDurations.push(Math.max(0, duration));
+  }
+  return {
+    chars: parsedChars,
+    charStartTimesMs: parsedStarts,
+    charDurationsMs: parsedDurations,
+  };
+}
+
+function mergeTtsSpeechAlignment(
+  previous: TtsSpeechAlignment | null,
+  next: TtsSpeechAlignment
+): TtsSpeechAlignment {
+  if (!previous) return next;
+  const previousText = previous.chars.join("");
+  const nextText = next.chars.join("");
+  if (!nextText) return previous;
+  if (nextText.startsWith(previousText)) return next;
+  if (previousText.includes(nextText)) return previous;
+
+  const previousEndMs = alignmentEndMs(previous);
+  const nextFirstMs = next.charStartTimesMs[0] ?? 0;
+  const offsetMs = nextFirstMs >= previousEndMs - 100 ? 0 : previousEndMs;
+  return {
+    chars: [...previous.chars, ...next.chars],
+    charStartTimesMs: [
+      ...previous.charStartTimesMs,
+      ...next.charStartTimesMs.map((timeMs) => timeMs + offsetMs),
+    ],
+    charDurationsMs: [...previous.charDurationsMs, ...next.charDurationsMs],
+  };
+}
+
+function buildSpeechProgressCheckpoints(
+  alignment: TtsSpeechAlignment,
+  originalText: string,
+  playbackRate: number
+): SpeechProgressCheckpoint[] {
+  const checkpoints: SpeechProgressCheckpoint[] = [];
+  let lastCheckpointIndex = -1;
+  let lastCheckpointAudioMs = 0;
+  for (let index = 0; index < alignment.chars.length; index += 1) {
+    const char = alignment.chars[index] ?? "";
+    const endMs = alignment.charStartTimesMs[index]! + alignment.charDurationsMs[index]!;
+    const elapsedSinceLast = endMs - lastCheckpointAudioMs;
+    const charsSinceLast = index - lastCheckpointIndex;
+    const isPunctuation = /[。！？!?；;，,、\n]/u.test(char);
+    const isLongEnough = elapsedSinceLast >= 900 && charsSinceLast >= 4;
+    if (!isPunctuation && !isLongEnough) continue;
+    const text = alignment.chars.slice(0, index + 1).join("").trim();
+    if (!text) continue;
+    checkpoints.push({
+      text,
+      audioMs: Math.round(endMs / playbackRate),
+    });
+    lastCheckpointIndex = index;
+    lastCheckpointAudioMs = endMs;
+  }
+
+  const finalText = originalText.trim();
+  const finalAudioMs = Math.round(alignmentEndMs(alignment) / playbackRate);
+  if (
+    finalText &&
+    checkpoints[checkpoints.length - 1]?.text.trim() !== finalText
+  ) {
+    checkpoints.push({ text: finalText, audioMs: finalAudioMs });
+  }
+  return dedupeSpeechProgressCheckpoints(checkpoints);
+}
+
+function dedupeSpeechProgressCheckpoints(
+  checkpoints: SpeechProgressCheckpoint[]
+): SpeechProgressCheckpoint[] {
+  const deduped: SpeechProgressCheckpoint[] = [];
+  let lastText = "";
+  for (const checkpoint of checkpoints) {
+    if (!checkpoint.text || checkpoint.text === lastText) continue;
+    deduped.push(checkpoint);
+    lastText = checkpoint.text;
+  }
+  return deduped;
+}
+
+function alignmentEndMs(alignment: TtsSpeechAlignment): number {
+  let endMs = 0;
+  for (let index = 0; index < alignment.chars.length; index += 1) {
+    endMs = Math.max(
+      endMs,
+      (alignment.charStartTimesMs[index] ?? 0) +
+        (alignment.charDurationsMs[index] ?? 0)
+    );
+  }
+  return endMs;
+}
+
+function countTtsSpeechAlignmentChars(
+  alignment: TtsSpeechAlignment | null
+): number {
+  return alignment?.chars.length ?? 0;
+}
+
+function normalizeSpeechPlaybackRate(playbackRate: number): number {
+  return Number.isFinite(playbackRate)
+    ? Math.min(2, Math.max(0.75, playbackRate))
+    : 1;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function withTimeout<T>(

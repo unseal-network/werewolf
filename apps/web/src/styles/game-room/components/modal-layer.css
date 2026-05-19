@@ -31,6 +31,8 @@
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   color: #f6f0dc !important;
 }
 
@@ -70,4 +72,17 @@
   font-size: 16px;
   font-weight: 800;
   line-height: 1.35;
+}
+
+.game-layout-root[data-scene="end"] .modal-layer .endgame-exit-button {
+  margin-top: 8px;
+  min-width: 0;
+  max-width: 300px;
+  justify-self: center;
+}
+
+.game-layout-root[data-scene="end"] .modal-layer .endgame-exit-button::before,
+.game-layout-root[data-scene="end"] .modal-layer .endgame-exit-button::after {
+  content: none !important;
+  display: none !important;
 }

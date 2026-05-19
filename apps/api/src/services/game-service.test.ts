@@ -951,6 +951,70 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
+  it("resolves tied wolf kill votes to the first submitted target", async () => {
+    const { games, gameRoomId } = createStartedServiceGameWithPlayers(7);
+    const room = games.snapshot(gameRoomId);
+    const wolves = room.privateStates.filter(
+      (state) => state.role === "werewolf"
+    );
+    const goodTargets = room.privateStates.filter(
+      (state) => state.team === "good" && state.alive
+    );
+    expect(wolves).toHaveLength(2);
+    expect(goodTargets.length).toBeGreaterThanOrEqual(2);
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 56,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    await games.submitAction(gameRoomId, wolves[0]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: goodTargets[0]!.playerId,
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 56,
+    });
+    await games.submitAction(gameRoomId, wolves[1]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: goodTargets[1]!.playerId,
+      expectedPhase: "night_wolf",
+      expectedDay: 1,
+      expectedVersion: 56,
+    });
+
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "wolf_vote_resolved",
+        subjectId: goodTargets[0]!.playerId,
+        payload: expect.objectContaining({
+          tally: {
+            [goodTargets[0]!.playerId]: 1,
+            [goodTargets[1]!.playerId]: 1,
+          },
+          targetPlayerId: goodTargets[0]!.playerId,
+          tiedPlayerIds: [
+            goodTargets[0]!.playerId,
+            goodTargets[1]!.playerId,
+          ],
+          valid: true,
+        }),
+      })
+    );
+    expect(room.pendingNightActions).toContainEqual(
+      expect.objectContaining({
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: goodTargets[0]!.playerId,
+      })
+    );
+  });
+
   it("asks each agent wolf for a kill vote before resolving the team kill", async () => {
     const { games, gameRoomId } = createStartedServiceGameWithPlayers(7);
     const room = games.snapshot(gameRoomId);
@@ -1789,7 +1853,15 @@ describe("InMemoryGameService rules", () => {
 
     games.setVoiceAgents({
       get: () => ({
-        speak: () => speakDone,
+        speak: (
+          _text: string,
+          _playerId: string,
+          _playbackRate: number,
+          onProgress?: (text: string) => void
+        ) => {
+          onProgress?.("我先说结论。3号这轮发言偏防守，我今天会先归3号。");
+          return speakDone;
+        },
       }),
     } as unknown as VoiceAgentRegistry);
     agentSpeaker.kind = "agent";
@@ -1871,6 +1943,55 @@ describe("InMemoryGameService rules", () => {
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
   });
 
+  it("streams agent speech from TTS progress while storing the original speech", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const originalSpeech =
+      "我先说结论。3号这轮发言偏防守，我今天会先归3号。";
+
+    games.setVoiceAgents({
+      get: () => ({
+        speak: async (
+          _text: string,
+          _playerId: string,
+          _playbackRate: number,
+          onProgress?: (text: string) => void
+        ) => {
+          onProgress?.("我先说结论。");
+          onProgress?.("我先说结论。3号这轮发言偏防守，");
+          return true;
+        },
+      }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "unused",
+      toolName: "saySpeech",
+      input: { speech: originalSpeech },
+    }));
+
+    const streamEvent = room.events.find(
+      (event) => event.type === "stream" && event.actorId === agentSpeaker.id
+    );
+    const speechEvent = room.events.find(
+      (event) =>
+        event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+    );
+    expect(streamEvent?.payload.text).toBe("我先说结论。3号这轮发言偏防守，");
+    expect(speechEvent?.payload.speech).toBe(originalSpeech);
+  });
+
   it("submits final agent speech even when TTS fails after deltas", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
@@ -1949,7 +2070,8 @@ describe("InMemoryGameService rules", () => {
     expect(speak).toHaveBeenCalledWith(
       "我先看2号发言偏保守。\n今天可以先归2号。",
       agentSpeaker.id,
-      room.timing.agentSpeechRate
+      room.timing.agentSpeechRate,
+      expect.any(Function)
     );
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
     expect(speechEvent?.payload.speech).toBe(

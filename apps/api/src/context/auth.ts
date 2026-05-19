@@ -42,6 +42,16 @@ export interface MatrixProfileCache {
 }
 
 const profileRefreshMs = 3 * 24 * 60 * 60 * 1000;
+const authTokenCacheTtlMs = 60 * 1000;
+
+const authTokenCache = new Map<
+  string,
+  { expiresAt: number; user: AuthenticatedUser }
+>();
+
+export function clearAuthTokenCacheForTests(): void {
+  authTokenCache.clear();
+}
 
 export async function authenticateRequest(
   request: Request,
@@ -70,6 +80,19 @@ export async function authenticateRequest(
     };
   }
 
+  const cachedAuth = authTokenCache.get(token);
+  if (cachedAuth && cachedAuth.expiresAt > Date.now()) {
+    return cachedAuth.user;
+  }
+
+  const cacheAndReturn = (user: AuthenticatedUser): AuthenticatedUser => {
+    authTokenCache.set(token, {
+      user,
+      expiresAt: Date.now() + authTokenCacheTtlMs,
+    });
+    return user;
+  };
+
   try {
     const whoami = await _matrix.whoami(token);
     const cached = profileCache
@@ -82,12 +105,12 @@ export async function authenticateRequest(
       void Promise.resolve(profileCache?.touch?.(whoami.user_id)).catch(
         () => undefined
       );
-      return {
+      return cacheAndReturn({
         id: whoami.user_id,
         matrixUserId: whoami.user_id,
         displayName: cached.displayName,
         ...(cached.avatarUrl ? { avatarUrl: cached.avatarUrl } : {}),
-      };
+      });
     }
     const profile = _matrix.profile
       ? await _matrix.profile(whoami.user_id, token).catch(() => undefined)
@@ -113,12 +136,12 @@ export async function authenticateRequest(
         profileSyncedAt: new Date(),
       })
     ).catch(() => undefined);
-    return {
+    return cacheAndReturn({
       id: whoami.user_id,
       matrixUserId: whoami.user_id,
       displayName,
       ...(avatarUrl ? { avatarUrl } : {}),
-    };
+    });
   } catch {
     throw new AppError("unauthorized", "Invalid Matrix bearer token", 401);
   }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   getActionBubbleTriggerVisibility,
   shouldPinActionBubbleOpen,
@@ -44,6 +45,17 @@ describe("center stage layout", () => {
     expect(shouldStartActionBubbleCollapsed("lobby")).toBe(false);
     expect(shouldStartActionBubbleCollapsed("deal")).toBe(false);
     expect(shouldStartActionBubbleCollapsed("end")).toBe(false);
+  });
+
+  it("keeps an explicit exit affordance in the terminal game dialog", () => {
+    const endBranch = readCenterStageSource().match(
+      /if \(actionMode === "end"\) \{[\s\S]*?\/\/ Waiting/
+    )?.[0] ?? "";
+
+    expect(endBranch).toContain("onExitGame");
+    expect(endBranch).toContain("stage.exitGame");
+    expect(endBranch).toContain('variant="primary"');
+    expect(endBranch).not.toContain('variant="secondary"');
   });
 
   it("auto-opens the bubble only when the current user has an available action", () => {
@@ -115,3 +127,9 @@ describe("center stage layout", () => {
   });
 
 });
+
+function readCenterStageSource(): string {
+  // Keep this as a source-shape assertion because the repo does not currently
+  // carry a React render-test dependency for this component.
+  return readFileSync(new URL("./CenterStage.tsx", import.meta.url), "utf8");
+}

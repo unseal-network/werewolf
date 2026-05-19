@@ -5,6 +5,7 @@ import {
   applySubscribeMessage,
   collapseStreamingTimelineEvents,
   computeTimelineBaseEventId,
+  computeSseReconnectDelayMs,
   parseSubscribeMessage,
   type SnapshotSseState,
 } from "./snapshotSse";
@@ -52,6 +53,14 @@ const event = {
 } satisfies GameEventDto;
 
 describe("snapshot-first SSE state", () => {
+  it("backs off subscribe reconnects so auth failures do not hammer the server", () => {
+    expect(computeSseReconnectDelayMs(0, 1000)).toBe(1000);
+    expect(computeSseReconnectDelayMs(1, 1000)).toBe(2000);
+    expect(computeSseReconnectDelayMs(5, 1000)).toBe(30000);
+    expect(computeSseReconnectDelayMs(10, 1000)).toBe(30000);
+    expect(computeSseReconnectDelayMs(0, 1)).toBe(250);
+  });
+
   it("rebuilds room state and timeline from the first snapshot message", () => {
     const parsed = parseSubscribeMessage(
       JSON.stringify({
