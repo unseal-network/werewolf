@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, or, sql as rawSql } from "drizzle-orm";
+import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import {
   type DbClient,
   gameEvents,
@@ -9,6 +9,7 @@ import {
 } from "@werewolf/db";
 import type { GameEvent } from "@werewolf/shared";
 import type { PlayerPrivateState, RoomProjection } from "@werewolf/engine";
+import { compareEventIds, isEventIdAfter } from "./event-id-cursor";
 import type { StoredGameRoom, StoredPlayer } from "./game-service";
 
 /**
@@ -393,8 +394,7 @@ export class GameStore {
       this.db
         .select()
         .from(gameEvents)
-        .where(inArray(gameEvents.gameRoomId, roomIds))
-        .orderBy(asc(gameEvents.id)),
+        .where(inArray(gameEvents.gameRoomId, roomIds)),
     ]);
 
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
@@ -426,7 +426,9 @@ export class GameStore {
       const privateStates = (privateByRoom.get(r.id) ?? []).map(
         (row) => row.privateState as PlayerPrivateState
       );
-      const events = (eventsByRoom.get(r.id) ?? []).map(rowToGameEvent);
+      const events = [...(eventsByRoom.get(r.id) ?? [])]
+        .sort((a, b) => compareEventIds(a.id, b.id))
+        .map(rowToGameEvent);
       return {
         id: r.id,
         creatorUserId: r.creatorUserId,
@@ -484,13 +486,11 @@ export class GameStore {
     const rows = await this.db
       .select()
       .from(gameEvents)
-      .where(
-        afterEventId
-          ? and(eq(gameEvents.gameRoomId, gameRoomId), gt(gameEvents.id, afterEventId))
-          : eq(gameEvents.gameRoomId, gameRoomId)
-      )
-      .orderBy(asc(gameEvents.id));
-    return rows.map(rowToGameEvent);
+      .where(eq(gameEvents.gameRoomId, gameRoomId));
+    return rows
+      .filter((row) => !afterEventId || isEventIdAfter(row.id, afterEventId))
+      .sort((a, b) => compareEventIds(a.id, b.id))
+      .map(rowToGameEvent);
   }
 
   /** Drop everything for a room — only used by tests / dev tools. */

@@ -1,3 +1,5 @@
+import { isEventIdAfter } from "./event-id-cursor";
+
 export class SseBroker {
   private listeners = new Map<string, Set<(payload: string) => void>>();
   private histories = new Map<
@@ -12,7 +14,7 @@ export class SseBroker {
   ): { replay: Array<{ id: string; payload: string }>; unsubscribe: () => void } {
     const history = this.histories.get(gameRoomId) ?? [];
     const replay = lastEventId
-      ? history.filter((event) => event.id > lastEventId)
+      ? history.filter((event) => isEventIdAfter(event.id, lastEventId))
       : history;
 
     const set = this.listeners.get(gameRoomId) ?? new Set();
