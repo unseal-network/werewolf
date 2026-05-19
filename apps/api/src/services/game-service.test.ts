@@ -1894,12 +1894,14 @@ describe("InMemoryGameService rules", () => {
       deadlineAt: new Date(Date.now() + 60_000).toISOString(),
     };
     room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+    const llmSpeech =
+      "  我先说结论。3号这轮发言偏防守，\n我今天会先归3号。  ";
 
     const advance = games.advanceGame(gameRoomId, async () => ({
       text: "unused",
       toolName: "saySpeech",
       input: {
-        speech: "我先说结论。3号这轮发言偏防守，我今天会先归3号。",
+        speech: llmSpeech,
       },
     }));
 
@@ -1945,6 +1947,7 @@ describe("InMemoryGameService rules", () => {
       (event) =>
         event.type === "speech_submitted" && event.actorId === agentSpeaker.id
     );
+    const speechEvent = room.events[speechEventIndex];
     const lastDeltaIndex =
       room.events.length -
       1 -
@@ -1970,6 +1973,7 @@ describe("InMemoryGameService rules", () => {
     expect(String(deltaEvents[0]!.payload.text)).toBe("我先说结论。");
     expect(lastDeltaIndex).toBeGreaterThan(-1);
     expect(speechEventIndex).toBeGreaterThan(lastDeltaIndex);
+    expect(speechEvent?.payload.speech).toBe(llmSpeech);
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
   });
 
