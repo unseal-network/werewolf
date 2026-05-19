@@ -9,6 +9,7 @@
     "integration:real-runtime": "node scripts/verify-real-runtime.mjs",
     "load:api": "node scripts/load-server.mjs",
     "load:api:profile": "node scripts/profile-load-server.mjs",
+    "load:room-actor": "node scripts/load-room-actor.mjs",
     "migrate": "node scripts/migrate.mjs",
     "smoke": "vitest run apps/api/src/smoke.test.ts",
     "test": "vitest run",
