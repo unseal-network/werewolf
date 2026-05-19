@@ -15,8 +15,8 @@ describe("events no-gap replay", () => {
 
     const plan = createNoGapReplayPlan({
       snapshotEventId: "game_1_0002",
-      replay,
-      buffer,
+      replayPayloads: replay,
+      bufferedPayloads: buffer,
     });
 
     expect(plan).toEqual([
@@ -26,27 +26,31 @@ describe("events no-gap replay", () => {
     ]);
   });
 
-  it("fans out only to listeners in the published room", () => {
-    const pubsub = new InMemoryRoomPubSub<string>();
+  it("fans out only to listeners in the published room", async () => {
+    const pubsub = new InMemoryRoomPubSub();
     const roomA: string[] = [];
     const roomB: string[] = [];
 
-    const subscriptionA = pubsub.subscribe("room-a", (payload) => roomA.push(payload));
-    const subscriptionB = pubsub.subscribe("room-b", (payload) => roomB.push(payload));
+    const subscriptionA = await pubsub.subscribe("room-a", (payload) =>
+      roomA.push(payload.rawSsePayload)
+    );
+    const subscriptionB = await pubsub.subscribe("room-b", (payload) =>
+      roomB.push(payload.rawSsePayload)
+    );
 
-    pubsub.publish("room-a", "event-a");
+    await pubsub.publish("room-a", [payload("event-a", "replay")]);
 
     subscriptionA.unsubscribe();
     subscriptionB.unsubscribe();
 
-    expect(roomA).toEqual(["event-a"]);
+    expect(roomA).toEqual(["id: event-a\ndata: replay\n\n"]);
     expect(roomB).toEqual([]);
   });
 });
 
 function payload(id: string, source: "replay" | "buffer") {
   return {
-    id,
+    eventId: id,
     rawSsePayload: `id: ${id}\ndata: ${source}\n\n`,
   };
 }

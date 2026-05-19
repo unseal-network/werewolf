@@ -1,24 +1,30 @@
+import type { RawTimelinePayload } from "./timeline-cache";
+
 export interface RoomSubscription {
-  unsubscribe(): void;
+  unsubscribe(): Promise<void> | void;
 }
 
-export interface RoomPubSub<TPayload = unknown> {
+export interface RoomPubSub {
   subscribe(
     gameRoomId: string,
-    listener: (payload: TPayload) => void
-  ): RoomSubscription;
-  publish(gameRoomId: string, payload: TPayload): void;
+    listener: (payload: RawTimelinePayload) => void
+  ): Promise<RoomSubscription>;
+  publish(
+    gameRoomId: string,
+    payloads: readonly RawTimelinePayload[]
+  ): Promise<void>;
 }
 
-export class InMemoryRoomPubSub<TPayload = unknown>
-  implements RoomPubSub<TPayload>
-{
-  private listenersByRoom = new Map<string, Set<(payload: TPayload) => void>>();
+export class InMemoryRoomPubSub implements RoomPubSub {
+  private listenersByRoom = new Map<
+    string,
+    Set<(payload: RawTimelinePayload) => void>
+  >();
 
-  subscribe(
+  async subscribe(
     gameRoomId: string,
-    listener: (payload: TPayload) => void
-  ): RoomSubscription {
+    listener: (payload: RawTimelinePayload) => void
+  ): Promise<RoomSubscription> {
     const listeners = this.listenersByRoom.get(gameRoomId) ?? new Set();
     listeners.add(listener);
     this.listenersByRoom.set(gameRoomId, listeners);
@@ -33,12 +39,17 @@ export class InMemoryRoomPubSub<TPayload = unknown>
     };
   }
 
-  publish(gameRoomId: string, payload: TPayload): void {
+  async publish(
+    gameRoomId: string,
+    payloads: readonly RawTimelinePayload[]
+  ): Promise<void> {
     const listeners = this.listenersByRoom.get(gameRoomId);
     if (!listeners) return;
 
-    for (const listener of listeners) {
-      listener(payload);
+    for (const payload of payloads) {
+      for (const listener of listeners) {
+        listener(payload);
+      }
     }
   }
 }
