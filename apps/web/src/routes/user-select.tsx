@@ -207,28 +207,18 @@ export function UserSelectPage() {
 
         {/* User grid */}
         {!loading && cards.length > 0 ? (
-          <div className="grid gap-4 sm:gap-5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+          <div className="grid gap-4 sm:gap-5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
             {cards.map((user) => (
               <button
                 key={user.userId}
                 type="button"
-                className="grid items-center gap-4 p-[18px] rounded-2xl text-left transition-all duration-160 hover:-translate-y-0.5"
+                className="grid items-center gap-4 p-[18px] rounded-2xl text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-[rgba(212,177,92,0.36)] hover:shadow-[0_18px_34px_rgba(0,0,0,0.26)]"
                 style={{
                   gridTemplateColumns: "64px minmax(0,1fr)",
                   border: "1px solid rgba(212,177,92,0.18)",
                   background:
                     "linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03)), rgba(11,14,24,0.82)",
                   color: "inherit",
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget;
-                  el.style.borderColor = "rgba(212,177,92,0.36)";
-                  el.style.boxShadow = "0 18px 34px rgba(0,0,0,0.26)";
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget;
-                  el.style.borderColor = "rgba(212,177,92,0.18)";
-                  el.style.boxShadow = "";
                 }}
                 onClick={() => handleSelect(user)}
               >

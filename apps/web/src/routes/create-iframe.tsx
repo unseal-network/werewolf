@@ -100,47 +100,22 @@ export function IframeCreatePage({
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div
-      style={{
-        minHeight: "100dvh",
-        width: "100%",
-        overflow: "hidden",
-        background:
-          "linear-gradient(160deg, #07041a 0%, #0d0825 40%, #120930 70%, #0a0618 100%)",
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-      }}
+      className="min-h-dvh w-full overflow-hidden flex flex-col relative"
+      style={{ background: "linear-gradient(160deg, #07041a 0%, #0d0825 40%, #120930 70%, #0a0618 100%)" }}
     >
-      {/* ── Ambient particles ────────────────────────────────────────────── */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          overflow: "hidden",
-        }}
-      >
+      {/* ── Ambient particles ──────────────────────────────────────────── */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <div
-          style={{
-            position: "absolute",
-            top: "10%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: 320,
-            height: 320,
-            background:
-              "radial-gradient(circle, rgba(109,40,217,0.28) 0%, transparent 70%)",
-            borderRadius: "50%",
-          }}
+          className="absolute top-[10%] left-1/2 -translate-x-1/2 w-80 h-80 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(109,40,217,0.28) 0%, transparent 70%)" }}
         />
         {[...Array(16)].map((_, i) => (
           <div
             key={i}
+            className="absolute rounded-full"
             style={{
-              position: "absolute",
               width: i % 3 === 0 ? 2 : 1,
               height: i % 3 === 0 ? 2 : 1,
-              borderRadius: "50%",
               background: `rgba(${i % 2 === 0 ? "196,181,253" : "255,209,102"},${0.2 + (i % 4) * 0.1})`,
               left: `${((i * 37 + 13) % 90) + 5}%`,
               top: `${((i * 23 + 7) % 60) + 5}%`,
@@ -148,78 +123,22 @@ export function IframeCreatePage({
           />
         ))}
       </div>
-
-      {/* ── Mobile close/more header ─────────────────────────────────────── */}
-      {co.isMobile && (
-        <MobileHeader onClose={handleLeave} />
-      )}
-
-      {/* ── Scrollable main content ──────────────────────────────────────── */}
+      {/* ── Scrollable main content ─────────────────────────────────────── */}
       <div
-        style={{
-          flex: 1,
-          position: "relative",
-          zIndex: 10,
-          padding: "calc(var(--web-safe-area-top, 0px) + 52px) 20px 0",
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          overflowY: "auto",
-        }}
+        className="flex-1 relative z-10 overflow-y-auto flex flex-col gap-2.5"
+        style={{ padding: "calc(var(--web-safe-area-top, 0px) + 2p) 20px 0" }}
       >
         {/* User identity chip */}
         {userId && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "10px 14px",
-              borderRadius: 14,
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(255,255,255,0.07)",
-            }}
-          >
-            <div
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: "50%",
-                background: "rgba(139,92,246,0.2)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 14,
-                fontWeight: 700,
-                color: "#c4b5fd",
-                border: "1px solid rgba(139,92,246,0.3)",
-                flexShrink: 0,
-              }}
-            >
+          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[14px] bg-white/[0.03] border border-white/[0.07]">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-purple-text shrink-0 bg-violet-500/20 border border-violet-500/30">
               {getInitial(displayName)}
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: "#e2e8f0",
-                  fontWeight: 600,
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
+            <div className="flex-1 min-w-0">
+              <div className="text-[13px] text-slate-200 font-semibold truncate">
                 {displayName}
               </div>
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#475569",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <div className="text-[10px] text-ink-faint truncate">
                 {userId}
               </div>
             </div>
@@ -227,41 +146,22 @@ export function IframeCreatePage({
         )}
 
         {/* Section header */}
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4 }}
-        >
+        <div className="flex items-center gap-2.5 mt-1">
           <div
-            style={{
-              flex: 1,
-              height: 1,
-              background:
-                "linear-gradient(90deg, transparent, rgba(139,92,246,0.35))",
-            }}
+            className="flex-1 h-px"
+            style={{ background: "linear-gradient(90deg, transparent, rgba(139,92,246,0.35))" }}
           />
-          <span
-            style={{
-              fontSize: 10,
-              color: "rgba(139,92,246,0.7)",
-              letterSpacing: "0.22em",
-              fontWeight: 700,
-            }}
-          >
+          <span className="text-[10px] text-violet-500/70 tracking-[0.22em] font-bold">
             ✦ GAME SETUP ✦
           </span>
           <div
-            style={{
-              flex: 1,
-              height: 1,
-              background:
-                "linear-gradient(270deg, transparent, rgba(139,92,246,0.35))",
-            }}
+            className="flex-1 h-px"
+            style={{ background: "linear-gradient(270deg, transparent, rgba(139,92,246,0.35))" }}
           />
         </div>
 
         {/* Config cards */}
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
-        >
+        <div className="grid grid-cols-2 gap-2.5">
           {(
             [
               {
@@ -287,42 +187,16 @@ export function IframeCreatePage({
             <button
               key={label}
               onClick={() => setActiveSheet(sheet)}
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(139,92,246,0.18)",
-                borderRadius: 18,
-                padding: 14,
-                cursor: "pointer",
-                textAlign: "left",
-                display: "flex",
-                flexDirection: "column",
-                gap: 6,
-              }}
+              className="bg-white/[0.04] border border-violet-500/[0.18] rounded-[18px] p-3.5 cursor-pointer text-left flex flex-col gap-1.5"
             >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div
-                  style={{ display: "flex", alignItems: "center", gap: 5 }}
-                >
-                  <span style={{ fontSize: 14 }}>{icon}</span>
-                  <span
-                    style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}
-                  >
-                    {label}
-                  </span>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <span className="text-sm">{icon}</span>
+                  <span className="text-[10px] text-ink-muted font-semibold">{label}</span>
                 </div>
-                <span style={{ fontSize: 10, color: "rgba(139,92,246,0.5)" }}>
-                  ›
-                </span>
+                <span className="text-[10px] text-violet-500/50">›</span>
               </div>
-              <div
-                style={{ fontSize: 15, fontWeight: 800, color: "#c4b5fd" }}
-              >
+              <div className="text-[15px] font-extrabold text-purple-text">
                 {value}
               </div>
             </button>
@@ -332,30 +206,12 @@ export function IframeCreatePage({
 
       {/* ── Bottom CTA ───────────────────────────────────────────────────── */}
       <div
-        style={{
-          flexShrink: 0,
-          position: "relative",
-          zIndex: 10,
-          padding:
-            "16px 20px calc(env(safe-area-inset-bottom, 0px) + 16px)",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
+        className="shrink-0 relative z-10 flex flex-col gap-2"
+        style={{ padding: "16px 20px calc(env(safe-area-inset-bottom, 0px) + 16px)" }}
       >
         {/* Error */}
         {error && (
-          <div
-            style={{
-              textAlign: "center",
-              fontSize: 12,
-              color: "#f87171",
-              padding: "6px 12px",
-              borderRadius: 10,
-              background: "rgba(239,68,68,0.1)",
-              border: "1px solid rgba(239,68,68,0.2)",
-            }}
-          >
+          <div className="text-center text-xs text-red-400 px-3 py-1.5 rounded-[10px] bg-red-500/10 border border-red-500/20">
             {error}
           </div>
         )}
@@ -364,43 +220,16 @@ export function IframeCreatePage({
         <button
           onClick={() => void handleCreate()}
           disabled={submitting}
+          className="w-full h-16 rounded-[20px] text-lg font-extrabold flex items-center justify-center gap-2 transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed"
           style={{
-            width: "100%",
-            height: 64,
-            borderRadius: 20,
-            background: submitting
-              ? "rgba(255,255,255,0.06)"
-              : "linear-gradient(135deg, #5b21b6, #7c3aed)",
-            border: submitting
-              ? "1px solid rgba(255,255,255,0.08)"
-              : "1px solid rgba(255,209,102,0.5)",
+            background: submitting ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg, #5b21b6, #7c3aed)",
+            border: submitting ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(255,209,102,0.5)",
             color: submitting ? "#475569" : "#ffd166",
-            fontSize: 18,
-            fontWeight: 800,
-            cursor: submitting ? "not-allowed" : "pointer",
-            opacity: submitting ? 0.6 : 1,
-            boxShadow: submitting
-              ? "none"
-              : "0 0 24px rgba(109,40,217,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            transition: "all 150ms",
+            boxShadow: submitting ? "none" : "0 0 24px rgba(109,40,217,0.5)",
           }}
         >
           {submitting ? (
-            <span
-              style={{
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                border: "2.5px solid rgba(255,255,255,0.2)",
-                borderTopColor: "#fff",
-                display: "inline-block",
-                animation: "ic-spin 0.8s linear infinite",
-              }}
-            />
+            <span className="w-[22px] h-[22px] rounded-full border-[2.5px] border-white/20 border-t-white inline-block animate-spin" />
           ) : (
             "🐺 创建游戏"
           )}
@@ -409,16 +238,7 @@ export function IframeCreatePage({
         {/* Leave */}
         <button
           onClick={handleLeave}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "rgba(148,163,184,0.5)",
-            fontSize: 12,
-            cursor: "pointer",
-            padding: "8px",
-            letterSpacing: "0.12em",
-            fontWeight: 600,
-          }}
+          className="bg-transparent border-0 text-slate-400/50 text-xs cursor-pointer py-2 tracking-[0.12em] font-semibold"
         >
           ← Abandon
         </button>
@@ -432,7 +252,7 @@ export function IframeCreatePage({
         onClose={() => setActiveSheet(null)}
         title="玩家人数"
       >
-        <div style={{ display: "flex", gap: 12 }}>
+        <div className="flex gap-3">
           {PLAYER_COUNTS.map((n) => (
             <button
               key={n}
@@ -440,43 +260,21 @@ export function IframeCreatePage({
                 setTargetPlayerCount(n);
                 setActiveSheet(null);
               }}
+              className="flex-1 py-5 rounded-2xl cursor-pointer transition-colors"
               style={{
-                flex: 1,
-                padding: "20px 0",
-                borderRadius: 16,
-                background:
-                  targetPlayerCount === n
-                    ? "rgba(109,40,217,0.25)"
-                    : "rgba(255,255,255,0.04)",
-                border: `1px solid ${
-                  targetPlayerCount === n
-                    ? "rgba(139,92,246,0.6)"
-                    : "rgba(255,255,255,0.08)"
-                }`,
-                cursor: "pointer",
+                background: targetPlayerCount === n ? "rgba(109,40,217,0.25)" : "rgba(255,255,255,0.04)",
+                border: `1px solid ${targetPlayerCount === n ? "rgba(139,92,246,0.6)" : "rgba(255,255,255,0.08)"}`,
               }}
             >
               <div
-                style={{
-                  fontSize: 24,
-                  fontWeight: 800,
-                  color:
-                    targetPlayerCount === n ? "#c4b5fd" : "#64748b",
-                  textAlign: "center",
-                }}
+                className="text-2xl font-extrabold text-center"
+                style={{ color: targetPlayerCount === n ? "#c4b5fd" : "#64748b" }}
               >
                 {n}
               </div>
               <div
-                style={{
-                  fontSize: 11,
-                  textAlign: "center",
-                  color:
-                    targetPlayerCount === n
-                      ? "rgba(196,181,253,0.7)"
-                      : "#475569",
-                  marginTop: 2,
-                }}
+                className="text-[11px] text-center mt-0.5"
+                style={{ color: targetPlayerCount === n ? "rgba(196,181,253,0.7)" : "#475569" }}
               >
                 人局
               </div>
@@ -491,9 +289,7 @@ export function IframeCreatePage({
         onClose={() => setActiveSheet(null)}
         title="语言设置"
       >
-        <div
-          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}
-        >
+        <div className="grid grid-cols-2 gap-2.5">
           {LANGUAGES.map((lang) => (
             <button
               key={lang.code}
@@ -501,23 +297,11 @@ export function IframeCreatePage({
                 setLanguage(lang.code);
                 setActiveSheet(null);
               }}
+              className="p-3.5 rounded-[14px] cursor-pointer text-[15px] font-bold text-center transition-colors"
               style={{
-                padding: 14,
-                borderRadius: 14,
-                background:
-                  language === lang.code
-                    ? "rgba(109,40,217,0.22)"
-                    : "rgba(255,255,255,0.04)",
-                border: `1px solid ${
-                  language === lang.code
-                    ? "rgba(139,92,246,0.55)"
-                    : "rgba(255,255,255,0.08)"
-                }`,
-                cursor: "pointer",
-                fontSize: 15,
-                fontWeight: 700,
+                background: language === lang.code ? "rgba(109,40,217,0.22)" : "rgba(255,255,255,0.04)",
+                border: `1px solid ${language === lang.code ? "rgba(139,92,246,0.55)" : "rgba(255,255,255,0.08)"}`,
                 color: language === lang.code ? "#c4b5fd" : "#64748b",
-                textAlign: "center",
               }}
             >
               {lang.name}
@@ -532,7 +316,7 @@ export function IframeCreatePage({
         onClose={() => setActiveSheet(null)}
         title="语音通话"
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div className="flex flex-col gap-2.5">
           {(
             [
               {
@@ -555,54 +339,24 @@ export function IframeCreatePage({
                 setMeetingRequired(opt.value);
                 setActiveSheet(null);
               }}
+              className="flex items-center gap-3.5 p-4 rounded-2xl cursor-pointer text-left w-full transition-colors"
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 14,
-                padding: 16,
-                borderRadius: 16,
-                background:
-                  meetingRequired === opt.value
-                    ? "rgba(109,40,217,0.22)"
-                    : "rgba(255,255,255,0.04)",
-                border: `1px solid ${
-                  meetingRequired === opt.value
-                    ? "rgba(139,92,246,0.55)"
-                    : "rgba(255,255,255,0.08)"
-                }`,
-                cursor: "pointer",
-                textAlign: "left",
-                width: "100%",
+                background: meetingRequired === opt.value ? "rgba(109,40,217,0.22)" : "rgba(255,255,255,0.04)",
+                border: `1px solid ${meetingRequired === opt.value ? "rgba(139,92,246,0.55)" : "rgba(255,255,255,0.08)"}`,
               }}
             >
-              <span style={{ fontSize: 24 }}>{opt.icon}</span>
+              <span className="text-2xl">{opt.icon}</span>
               <div>
                 <div
-                  style={{
-                    fontSize: 14,
-                    fontWeight: 700,
-                    color:
-                      meetingRequired === opt.value ? "#c4b5fd" : "#e2e8f0",
-                  }}
+                  className="text-sm font-bold"
+                  style={{ color: meetingRequired === opt.value ? "#c4b5fd" : "#e2e8f0" }}
                 >
                   {opt.label}
                 </div>
-                <div
-                  style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}
-                >
-                  {opt.desc}
-                </div>
+                <div className="text-xs text-ink-muted mt-0.5">{opt.desc}</div>
               </div>
               {meetingRequired === opt.value && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    color: "#8b5cf6",
-                    fontSize: 18,
-                  }}
-                >
-                  ✓
-                </span>
+                <span className="ml-auto text-violet-500 text-lg">✓</span>
               )}
             </button>
           ))}

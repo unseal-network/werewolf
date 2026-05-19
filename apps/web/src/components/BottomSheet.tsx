@@ -13,64 +13,35 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
       {/* Backdrop */}
       <div
         onClick={onClose}
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-250"
         style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 40,
-          background: "rgba(0,0,0,0.6)",
-          backdropFilter: "blur(4px)",
-          WebkitBackdropFilter: "blur(4px)",
           opacity: open ? 1 : 0,
           pointerEvents: open ? "auto" : "none",
-          transition: "opacity 250ms",
         }}
       />
+
       {/* Sheet */}
       <div
+        className="fixed left-0 right-0 bottom-0 z-50 flex flex-col rounded-t-[24px] max-h-[75vh] border border-b-0 border-violet-500/30"
         style={{
-          position: "fixed",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 50,
           background: "linear-gradient(180deg, #1a1040 0%, #0e0820 100%)",
-          border: "1px solid rgba(139,92,246,0.3)",
-          borderBottom: "none",
-          borderRadius: "24px 24px 0 0",
           padding: "0 0 env(safe-area-inset-bottom)",
           transform: open ? "translateY(0)" : "translateY(110%)",
           transition: "transform 300ms cubic-bezier(0.32,0.72,0,1)",
-          maxHeight: "75vh",
-          display: "flex",
-          flexDirection: "column",
         }}
       >
         {/* Drag handle */}
-        <div style={{ display: "flex", justifyContent: "center", padding: "12px 0 4px" }}>
-          <div
-            style={{
-              width: 36,
-              height: 4,
-              borderRadius: 2,
-              background: "rgba(139,92,246,0.4)",
-            }}
-          />
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-9 h-1 rounded-full bg-violet-500/40" />
         </div>
+
         {/* Title */}
-        <div
-          style={{
-            textAlign: "center",
-            padding: "4px 0 16px",
-            fontSize: 15,
-            fontWeight: 700,
-            color: "#e2e8f0",
-            letterSpacing: "0.06em",
-          }}
-        >
+        <div className="text-center pb-4 text-[15px] font-bold text-slate-200 tracking-[0.06em]">
           {title}
         </div>
+
         {/* Content */}
-        <div style={{ flex: 1, overflow: "auto", padding: "0 20px 24px" }}>
+        <div className="flex-1 overflow-auto px-5 pb-6">
           {children}
         </div>
       </div>

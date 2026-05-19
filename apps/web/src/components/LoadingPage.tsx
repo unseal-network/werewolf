@@ -26,160 +26,63 @@ export function LoadingPage({
 
   return (
     <div
-      style={{
-        height: "100dvh",
-        width: "100%",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "40px",
-        background:
-          "linear-gradient(160deg, #07041a 0%, #0d0825 40%, #0a0618 100%)",
-        position: "relative",
-      }}
+      className="h-dvh w-full overflow-hidden flex flex-col items-center justify-center p-10 relative"
+      style={{ background: "linear-gradient(160deg, #07041a 0%, #0d0825 40%, #0a0618 100%)" }}
     >
       {/* Top bar */}
-      <div
-        style={{
-          position: "fixed",
-          top: 40,
-          left: 40,
-          right: 40,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          opacity: 0.2,
-          pointerEvents: "none",
-        }}
-      >
+      <div className="fixed top-10 left-10 right-10 flex justify-between items-start opacity-20 pointer-events-none">
         <div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 9,
-              fontWeight: 900,
-              textTransform: "uppercase",
-              letterSpacing: "0.4em",
-              color: "#94a3b8",
-            }}
-          >
+          <div className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.4em] text-slate-400">
             <Globe size={10} />
             Live Protocol
           </div>
-          <div
-            style={{
-              fontSize: 24,
-              fontWeight: 900,
-              letterSpacing: "-0.02em",
-              opacity: 0.1,
-              color: "#94a3b8",
-            }}
-          >
+          <div className="text-2xl font-black tracking-tight opacity-10 text-slate-400">
             CONNECTING...
           </div>
         </div>
       </div>
 
-      {/* Admin button — rendered outside the low-opacity container */}
+      {/* Admin button */}
       {isAdmin && onAdminAction && (
         <button
           onClick={onAdminAction}
-          style={{
-            position: "fixed",
-            top: 40,
-            right: 40,
-            width: 32,
-            height: 32,
-            borderRadius: 10,
-            background: "rgba(239,68,68,0.12)",
-            border: "1px solid rgba(239,68,68,0.3)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            fontSize: 14,
-            color: "rgba(252,165,165,0.9)",
-          }}
+          className="fixed top-10 right-10 w-8 h-8 rounded-[10px] flex items-center justify-center cursor-pointer text-sm text-red-300/90 bg-red-500/[0.12] border border-red-500/30"
         >
           ⚙︎
         </button>
       )}
 
       {/* Center content */}
-      <div
-        style={{
-          position: "relative",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-        }}
-      >
+      <div className="relative flex flex-col items-center">
         {/* Glow */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: "50%",
-            filter: "blur(48px)",
-            transform: "scale(2.5)",
-            pointerEvents: "none",
-          }}
-        />
+        <div className="absolute inset-0 bg-white/[0.03] rounded-full blur-[48px] scale-[2.5] pointer-events-none" />
+
         {/* Icon + scan line */}
-        <div style={{ position: "relative" }}>
+        <div className="relative">
           <Fingerprint
             size={64}
             strokeWidth={1}
-            style={{ color: "rgba(139,92,246,0.3)", display: "block" }}
+            className="block text-violet-500/30"
           />
           {!error && (
             <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: 1,
-                background: "rgba(139,92,246,0.4)",
-                animation: "lp-scan 2s ease-in-out infinite",
-              }}
+              className="absolute top-0 left-0 w-full h-px bg-violet-500/40"
+              style={{ animation: "lp-scan 2s ease-in-out infinite" }}
             />
           )}
         </div>
 
         {/* Text below icon */}
-        <div
-          style={{
-            marginTop: 48,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 6,
-          }}
-        >
+        <div className="mt-12 flex flex-col items-center gap-1.5">
           {error ? (
             <>
-              <span style={{ fontSize: 12, color: "#f87171", textAlign: "center", maxWidth: 280 }}>
+              <span className="text-xs text-red-400 text-center max-w-[280px]">
                 {error}
               </span>
               {onRetry && (
                 <button
                   onClick={onRetry}
-                  style={{
-                    marginTop: 8,
-                    padding: "8px 20px",
-                    borderRadius: 10,
-                    background: "rgba(139,92,246,0.2)",
-                    border: "1px solid rgba(139,92,246,0.4)",
-                    color: "#c4b5fd",
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
+                  className="mt-2 px-5 py-2 rounded-[10px] bg-violet-500/20 border border-violet-500/40 text-violet-300 text-xs cursor-pointer"
                 >
                   重试
                 </button>
@@ -187,27 +90,10 @@ export function LoadingPage({
             </>
           ) : (
             <>
-              <span
-                style={{
-                  fontSize: 10,
-                  fontWeight: 900,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.6em",
-                  color: "#64748b",
-                }}
-              >
+              <span className="text-[10px] font-black uppercase tracking-[0.6em] text-slate-500">
                 Retrieving Data{dots}
               </span>
-              <p
-                style={{
-                  fontSize: 9,
-                  fontWeight: 700,
-                  letterSpacing: "0.2em",
-                  color: "rgba(100,116,139,0.5)",
-                  fontStyle: "italic",
-                  margin: 0,
-                }}
-              >
+              <p className="text-[9px] font-bold tracking-[0.2em] text-slate-500/50 italic m-0">
                 Synchronizing with the oracle
               </p>
             </>
@@ -216,16 +102,8 @@ export function LoadingPage({
       </div>
 
       {/* Footer */}
-      <div style={{ position: "fixed", bottom: 40, opacity: 0.1 }}>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 900,
-            letterSpacing: "0.5em",
-            textTransform: "uppercase",
-            color: "#94a3b8",
-          }}
-        >
+      <div className="fixed bottom-10 opacity-10">
+        <span className="text-[10px] font-black tracking-[0.5em] uppercase text-slate-400">
           Lupus Night Protocol v1.0
         </span>
       </div>
