@@ -36,6 +36,13 @@
       "when": 1778638498069,
       "tag": "0004_player_invited_by_user_id",
       "breakpoints": false
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779194347984,
+      "tag": "0006_room_actor_authority",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, lte, or, sql as rawSql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import {
   type DbClient,
   gameEvents,
@@ -179,29 +179,20 @@ export class GameStore {
   }
 
   /**
-   * Append events to the event log. Existing (room, seq) pairs are ignored —
-   * the unique index makes this idempotent so re-runs after partial failure
-   * are safe.
+   * Append events to the event log. Existing legacy events are keyed by their
+   * event id until the room-actor command pipeline owns this write path.
    */
   async appendEvents(roomId: string, events: GameEvent[]): Promise<void> {
     if (events.length === 0) return;
     await this.db
       .insert(gameEvents)
-      .values(
-        events.map((e) => ({
-          id: e.id,
-          gameRoomId: roomId,
-          seq: e.seq,
-          type: e.type,
-          visibility: e.visibility,
-          actorId: e.actorId ?? null,
-          subjectId: e.subjectId ?? null,
-          payload: e.payload,
-          createdAt: new Date(e.createdAt),
-        }))
-      )
+      .values(events.map((event) => toLegacyGameEventRow(roomId, event)))
       .onConflictDoNothing({
-        target: [gameEvents.gameRoomId, gameEvents.seq],
+        target: [
+          gameEvents.gameRoomId,
+          gameEvents.commandId,
+          gameEvents.commandEventIndex,
+        ],
       });
   }
 
@@ -330,27 +321,22 @@ export class GameStore {
       if (events.length > 0) {
         await tx
           .insert(gameEvents)
-          .values(
-            events.map((event) => ({
-              id: event.id,
-              gameRoomId: room.id,
-              seq: event.seq,
-              type: event.type,
-              visibility: event.visibility,
-              actorId: event.actorId ?? null,
-              subjectId: event.subjectId ?? null,
-              payload: event.payload,
-              createdAt: new Date(event.createdAt),
-            }))
-          )
+          .values(events.map((event) => toLegacyGameEventRow(room.id, event)))
           .onConflictDoUpdate({
-            target: [gameEvents.gameRoomId, gameEvents.seq],
+            target: [
+              gameEvents.gameRoomId,
+              gameEvents.commandId,
+              gameEvents.commandEventIndex,
+            ],
             set: {
               type: rawSql`excluded.type`,
               visibility: rawSql`excluded.visibility`,
               actorId: rawSql`excluded.actor_id`,
               subjectId: rawSql`excluded.subject_id`,
               payload: rawSql`excluded.payload`,
+              rawEventJson: rawSql`excluded.raw_event_json`,
+              rawSsePayload: rawSql`excluded.raw_sse_payload`,
+              visibleToPlayerIds: rawSql`excluded.visible_to_player_ids`,
             },
           });
       }
@@ -408,7 +394,7 @@ export class GameStore {
         .select()
         .from(gameEvents)
         .where(inArray(gameEvents.gameRoomId, roomIds))
-        .orderBy(asc(gameEvents.seq)),
+        .orderBy(asc(gameEvents.createdAt), asc(gameEvents.id)),
     ]);
 
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
@@ -440,17 +426,7 @@ export class GameStore {
       const privateStates = (privateByRoom.get(r.id) ?? []).map(
         (row) => row.privateState as PlayerPrivateState
       );
-      const events = (eventsByRoom.get(r.id) ?? []).map<GameEvent>((row) => ({
-        id: row.id,
-        gameRoomId: row.gameRoomId,
-        seq: row.seq,
-        type: row.type as GameEvent["type"],
-        visibility: row.visibility as GameEvent["visibility"],
-        ...(row.actorId !== null ? { actorId: row.actorId } : {}),
-        ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
-        payload: (row.payload ?? {}) as GameEvent["payload"],
-        createdAt: row.createdAt.toISOString(),
-      }));
+      const events = (eventsByRoom.get(r.id) ?? []).map(rowToGameEvent);
       return {
         id: r.id,
         creatorUserId: r.creatorUserId,
@@ -502,9 +478,8 @@ export class GameStore {
   }
 
   /**
-   * Load all events for a room with seq > `sinceSeq`, ordered by seq. Used
-   * by the SSE subscribe endpoint to replay history after a process restart
-   * (when the broker's in-memory history is empty).
+   * Load all events for a room with legacy event.seq > `sinceSeq`. This keeps
+   * the existing SSE replay API compiling until room-actor storage replaces it.
    */
   async loadEventsSince(
     gameRoomId: string,
@@ -513,24 +488,9 @@ export class GameStore {
     const rows = await this.db
       .select()
       .from(gameEvents)
-      .where(
-        and(
-          eq(gameEvents.gameRoomId, gameRoomId),
-          gt(gameEvents.seq, sinceSeq)
-        )
-      )
-      .orderBy(asc(gameEvents.seq));
-    return rows.map<GameEvent>((row) => ({
-      id: row.id,
-      gameRoomId: row.gameRoomId,
-      seq: row.seq,
-      type: row.type as GameEvent["type"],
-      visibility: row.visibility as GameEvent["visibility"],
-      ...(row.actorId !== null ? { actorId: row.actorId } : {}),
-      ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
-      payload: (row.payload ?? {}) as GameEvent["payload"],
-      createdAt: row.createdAt.toISOString(),
-    }));
+      .where(eq(gameEvents.gameRoomId, gameRoomId))
+      .orderBy(asc(gameEvents.createdAt), asc(gameEvents.id));
+    return rows.map(rowToGameEvent).filter((event) => event.seq > sinceSeq);
   }
 
   /** Drop everything for a room — only used by tests / dev tools. */
@@ -562,5 +522,51 @@ function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
   return out;
 }
 
-// Suppress unused-import warnings — `rawSql` is exported for future use.
-void rawSql;
+type GameEventRow = typeof gameEvents.$inferSelect;
+type GameEventInsert = typeof gameEvents.$inferInsert;
+
+function toLegacyGameEventRow(
+  roomId: string,
+  event: GameEvent
+): GameEventInsert {
+  return {
+    id: event.id,
+    gameRoomId: roomId,
+    commandId: event.id,
+    commandEventIndex: 0,
+    type: event.type,
+    visibility: event.visibility,
+    actorId: event.actorId ?? null,
+    subjectId: event.subjectId ?? null,
+    payload: event.payload,
+    rawEventJson: JSON.stringify(event),
+    rawSsePayload: `data: ${JSON.stringify(event)}\n\n`,
+    visibleToPlayerIds: [],
+    createdAt: new Date(event.createdAt),
+  };
+}
+
+function rowToGameEvent(row: GameEventRow): GameEvent {
+  const parsed = parseRawGameEvent(row.rawEventJson);
+  return {
+    id: row.id,
+    gameRoomId: row.gameRoomId,
+    seq: parsed?.seq ?? row.commandEventIndex + 1,
+    type: row.type as GameEvent["type"],
+    visibility: row.visibility as GameEvent["visibility"],
+    ...(row.actorId !== null ? { actorId: row.actorId } : {}),
+    ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
+    payload: (row.payload ?? {}) as GameEvent["payload"],
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function parseRawGameEvent(rawEventJson: string): GameEvent | null {
+  try {
+    const parsed = JSON.parse(rawEventJson) as Partial<GameEvent>;
+    if (typeof parsed.seq !== "number") return null;
+    return parsed as GameEvent;
+  } catch {
+    return null;
+  }
+}
