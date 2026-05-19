@@ -47,16 +47,29 @@ export type RoomCommitResult =
       result: unknown;
       events: RoomCommittedEvent[];
       rawSsePayloads: string[];
+      snapshotEventId: string;
     }
   | {
       status: "duplicate";
       result: unknown;
       events: RoomCommittedEvent[];
       rawSsePayloads: string[];
+      snapshotEventId: string;
     };
+
+export interface DuplicateCommand {
+  result: unknown;
+  events: RoomCommittedEvent[];
+  rawSsePayloads: string[];
+  snapshotEventId: string;
+}
 
 export interface RoomCommitStore {
   commit(staged: StagedRoomCommit): Promise<RoomCommitResult>;
+  findCommand(
+    gameRoomId: string,
+    commandId: string
+  ): Promise<DuplicateCommand | null>;
   loadSnapshot(gameRoomId: string): Promise<RoomSnapshot | null>;
   readEventsAfter(
     gameRoomId: string,
@@ -65,11 +78,7 @@ export interface RoomCommitStore {
   ): Promise<RoomCommittedEvent[]>;
 }
 
-interface StoredCommand {
-  result: unknown;
-  events: RoomCommittedEvent[];
-  rawSsePayloads: string[];
-}
+type StoredCommand = DuplicateCommand;
 
 interface OwnershipLease {
   fencingToken: bigint;
@@ -101,6 +110,7 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
         result: existing.result,
         events: [...existing.events],
         rawSsePayloads: [...existing.rawSsePayloads],
+        snapshotEventId: existing.snapshotEventId,
       };
     }
 
@@ -119,6 +129,7 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
       result: staged.result,
       events,
       rawSsePayloads,
+      snapshotEventId,
     });
     this.eventsByRoom.set(staged.gameRoomId, [
       ...(this.eventsByRoom.get(staged.gameRoomId) ?? []),
@@ -131,6 +142,21 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
       result: staged.result,
       events: [...events],
       rawSsePayloads: [...rawSsePayloads],
+      snapshotEventId,
+    };
+  }
+
+  async findCommand(
+    gameRoomId: string,
+    commandId: string
+  ): Promise<DuplicateCommand | null> {
+    const existing = this.commands.get(commandMapKey(gameRoomId, commandId));
+    if (!existing) return null;
+    return {
+      result: existing.result,
+      events: existing.events.map(copyEvent),
+      rawSsePayloads: [...existing.rawSsePayloads],
+      snapshotEventId: existing.snapshotEventId,
     };
   }
 
@@ -205,11 +231,18 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
             )
           )
           .orderBy(asc(gameEvents.commandEventIndex));
+        const snapshotRows = await tx
+          .select({ snapshotEventId: roomSnapshots.snapshotEventId })
+          .from(roomSnapshots)
+          .where(eq(roomSnapshots.gameRoomId, staged.gameRoomId))
+          .limit(1);
         return {
           status: "duplicate",
           result: existingCommand.resultJson,
           events: eventRows.map(eventFromRow),
           rawSsePayloads: eventRows.map((event) => event.rawSsePayload),
+          snapshotEventId:
+            existingCommand.lastEventId ?? snapshotRows[0]?.snapshotEventId ?? "",
         };
       }
 
@@ -270,8 +303,50 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
         result: staged.result,
         events,
         rawSsePayloads: [...staged.rawSsePayloads],
+        snapshotEventId,
       };
     });
+  }
+
+  async findCommand(
+    gameRoomId: string,
+    commandId: string
+  ): Promise<DuplicateCommand | null> {
+    const commandRows = await this.db
+      .select()
+      .from(gameCommands)
+      .where(
+        and(
+          eq(gameCommands.gameRoomId, gameRoomId),
+          eq(gameCommands.commandId, commandId)
+        )
+      )
+      .limit(1);
+    const command = commandRows[0];
+    if (!command) return null;
+
+    const eventRows = await this.db
+      .select()
+      .from(gameEvents)
+      .where(
+        and(
+          eq(gameEvents.gameRoomId, gameRoomId),
+          eq(gameEvents.commandId, commandId)
+        )
+      )
+      .orderBy(asc(gameEvents.commandEventIndex));
+    const snapshotRows = await this.db
+      .select({ snapshotEventId: roomSnapshots.snapshotEventId })
+      .from(roomSnapshots)
+      .where(eq(roomSnapshots.gameRoomId, gameRoomId))
+      .limit(1);
+
+    return {
+      result: command.resultJson,
+      events: eventRows.map(eventFromRow),
+      rawSsePayloads: eventRows.map((event) => event.rawSsePayload),
+      snapshotEventId: command.lastEventId ?? snapshotRows[0]?.snapshotEventId ?? "",
+    };
   }
 
   async loadSnapshot(gameRoomId: string): Promise<RoomSnapshot | null> {

@@ -28,9 +28,18 @@ describe("RoomCommitStore", () => {
   it("commits command, events, and snapshot atomically", async () => {
     const store = new InMemoryRoomCommitStore();
     store.seedOwnership("game_1", 1n);
+    await expect(store.findCommand("game_1", "cmd_1")).resolves.toBeNull();
     const result = await store.commit(staged("0001"));
-    expect(result.status).toBe("committed");
+    expect(result).toMatchObject({
+      status: "committed",
+      snapshotEventId: "0001",
+    });
     expect(await store.loadSnapshot("game_1")).toMatchObject({ snapshotEventId: "0001" });
+    await expect(store.findCommand("game_1", "cmd_1")).resolves.toMatchObject({
+      result: { kind: "joined", playerId: "player_1" },
+      snapshotEventId: "0001",
+      events: [{ id: "0001" }],
+    });
     expect(await store.readEventsAfter("game_1", "", 10)).toHaveLength(1);
   });
 
@@ -39,7 +48,16 @@ describe("RoomCommitStore", () => {
     store.seedOwnership("game_1", 1n);
     await store.commit(staged("0001", "cmd_1"));
     const duplicate = await store.commit(staged("0002", "cmd_1"));
-    expect(duplicate).toMatchObject({ status: "duplicate", result: { kind: "joined", playerId: "player_1" } });
+    expect(duplicate).toMatchObject({
+      status: "duplicate",
+      result: { kind: "joined", playerId: "player_1" },
+      snapshotEventId: "0001",
+    });
+    await expect(store.findCommand("game_1", "cmd_1")).resolves.toMatchObject({
+      result: { kind: "joined", playerId: "player_1" },
+      snapshotEventId: "0001",
+      events: [{ id: "0001" }],
+    });
     expect((await store.readEventsAfter("game_1", "", 10)).map((event) => event.id)).toEqual(["0001"]);
   });
 
