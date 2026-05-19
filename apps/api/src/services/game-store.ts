@@ -378,7 +378,7 @@ export class GameStore {
     if (roomRows.length === 0) return [];
     const roomIds = roomRows.map((r) => r.id);
 
-    const [playerRows, projRows, privateRows, eventRows] = await Promise.all([
+    const [playerRows, projRows, privateRows] = await Promise.all([
       this.db
         .select()
         .from(gameRoomPlayers)
@@ -391,16 +391,11 @@ export class GameStore {
         .select()
         .from(playerPrivateState)
         .where(inArray(playerPrivateState.gameRoomId, roomIds)),
-      this.db
-        .select()
-        .from(gameEvents)
-        .where(inArray(gameEvents.gameRoomId, roomIds)),
     ]);
 
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
     const projByRoom = new Map(projRows.map((p) => [p.gameRoomId, p]));
     const privateByRoom = groupBy(privateRows, (p) => p.gameRoomId);
-    const eventsByRoom = groupBy(eventRows, (e) => e.gameRoomId);
 
     return roomRows.map<StoredGameRoom>((r) => {
       const projRow = projByRoom.get(r.id);
@@ -426,9 +421,6 @@ export class GameStore {
       const privateStates = (privateByRoom.get(r.id) ?? []).map(
         (row) => row.privateState as PlayerPrivateState
       );
-      const events = [...(eventsByRoom.get(r.id) ?? [])]
-        .sort((a, b) => compareEventIds(a.id, b.id))
-        .map(rowToGameEvent);
       return {
         id: r.id,
         creatorUserId: r.creatorUserId,
@@ -442,7 +434,7 @@ export class GameStore {
         players,
         projection: payload?.projection ?? null,
         privateStates,
-        events,
+        events: [],
         pendingNightActions: (payload?.runtime?.pendingNightActions ??
           []) as StoredGameRoom["pendingNightActions"],
         pendingVotes: payload?.runtime?.pendingVotes ?? [],
@@ -483,14 +475,9 @@ export class GameStore {
     gameRoomId: string,
     afterEventId: string | null | undefined
   ): Promise<GameEvent[]> {
-    const rows = await this.db
-      .select()
-      .from(gameEvents)
-      .where(eq(gameEvents.gameRoomId, gameRoomId));
-    return rows
-      .filter((row) => !afterEventId || isEventIdAfter(row.id, afterEventId))
-      .sort((a, b) => compareEventIds(a.id, b.id))
-      .map(rowToGameEvent);
+    void gameRoomId;
+    void afterEventId;
+    return [];
   }
 
   async loadRawSsePayloadsAfter(
@@ -538,7 +525,6 @@ function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
   return out;
 }
 
-type GameEventRow = typeof gameEvents.$inferSelect;
 type GameEventInsert = typeof gameEvents.$inferInsert;
 
 export function toLegacyGameEventRow(
@@ -570,17 +556,4 @@ export function toLegacyGameEventRow(
     visibleToPlayerIds: [],
     createdAt: new Date(event.createdAt),
   };
-}
-
-function rowToGameEvent(row: GameEventRow): GameEvent {
-  return {
-    id: row.id,
-    gameRoomId: row.gameRoomId,
-    type: row.type as GameEvent["type"],
-    visibility: row.visibility as GameEvent["visibility"],
-    ...(row.actorId !== null ? { actorId: row.actorId } : {}),
-    ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
-    payload: (row.payload ?? {}) as GameEvent["payload"],
-    createdAt: row.createdAt.toISOString(),
-  } as GameEvent;
 }
