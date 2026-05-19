@@ -46,7 +46,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
         async start(controller) {
           const encoder = new TextEncoder();
           const perspective = () => buildPerspective(games, gameRoomId, user.id);
-          const serializeSnapshot = (seq?: number) => {
+          const serializeSnapshot = (eventId?: string | number) => {
             const view = perspective();
             const data = `data: ${JSON.stringify({
               snapshot: {
@@ -56,7 +56,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
                 events: view.events,
               },
             })}\n\n`;
-            return seq ? `id: ${seq}\n${data}` : data;
+            return eventId ? `id: ${eventId}\n${data}` : data;
           };
           const pushVisible = (payload: string) => {
             const event = eventFromSsePayload(payload);
@@ -102,15 +102,13 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
             try {
               const view = perspective();
               const dbEvents = filterEventsForUser(
-                await store.loadEventsSince(gameRoomId, lastSeq),
+                await store.loadEventsAfter(gameRoomId, lastEventId),
                 view.myPlayerId,
                 view.isWolf,
                 view.revealAll
               );
-              const minBrokerSeq = replayStart;
               for (const event of dbEvents) {
-                if (event.seq >= minBrokerSeq) break; // broker covers the rest
-                const serialized = `id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`;
+                const serialized = `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
                 controller.enqueue(encoder.encode(serialized));
               }
             } catch (err) {

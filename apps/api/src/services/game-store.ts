@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or, sql as rawSql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, or, sql as rawSql } from "drizzle-orm";
 import {
   type DbClient,
   gameEvents,
@@ -394,7 +394,7 @@ export class GameStore {
         .select()
         .from(gameEvents)
         .where(inArray(gameEvents.gameRoomId, roomIds))
-        .orderBy(asc(gameEvents.createdAt), asc(gameEvents.id)),
+        .orderBy(asc(gameEvents.id)),
     ]);
 
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
@@ -477,20 +477,20 @@ export class GameStore {
     return rows.map((row) => row.id);
   }
 
-  /**
-   * Load all events for a room with legacy event.seq > `sinceSeq`. This keeps
-   * the existing SSE replay API compiling until room-actor storage replaces it.
-   */
-  async loadEventsSince(
+  async loadEventsAfter(
     gameRoomId: string,
-    sinceSeq: number
+    afterEventId: string | null | undefined
   ): Promise<GameEvent[]> {
     const rows = await this.db
       .select()
       .from(gameEvents)
-      .where(eq(gameEvents.gameRoomId, gameRoomId))
-      .orderBy(asc(gameEvents.createdAt), asc(gameEvents.id));
-    return rows.map(rowToGameEvent).filter((event) => event.seq > sinceSeq);
+      .where(
+        afterEventId
+          ? and(eq(gameEvents.gameRoomId, gameRoomId), gt(gameEvents.id, afterEventId))
+          : eq(gameEvents.gameRoomId, gameRoomId)
+      )
+      .orderBy(asc(gameEvents.id));
+    return rows.map(rowToGameEvent);
   }
 
   /** Drop everything for a room — only used by tests / dev tools. */
@@ -529,6 +529,16 @@ function toLegacyGameEventRow(
   roomId: string,
   event: GameEvent
 ): GameEventInsert {
+  const rawEvent = {
+    id: event.id,
+    gameRoomId: roomId,
+    type: event.type,
+    visibility: event.visibility,
+    ...(event.actorId !== undefined ? { actorId: event.actorId } : {}),
+    ...(event.subjectId !== undefined ? { subjectId: event.subjectId } : {}),
+    payload: event.payload,
+    createdAt: event.createdAt,
+  };
   return {
     id: event.id,
     gameRoomId: roomId,
@@ -539,7 +549,7 @@ function toLegacyGameEventRow(
     actorId: event.actorId ?? null,
     subjectId: event.subjectId ?? null,
     payload: event.payload,
-    rawEventJson: JSON.stringify(event),
+    rawEventJson: JSON.stringify(rawEvent),
     rawSsePayload: `data: ${JSON.stringify(event)}\n\n`,
     visibleToPlayerIds: [],
     createdAt: new Date(event.createdAt),
@@ -547,26 +557,14 @@ function toLegacyGameEventRow(
 }
 
 function rowToGameEvent(row: GameEventRow): GameEvent {
-  const parsed = parseRawGameEvent(row.rawEventJson);
   return {
     id: row.id,
     gameRoomId: row.gameRoomId,
-    seq: parsed?.seq ?? row.commandEventIndex + 1,
     type: row.type as GameEvent["type"],
     visibility: row.visibility as GameEvent["visibility"],
     ...(row.actorId !== null ? { actorId: row.actorId } : {}),
     ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
     payload: (row.payload ?? {}) as GameEvent["payload"],
     createdAt: row.createdAt.toISOString(),
-  };
-}
-
-function parseRawGameEvent(rawEventJson: string): GameEvent | null {
-  try {
-    const parsed = JSON.parse(rawEventJson) as Partial<GameEvent>;
-    if (typeof parsed.seq !== "number") return null;
-    return parsed as GameEvent;
-  } catch {
-    return null;
-  }
+  } as GameEvent;
 }
