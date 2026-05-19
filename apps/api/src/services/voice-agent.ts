@@ -72,6 +72,10 @@ export interface VoiceTranscriptUpdate {
 
 export type VoiceTranscriptHandler = (update: VoiceTranscriptUpdate) => void;
 
+export interface VoiceSpeakOptions {
+  onSpeechProgress?: (text: string) => void;
+}
+
 interface PlayerVoiceIdentityBinding {
   playerId: string;
   matrixUserId: string;
@@ -379,10 +383,11 @@ export class VoiceAgentService {
   async speak(
     text: string,
     playerId?: string | null,
-    playbackRate = 1
+    playbackRate = 1,
+    options: VoiceSpeakOptions = {}
   ): Promise<boolean> {
     const next = this.speakQueue.then(() =>
-      this.speakImpl(text, playerId, playbackRate)
+      this.speakImpl(text, playerId, playbackRate, options)
     );
     this.speakQueue = next.catch(() => undefined);
     return next;
@@ -426,9 +431,10 @@ export class VoiceAgentService {
   private async speakImpl(
     text: string,
     playerId?: string | null,
-    playbackRate = 1
+    playbackRate = 1,
+    options: VoiceSpeakOptions = {}
   ): Promise<boolean> {
-    const inner = this.speakImplInner(text, playerId, playbackRate);
+    const inner = this.speakImplInner(text, playerId, playbackRate, options);
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<boolean>((resolve) => {
       timeoutId = setTimeout(() => {
@@ -519,7 +525,8 @@ export class VoiceAgentService {
   private async speakImplInner(
     text: string,
     playerId?: string | null,
-    playbackRate = 1
+    playbackRate = 1,
+    options: VoiceSpeakOptions = {}
   ): Promise<boolean> {
     const trimmed = text.trim();
     if (!trimmed) return false;
@@ -555,16 +562,53 @@ export class VoiceAgentService {
     const sampleRate = TTS_AUDIO_SOURCE_SAMPLE_RATE; // we always request pcm_16000
     let capturedAny = false;
     let firstChunkLogged = false;
+    let capturedAudioMs = 0;
+    let lastProgressText = "";
+    let lastProgressMarkerMs = 0;
+    const progressMarkers: Array<{ atMs: number; text: string }> = [];
     // Serialize captureFrame calls — the LiveKit rtc-node AudioSource native
     // FFI rejects concurrent captures with "InvalidState - failed to capture
     // frame", so we feed PCM chunks one at a time through a Promise chain.
     let captureChain: Promise<void> = Promise.resolve();
+
+    const flushSpeechProgress = () => {
+      if (!options.onSpeechProgress) return;
+      let nextText = lastProgressText;
+      while (
+        progressMarkers.length > 0 &&
+        progressMarkers[0]!.atMs <= capturedAudioMs
+      ) {
+        nextText = progressMarkers.shift()!.text;
+      }
+      if (nextText && nextText !== lastProgressText) {
+        lastProgressText = nextText;
+        try {
+          options.onSpeechProgress(nextText);
+        } catch (err) {
+          console.error("[VoiceAgent] speech progress callback failed:", err);
+        }
+      }
+    };
 
     const ttsClientOptions: TtsClientOptions = {
       apiBaseUrl: this.config.unsealApiBaseUrl,
       agentId: this.resolveTtsAgentId(playerId),
       apiKey: this.config.unsealApiKey,
       connectTimeoutMs: TTS_CONNECT_TIMEOUT_MS,
+      onAlignment: (event) => {
+        const markers = alignmentProgressMarkers(
+          event,
+          trimmed,
+          playbackRate,
+          lastProgressMarkerMs,
+          lastProgressText
+        );
+        if (markers.length === 0) return;
+        lastProgressMarkerMs = markers[markers.length - 1]!.atMs;
+        progressMarkers.push(...markers);
+        progressMarkers.sort((a, b) => a.atMs - b.atMs);
+        flushSpeechProgress();
+      },
       onAudioChunk: (chunk, frameRate) => {
         const rate = frameRate ?? sampleRate;
         const int16Length = Math.floor(chunk.byteLength / Int16Array.BYTES_PER_ELEMENT);
@@ -587,11 +631,14 @@ export class VoiceAgentService {
           int16[i] = chunk.readInt16LE(i * Int16Array.BYTES_PER_ELEMENT);
         }
         const playbackSamples = resamplePcmForPlaybackRate(int16, playbackRate);
-        generatedAudioMs += Math.round((playbackSamples.length / rate) * 1000);
+        const chunkAudioMs = Math.round((playbackSamples.length / rate) * 1000);
+        generatedAudioMs += chunkAudioMs;
         captureChain = captureChain
           .then(async () => {
             if (await this.captureTtsPcmFrames(playbackSamples, rate)) {
               capturedAny = true;
+              capturedAudioMs += chunkAudioMs;
+              flushSpeechProgress();
             }
           })
           .catch(() => undefined);
@@ -1095,6 +1142,100 @@ function chunkInt16(samples: Int16Array, chunkSize: number): Int16Array[] {
     chunks.push(samples.slice(offset, offset + size));
   }
   return chunks;
+}
+
+function alignmentProgressMarkers(
+  event: Record<string, unknown>,
+  speech: string,
+  playbackRate: number,
+  afterMs: number,
+  previousText: string
+): Array<{ atMs: number; text: string }> {
+  const alignment =
+    objectValue(event.normalizedAlignment) ?? objectValue(event.alignment);
+  if (!alignment) return [];
+  const chars = arrayValue(alignment.chars);
+  const starts =
+    numberArrayValue(alignment.charStartTimesMs) ??
+    numberArrayValue(alignment.char_start_times_ms);
+  const durations =
+    numberArrayValue(alignment.charDurationsMs) ??
+    numberArrayValue(alignment.char_durations_ms);
+  if (!chars || !starts || !durations) return [];
+  const count = Math.min(chars.length, starts.length, durations.length);
+  if (count === 0) return [];
+
+  const markers: Array<{ atMs: number; text: string }> = [];
+  for (let index = 0; index < count; index += 1) {
+    const alignedText = chars
+      .slice(0, index + 1)
+      .map((char) => String(char))
+      .join("");
+    const isFullSpeechAlignment = speech.startsWith(alignedText);
+    const text = speechPrefixForAlignmentChars(
+      speech,
+      isFullSpeechAlignment ? alignedText : `${previousText}${alignedText}`
+    );
+    if (!text) continue;
+    const rawAtMs = Math.max(
+      0,
+      Math.round(((starts[index] ?? 0) + (durations[index] ?? 0)) / playbackRate)
+    );
+    const atMs = Math.max(
+      0,
+      isFullSpeechAlignment ? rawAtMs : afterMs + rawAtMs
+    );
+    if (atMs <= afterMs) continue;
+    if (markers.at(-1)?.text === text) continue;
+    markers.push({ atMs, text });
+  }
+  return markers;
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function arrayValue(value: unknown): unknown[] | null {
+  return Array.isArray(value) ? value : null;
+}
+
+function numberArrayValue(value: unknown): number[] | null {
+  if (!Array.isArray(value)) return null;
+  const numbers = value
+    .map((candidate) =>
+      typeof candidate === "number"
+        ? candidate
+        : typeof candidate === "string"
+          ? Number(candidate)
+          : NaN
+    )
+    .filter((candidate) => Number.isFinite(candidate));
+  return numbers.length === value.length ? numbers : null;
+}
+
+function speechPrefixForAlignmentChars(speech: string, alignedText: string): string {
+  if (!alignedText) return "";
+  if (speech.startsWith(alignedText)) return alignedText;
+  const compactAligned = compactSpeechText(alignedText);
+  if (!compactAligned) return "";
+  let compactIndex = 0;
+  for (let index = 0; index < speech.length; index += 1) {
+    const char = speech[index]!;
+    if (/\s/u.test(char)) continue;
+    if (char !== compactAligned[compactIndex]) continue;
+    compactIndex += 1;
+    if (compactIndex >= compactAligned.length) {
+      return speech.slice(0, index + 1);
+    }
+  }
+  return "";
+}
+
+function compactSpeechText(text: string): string {
+  return text.replace(/\s+/gu, "");
 }
 
 /** One VoiceAgentService per game room. */

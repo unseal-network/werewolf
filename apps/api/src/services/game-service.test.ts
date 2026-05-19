@@ -1865,13 +1865,24 @@ describe("InMemoryGameService rules", () => {
     const agentSpeaker = room.players[0]!;
     const humanSpeaker = room.players[1]!;
     let resolveSpeak: () => void = () => undefined;
+    let speakStarted = false;
+    let onSpeechProgress: ((text: string) => void) | undefined;
     const speakDone = new Promise<boolean>((resolve) => {
       resolveSpeak = () => resolve(true);
     });
 
     games.setVoiceAgents({
       get: () => ({
-        speak: () => speakDone,
+        speak: (
+          _text: string,
+          _playerId?: string | null,
+          _playbackRate?: number,
+          options?: { onSpeechProgress?: (text: string) => void }
+        ) => {
+          speakStarted = true;
+          onSpeechProgress = options?.onSpeechProgress;
+          return speakDone;
+        },
       }),
     } as unknown as VoiceAgentRegistry);
     agentSpeaker.kind = "agent";
@@ -1891,6 +1902,17 @@ describe("InMemoryGameService rules", () => {
         speech: "我先说结论。3号这轮发言偏防守，我今天会先归3号。",
       },
     }));
+
+    await vi.waitFor(() => expect(speakStarted).toBe(true));
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "stream" &&
+          event.actorId === agentSpeaker.id
+      )
+    ).toBe(false);
+
+    onSpeechProgress?.("我先说结论。");
 
     await vi.waitFor(() => {
       expect(
@@ -1945,9 +1967,7 @@ describe("InMemoryGameService rules", () => {
         source: "agent",
       },
     });
-    expect(String(deltaEvents[0]!.payload.text)).toBe(
-      "我先说结论。3号这轮发言偏防守，我今天会先归3号。"
-    );
+    expect(String(deltaEvents[0]!.payload.text)).toBe("我先说结论。");
     expect(lastDeltaIndex).toBeGreaterThan(-1);
     expect(speechEventIndex).toBeGreaterThan(lastDeltaIndex);
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
@@ -2031,7 +2051,10 @@ describe("InMemoryGameService rules", () => {
     expect(speak).toHaveBeenCalledWith(
       "我先看2号发言偏保守。\n今天可以先归2号。",
       agentSpeaker.id,
-      room.timing.agentSpeechRate
+      room.timing.agentSpeechRate,
+      expect.objectContaining({
+        onSpeechProgress: expect.any(Function),
+      })
     );
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
     expect(speechEvent?.payload.speech).toBe(

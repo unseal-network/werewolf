@@ -195,6 +195,49 @@ describe("VoiceAgentService TTS LiveKit framing", () => {
     expect(calls).toEqual(["capture", "capture", "capture", "capture", "playout"]);
   });
 
+  it("reports speech progress from TTS alignment after matching audio is captured", async () => {
+    const agent = new VoiceAgentService("game_1", config);
+    const progress: string[] = [];
+    (agent as any).connect = vi.fn(async () => {
+      (agent as any).connected = true;
+    });
+    (agent as any).audioSource = {
+      captureFrame: vi.fn(async () => undefined),
+      waitForPlayout: vi.fn(async () => undefined),
+      queuedDuration: 0,
+    };
+    (agent as any).createTtsClient = vi.fn((opts) => ({
+      connect: vi.fn(async () => undefined),
+      synthesize: vi.fn(async () => {
+        opts.onAlignment?.({
+          normalizedAlignment: {
+            chars: ["我", "先", "说"],
+            charStartTimesMs: [0, 180, 360],
+            charDurationsMs: [120, 120, 120],
+          },
+        });
+        opts.onAudioChunk?.(Buffer.alloc(16_000), 16_000);
+        opts.onAlignment?.({
+          normalizedAlignment: {
+            chars: ["结", "论"],
+            charStartTimesMs: [0, 120],
+            charDurationsMs: [120, 120],
+          },
+        });
+        opts.onAudioChunk?.(Buffer.alloc(8_000), 16_000);
+      }),
+      close: vi.fn(),
+    }));
+
+    await expect(
+      agent.speak("我先说结论", "player_1", 1, {
+        onSpeechProgress: (text) => progress.push(text),
+      })
+    ).resolves.toBe(true);
+
+    expect(progress).toEqual(["我先说", "我先说结论"]);
+  });
+
   it("retries TTS synthesis once after a transient websocket failure", async () => {
     const agent = new VoiceAgentService("game_1", config);
     const attempts: Array<{ connect: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }> = [];

@@ -137,8 +137,6 @@ export type PlayerSubmittedAction =
   };
 
 const absentNightActorAutoAdvanceMs = 15_000;
-const AGENT_SPEECH_DELTA_DELAY_MS = 300;
-
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -2617,6 +2615,39 @@ export class InMemoryGameService {
     }
   }
 
+  private emitAgentSpeechProgress(
+    room: StoredGameRoom,
+    playerId: string,
+    text: string,
+    expectedSpeechTurn: {
+      phase: GamePhase;
+      day: number;
+      version: number;
+      currentSpeakerPlayerId: string | null;
+    }
+  ): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    if (
+      !room.projection ||
+      room.projection.phase !== expectedSpeechTurn.phase ||
+      room.projection.day !== expectedSpeechTurn.day ||
+      room.projection.version !== expectedSpeechTurn.version ||
+      room.projection.currentSpeakerPlayerId !==
+        expectedSpeechTurn.currentSpeakerPlayerId
+    ) {
+      return;
+    }
+    this.upsertSpeechStreamEvent(room, {
+      playerId,
+      day: expectedSpeechTurn.day,
+      phase: expectedSpeechTurn.phase,
+      text: trimmed,
+      final: false,
+      source: "agent",
+    });
+  }
+
   private async runCurrentSpeaker(
     room: StoredGameRoom,
     runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
@@ -2674,35 +2705,48 @@ export class InMemoryGameService {
       this.voiceAgents && player.kind === "agent"
         ? this.voiceAgents.get(room.id)
         : null;
-    const deltaDelayMs = voiceAgent ? AGENT_SPEECH_DELTA_DELAY_MS : 0;
-    const deltaStream = hasValidAgentSpeech
-      ? this.emitAgentSpeechDeltas(
-          room,
-          playerId,
-          speech,
-          expectedSpeechTurn,
-          deltaDelayMs
-        )
-      : Promise.resolve();
+    let streamedAgentSpeech = false;
+    let lastStreamedAgentSpeech = "";
+    const streamAgentSpeechProgress = (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || trimmed === lastStreamedAgentSpeech) return;
+      streamedAgentSpeech = true;
+      lastStreamedAgentSpeech = trimmed;
+      this.emitAgentSpeechProgress(room, playerId, trimmed, expectedSpeechTurn);
+    };
 
     const ttsStream =
       hasValidAgentSpeech && voiceAgent
         ? Promise.resolve(
-            voiceAgent.speak(speech, playerId, room.timing.agentSpeechRate ?? 1)
+            voiceAgent.speak(speech, playerId, room.timing.agentSpeechRate ?? 1, {
+              onSpeechProgress: streamAgentSpeechProgress,
+            })
           )
             .then((captured) => {
               if (!captured) {
+                if (!streamedAgentSpeech) streamAgentSpeechProgress(speech);
                 console.error(
                   `[VoiceAgent] no TTS audio captured for ${room.id}/${playerId}`
                 );
+              } else if (!streamedAgentSpeech) {
+                streamAgentSpeechProgress(speech);
               }
             })
             .catch((err) => {
+              if (!streamedAgentSpeech) streamAgentSpeechProgress(speech);
               console.error("[VoiceAgent] speak failed:", err);
             })
-        : Promise.resolve();
+        : hasValidAgentSpeech
+          ? this.emitAgentSpeechDeltas(
+              room,
+              playerId,
+              speech,
+              expectedSpeechTurn,
+              0
+            )
+          : Promise.resolve();
 
-    await Promise.all([deltaStream, ttsStream]);
+    await ttsStream;
 
     if (
       !room.projection ||

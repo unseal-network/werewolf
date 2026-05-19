@@ -218,20 +218,20 @@ export class TtsWebSocketClient {
       return;
     }
 
-    if (typeof msg.audio === "string" && msg.audio.length > 0) {
-      const chunk = Buffer.from(msg.audio, "base64");
-      if (chunk.byteLength > 0 && this.opts.onAudioChunk) {
-        const rate = this.currentRequest?.sampleRate ?? null;
-        this.opts.onAudioChunk(chunk, rate);
-      }
-    }
-
     if (
       (typeof msg.alignment === "object" && msg.alignment !== null) ||
       (typeof msg.normalizedAlignment === "object" &&
         msg.normalizedAlignment !== null)
     ) {
       if (this.opts.onAlignment) this.opts.onAlignment(msg);
+    }
+
+    if (typeof msg.audio === "string" && msg.audio.length > 0) {
+      const chunk = Buffer.from(msg.audio, "base64");
+      if (chunk.byteLength > 0 && this.opts.onAudioChunk) {
+        const rate = this.currentRequest?.sampleRate ?? null;
+        this.opts.onAudioChunk(chunk, rate);
+      }
     }
 
     if (msg.isFinal === true || msg.is_final === true) {
