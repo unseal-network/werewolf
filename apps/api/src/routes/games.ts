@@ -12,6 +12,7 @@ import type {
   RuntimeAgentTurnOutput,
   StoredGameRoom,
 } from "../services/game-service";
+import { roomCommandSchema, type RoomCommand } from "../services/room-actor/types";
 
 export interface GamesRouteDeps {
   matrix: MatrixAuthClient;
@@ -19,6 +20,7 @@ export interface GamesRouteDeps {
   games: InMemoryGameService;
   matrixHomeserverUrl?: string;
   runAgentTurn?: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>;
+  roomActors?: { dispatch(command: RoomCommand): Promise<unknown> } | undefined;
 }
 
 type DefaultAgentCandidate = {
@@ -120,6 +122,19 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = await readOptionalJson(c.req.raw);
       const seatNo = numberValue(body.seatNo);
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "join",
+            displayName: user.displayName,
+            ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+            ...(seatNo ? { seatNo } : {}),
+          })
+        );
+      }
       const player = deps.games.join(
         c.req.param("gameRoomId"),
         user.id,
@@ -140,6 +155,16 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   app.post("/:gameRoomId/leave", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "leave",
+          })
+        );
+      }
       const player = deps.games.leave(c.req.param("gameRoomId"), user.id);
       return c.json({ player });
     } catch (error) {
@@ -154,6 +179,16 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   app.post("/:gameRoomId/start", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "start",
+          })
+        );
+      }
       const started = deps.games.start(c.req.param("gameRoomId"), user.id);
       // runAgentTurn is set globally at server startup (server.ts) so the
       // tick worker can advance rooms even after a restart without waiting
@@ -189,13 +224,6 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
-      const room = deps.games.snapshot(c.req.param("gameRoomId"));
-      const player = room.players.find(
-        (p) => p.userId === user.id && !p.leftAt
-      );
-      if (!player) {
-        throw new AppError("not_found", "You are not in this room", 404);
-      }
       const kind = stringValue(body.kind);
       if (
         !kind ||
@@ -203,9 +231,13 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       ) {
         throw new AppError("invalid_action", "Invalid action kind", 400);
       }
+      const room =
+        !deps.roomActors || kind === "vote" || kind === "nightAction"
+          ? deps.games.snapshot(c.req.param("gameRoomId"))
+          : null;
       const targetPlayerId =
         kind === "vote" || kind === "nightAction"
-          ? resolveSubmittedTargetPlayerId(room, body)
+          ? resolveSubmittedTargetPlayerId(room!, body)
           : "";
       const action: PlayerSubmittedAction =
         kind === "speech"
@@ -226,6 +258,23 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       if (expectedPhase !== undefined) action.expectedPhase = expectedPhase;
       if (expectedDay !== undefined) action.expectedDay = expectedDay;
       if (expectedVersion !== undefined) action.expectedVersion = expectedVersion;
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "submitAction",
+            action,
+          })
+        );
+      }
+      const player = room!.players.find(
+        (p) => p.userId === user.id && !p.leftAt
+      );
+      if (!player) {
+        throw new AppError("not_found", "You are not in this room", 404);
+      }
       const event = await deps.games.submitAction(
         c.req.param("gameRoomId"),
         player.id,
@@ -248,6 +297,16 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         throw new AppError("conflict", "Runtime agent turn runner is not configured", 409);
       }
       const gameRoomId = c.req.param("gameRoomId");
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId,
+            actorUserId: user.id,
+            kind: "runtimeTick",
+          })
+        );
+      }
       const beforeRoom = deps.games.snapshot(gameRoomId);
       const myPlayer = beforeRoom.players.find(
         (p) => p.userId === user.id && !p.leftAt
@@ -452,6 +511,22 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       if (!agentUserId) {
         throw new AppError("invalid_action", "agentUserId is required", 400);
       }
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "addAgent",
+            agentUserId,
+            displayName: stringValue(body.displayName) ?? agentUserId,
+            ...(stringValue(body.avatarUrl)
+              ? { avatarUrl: matrixMediaUrl(stringValue(body.avatarUrl)) }
+              : {}),
+          }),
+          201
+        );
+      }
       const player = deps.games.addAgentPlayer(
         c.req.param("gameRoomId"),
         user.id,
@@ -477,6 +552,17 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       if (!seatNo) {
         throw new AppError("invalid_action", "seatNo is required", 400);
       }
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "swapSeat",
+            seatNo,
+          })
+        );
+      }
       const result = deps.games.swapSeat(
         c.req.param("gameRoomId"),
         user.id,
@@ -500,6 +586,17 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         room,
         c.req.param("matrixUserId")
       );
+      if (deps.roomActors) {
+        return c.json(
+          await dispatchActorCommand(deps, c.req.raw, {
+            commandId: commandId(c.req.raw),
+            gameRoomId: c.req.param("gameRoomId"),
+            actorUserId: user.id,
+            kind: "removePlayer",
+            playerId,
+          })
+        );
+      }
       const player = deps.games.removePlayer(
         c.req.param("gameRoomId"),
         user.id,
@@ -516,6 +613,29 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   });
 
   return app;
+}
+
+function commandId(request: Request): string {
+  const value = request.headers.get("x-command-id");
+  if (!value) {
+    throw new AppError(
+      "invalid_action",
+      "x-command-id is required for idempotent mutation routes",
+      400
+    );
+  }
+  return value;
+}
+
+async function dispatchActorCommand(
+  deps: GamesRouteDeps,
+  _request: Request,
+  command: RoomCommand
+): Promise<unknown> {
+  if (!deps.roomActors) {
+    throw new AppError("conflict", "Room actor dispatcher is not configured", 409);
+  }
+  return deps.roomActors.dispatch(roomCommandSchema.parse(command));
 }
 
 async function readOptionalJson(request: Request): Promise<Record<string, unknown>> {

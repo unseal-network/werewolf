@@ -3,6 +3,43 @@ import { createApp } from "../app";
 import { createTestDeps } from "../test-utils";
 
 describe("games API", () => {
+  it.each([
+    ["join", "POST", "/games/game_1/join", { seatNo: 1 }],
+    ["leave", "POST", "/games/game_1/leave", {}],
+    ["swapSeat", "POST", "/games/game_1/seat", { seatNo: 2 }],
+    ["start", "POST", "/games/game_1/start", {}],
+    ["submitAction", "POST", "/games/game_1/actions", { kind: "pass" }],
+  ])("routes %s through room actor", async (expectedKind, method, path, body) => {
+    const dispatched: unknown[] = [];
+    const app = createApp({
+      ...createTestDeps(),
+      roomActors: {
+        dispatch: async (command: unknown) => {
+          dispatched.push(command);
+          return { kind: `${expectedKind}Accepted` };
+        },
+      },
+    });
+
+    const response = await app.request(path, {
+      method,
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "content-type": "application/json",
+        "x-command-id": `cmd_${expectedKind}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBeLessThan(500);
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({
+      kind: expectedKind,
+      commandId: `cmd_${expectedKind}`,
+      gameRoomId: "game_1",
+    });
+  });
+
   it("requires Matrix bearer auth", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", { method: "POST", body: "{}" });
