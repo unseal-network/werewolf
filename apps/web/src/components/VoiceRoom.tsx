@@ -261,7 +261,7 @@ export function VoiceRoomProvider({
 
     void lkRoom
       .connect(serverUrl, token, { autoSubscribe: false })
-      .then(() => {
+      .then(async () => {
         if (cancelled) {
           void lkRoom.disconnect().catch(() => {});
           return;
@@ -269,6 +269,7 @@ export function VoiceRoomProvider({
         console.info("[VoiceRoom] connected", {
           remoteParticipantCount: lkRoom.remoteParticipants.size,
         });
+        await lkRoom.localParticipant.setMicrophoneEnabled(false);
         setRoom(lkRoom);
         for (const participant of lkRoom.remoteParticipants.values()) {
           for (const publication of participant.trackPublications.values()) {
@@ -304,13 +305,14 @@ export function VoiceRoomProvider({
               setState("connecting");
               void lkRoom
                 .connect(serverUrl, token, { autoSubscribe: false })
-                .then(() => {
+                .then(async () => {
                   if (cancelled) {
                     void lkRoom.disconnect().catch(() => {});
                     return;
                   }
                   retryAttemptRef.current = 0;
                   console.info("[VoiceRoom] reconnect succeeded", { attempt: retryAttemptRef.current });
+                  await lkRoom.localParticipant.setMicrophoneEnabled(false);
                   setRoom(lkRoom);
                   for (const participant of lkRoom.remoteParticipants.values()) {
                     for (const publication of participant.trackPublications.values()) {
@@ -331,10 +333,8 @@ export function VoiceRoomProvider({
                   if (hasNext) {
                     setState("reconnecting");
                     retryAttemptRef.current += 1;
-                    // Subsequent retries bubble through RoomEvent.Disconnected
-                    // or will be picked up on next token refresh — give up here
-                    // and let the user see the degraded state rather than an
-                    // infinite loop that holds the speakQueue.
+                    // Keep retries bounded; the join token is intentionally
+                    // stable for this game/user and is not refreshed here.
                   }
                   setState("error");
                   setErrorMessage(retryErr instanceof Error ? retryErr.message : String(retryErr));

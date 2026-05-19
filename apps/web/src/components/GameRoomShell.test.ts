@@ -452,6 +452,29 @@ describe("game room seat layout", () => {
     expect(voicePanel).not.toContain("canPublishVoice");
   });
 
+  it("keeps LiveKit credentials stable for the current game and user", () => {
+    const route = readFileSync(
+      resolve(process.cwd(), "apps/web/src/routes/game.$gameRoomId.tsx"),
+      "utf8"
+    );
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(route).toContain(
+      "const credentialKey = `${gameRoomId}:${matrixUserId}`"
+    );
+    expect(route).toContain(
+      "if (livekitCredentialKeyRef.current === credentialKey)"
+    );
+    expect(route).toContain("}, [matrixUserId, client, gameRoomId]);");
+    expect(route).not.toContain(
+      "}, [matrixUserId, client, gameRoomId, livekitToken, livekitServerUrl]);"
+    );
+    expect(voiceRoom).not.toContain("token refresh");
+  });
+
   it("does not auto-subscribe to LiveKit tracks in the browser", () => {
     const voiceRoom = readFileSync(
       resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
@@ -459,6 +482,17 @@ describe("game room seat layout", () => {
     );
     expect(voiceRoom).toContain("autoSubscribe: false");
     expect(voiceRoom).not.toContain("publication.setSubscribed(true)");
+  });
+
+  it("keeps the LiveKit microphone muted by default", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(voiceRoom).toContain(
+      "await lkRoom.localParticipant.setMicrophoneEnabled(false)"
+    );
   });
 
   it("does not preflight LiveKit immediately before connecting", () => {

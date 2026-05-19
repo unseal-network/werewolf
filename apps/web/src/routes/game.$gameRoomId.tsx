@@ -29,6 +29,7 @@ import {
 import { canUseActionPanel } from "../game/actionAvailability";
 import { isActionStateConflictError } from "../game/actionConflict";
 import { buildActionExpectation } from "../game/actionExpectation";
+import { getStableLivekitCredentials } from "../game/livekitCredentials";
 import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
   DEMO_DISPLAY_NAME,
@@ -678,16 +679,13 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       return;
     }
     const credentialKey = `${gameRoomId}:${matrixUserId}`;
-    if (
-      livekitCredentialKeyRef.current === credentialKey &&
-      livekitToken &&
-      livekitServerUrl
-    ) {
+    if (livekitCredentialKeyRef.current === credentialKey) {
       return;
     }
     let cancelled = false;
-    void client
-      .getLivekitToken(gameRoomId)
+    void getStableLivekitCredentials(credentialKey, () =>
+      client.getLivekitToken(gameRoomId)
+    )
       .then((res) => {
         if (cancelled) return;
         console.info("[VoiceRoom] livekit token ready", {
@@ -709,7 +707,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     return () => {
       cancelled = true;
     };
-  }, [matrixUserId, client, gameRoomId, livekitToken, livekitServerUrl]);
+  }, [matrixUserId, client, gameRoomId]);
 
   useEffect(() => {
     return () => {
