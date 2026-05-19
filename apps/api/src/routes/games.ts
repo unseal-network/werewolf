@@ -441,28 +441,54 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
-      const myPlayer = room.players.find(
-        (p) => p.userId === user.id && !p.leftAt
-      );
-      const myPlayerId = myPlayer?.id;
-      const myPrivateState = myPlayerId
-        ? room.privateStates.find((s) => s.playerId === myPlayerId)
-        : undefined;
-      const isWolf = myPrivateState?.team === "wolf" && myPrivateState.alive;
-
-      const filteredEvents = filterEventsForUser(
-        room.events,
-        myPlayerId,
-        isWolf,
-        room.status === "ended" || room.projection?.status === "ended"
-      );
-      const filteredPrivateStates = myPrivateState ? [myPrivateState] : [];
-
+      const view = buildGameReadView(room, user.id);
+      const snapshotEventId = room.events.at(-1)?.id ?? "";
       return c.json({
-        room: { ...room, events: filteredEvents, privateStates: filteredPrivateStates },
-        projection: room.projection,
-        privateStates: filteredPrivateStates,
-        events: filteredEvents,
+        snapshot: {
+          snapshotEventId,
+          latestEventId: snapshotEventId,
+          displayState: {
+            room: view.room,
+            projection: view.room.projection,
+            privateStates: view.privateStates,
+          },
+        },
+        timelineCursor: { after: snapshotEventId },
+      });
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
+  app.get("/:gameRoomId/timeline", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const room = deps.games.snapshot(c.req.param("gameRoomId"));
+      const after = c.req.query("after") ?? "";
+      const before = c.req.query("before") ?? "";
+      if (after && before) {
+        throw new AppError("invalid_action", "Only one of before or after may be provided", 400);
+      }
+      const requestedLimit = Number(c.req.query("limit") ?? 100);
+      const limit = Math.min(
+        500,
+        Math.max(1, Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 100)
+      );
+      const view = buildGameReadView(room, user.id);
+      const ordered = [...view.events].sort((a, b) => a.id.localeCompare(b.id));
+      const events = before
+        ? ordered.filter((event) => event.id < before).slice(-limit)
+        : ordered.filter((event) => !after || event.id > after).slice(0, limit);
+      return c.json({
+        events,
+        cursor: {
+          before: events[0]?.id ?? (before || null),
+          after: events.at(-1)?.id ?? (after || null),
+        },
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
@@ -721,4 +747,23 @@ export function filterEventsForUser(
     }
     return false;
   });
+}
+
+function buildGameReadView(room: StoredGameRoom, userId: string) {
+  const myPlayer = room.players.find((p) => p.userId === userId && !p.leftAt);
+  const myPlayerId = myPlayer?.id;
+  const myPrivateState = myPlayerId
+    ? room.privateStates.find((s) => s.playerId === myPlayerId)
+    : undefined;
+  const isWolf = Boolean(myPrivateState?.team === "wolf" && myPrivateState.alive);
+  const revealAll = room.status === "ended" || room.projection?.status === "ended";
+  const events = filterEventsForUser(room.events, myPlayerId, isWolf, revealAll);
+  const privateStates = myPrivateState ? [myPrivateState] : [];
+  const { events: _events, privateStates: _privateStates, ...roomWithoutTimeline } =
+    room;
+  return {
+    room: { ...roomWithoutTimeline, privateStates },
+    events,
+    privateStates,
+  };
 }

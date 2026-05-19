@@ -40,6 +40,57 @@ describe("games API", () => {
     });
   });
 
+  it("game read returns display snapshot without full timeline", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+
+    const response = await app.request(`/games/${room.id}`, {
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    const json = await response.json() as any;
+    expect(json.snapshot.displayState).toBeTruthy();
+    expect(json.snapshot.displayState.room.events).toBeUndefined();
+    expect(json.timeline).toBeUndefined();
+    expect(json.events).toBeUndefined();
+  });
+
+  it("timeline endpoint pages by event id cursor", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+
+    const response = await app.request(
+      `/games/${room.id}/timeline?after=${room.id}_1&limit=50`,
+      { headers: { authorization: "Bearer matrix-token-alice" } }
+    );
+
+    expect(response.status).toBe(200);
+    const json = await response.json() as any;
+    expect(Array.isArray(json.events)).toBe(true);
+    expect(json.events.every((event: { id: string }) => event.id > `${room.id}_1`)).toBe(true);
+  });
+
   it("requires Matrix bearer auth", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", { method: "POST", body: "{}" });
