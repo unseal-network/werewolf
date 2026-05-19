@@ -80,6 +80,8 @@ function mapConnectionState(state: ConnectionState): VoiceConnectionState {
  * cleanup uses a cancelled flag so async connect resolutions cannot mutate
  * a torn-down provider — important under React StrictMode double-invocation.
  */
+const VOICE_RECONNECT_DELAYS_MS = [2000, 4000, 8000, 15000, 30000];
+
 export function VoiceRoomProvider({
   serverUrl,
   token,
@@ -91,11 +93,18 @@ export function VoiceRoomProvider({
   const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
   const audioContainerRef = useRef<HTMLDivElement | null>(null);
   const audioUnlockCleanupRef = useRef<(() => void) | null>(null);
+  const retryAttemptRef = useRef(0);
+  const retryTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!serverUrl || !token) {
       audioUnlockCleanupRef.current?.();
       audioUnlockCleanupRef.current = null;
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      retryAttemptRef.current = 0;
       setRoom((current) => {
         if (current) {
           void current.disconnect().catch(() => {});
@@ -278,13 +287,81 @@ export function VoiceRoomProvider({
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        console.error("[VoiceRoom] connect failed", err);
-        setState("error");
-        setErrorMessage(err instanceof Error ? err.message : String(err));
+        const attempt = retryAttemptRef.current;
+        const delayMs = VOICE_RECONNECT_DELAYS_MS[attempt] ?? VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
+        const hasMoreRetries = attempt < VOICE_RECONNECT_DELAYS_MS.length;
+        console.error("[VoiceRoom] connect failed", {
+          err,
+          attempt,
+          willRetry: hasMoreRetries,
+          retryInMs: hasMoreRetries ? delayMs : null,
+        });
+        if (hasMoreRetries) {
+          setState("reconnecting");
+          setErrorMessage(null);
+          retryAttemptRef.current += 1;
+          retryTimerRef.current = window.setTimeout(() => {
+            retryTimerRef.current = null;
+            if (!cancelled) {
+              // Trigger re-run of this effect by bumping a counter isn't
+              // possible without state; instead we re-invoke connect directly
+              // on a fresh room — effect deps (serverUrl/token) haven't changed.
+              setState("connecting");
+              void lkRoom
+                .connect(serverUrl, token, { autoSubscribe: true })
+                .then(() => {
+                  if (cancelled) {
+                    void lkRoom.disconnect().catch(() => {});
+                    return;
+                  }
+                  retryAttemptRef.current = 0;
+                  console.info("[VoiceRoom] reconnect succeeded", { attempt: retryAttemptRef.current });
+                  setRoom(lkRoom);
+                  for (const participant of lkRoom.remoteParticipants.values()) {
+                    for (const publication of participant.trackPublications.values()) {
+                      if (publication.kind === Track.Kind.Audio) {
+                        publication.setSubscribed(true);
+                      }
+                      if (publication.track && publication.isSubscribed) {
+                        attachAudio(publication.track, publication, participant);
+                      }
+                    }
+                  }
+                  updateMicState();
+                  eagerStartAudio();
+                })
+                .catch((retryErr: unknown) => {
+                  if (cancelled) return;
+                  const nextAttempt = retryAttemptRef.current;
+                  const nextDelay = VOICE_RECONNECT_DELAYS_MS[nextAttempt] ?? VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
+                  const hasNext = nextAttempt < VOICE_RECONNECT_DELAYS_MS.length;
+                  console.error("[VoiceRoom] retry failed", { retryErr, nextAttempt, hasNext });
+                  if (hasNext) {
+                    setState("reconnecting");
+                    retryAttemptRef.current += 1;
+                    // Subsequent retries bubble through RoomEvent.Disconnected
+                    // or will be picked up on next token refresh — give up here
+                    // and let the user see the degraded state rather than an
+                    // infinite loop that holds the speakQueue.
+                  }
+                  setState("error");
+                  setErrorMessage(retryErr instanceof Error ? retryErr.message : String(retryErr));
+                });
+            }
+          }, delayMs);
+        } else {
+          setState("error");
+          setErrorMessage(err instanceof Error ? err.message : String(err));
+        }
       });
 
     return () => {
       cancelled = true;
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      retryAttemptRef.current = 0;
       // Detach lingering audio elements before tearing down the room.
       const host = audioContainerRef.current;
       if (host) {
