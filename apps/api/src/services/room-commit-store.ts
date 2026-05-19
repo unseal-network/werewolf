@@ -1,0 +1,365 @@
+import { and, asc, eq, gt, sql as rawSql } from "drizzle-orm";
+import {
+  type DbClient,
+  gameCommands,
+  gameEvents,
+  roomOwnership,
+  roomSnapshots,
+} from "@werewolf/db";
+import { compareEventIds, isEventIdAfter } from "./event-id-cursor";
+
+export interface RoomCommittedEvent {
+  id: string;
+  gameRoomId: string;
+  type: string;
+  visibility: string;
+  actorId?: string;
+  subjectId?: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface RoomSnapshot {
+  gameRoomId: string;
+  snapshotEventId: string;
+  canonicalState: unknown;
+  displayState: unknown;
+  updatedAt: string;
+}
+
+export interface StagedRoomCommit {
+  gameRoomId: string;
+  commandId: string;
+  kind: string;
+  actorUserId: string;
+  fencingToken: bigint;
+  baseSnapshotEventId: string;
+  events: readonly RoomCommittedEvent[];
+  rawSsePayloads: readonly string[];
+  canonicalState: unknown;
+  displayState: unknown;
+  result: unknown;
+}
+
+export type RoomCommitResult =
+  | {
+      status: "committed";
+      result: unknown;
+      events: RoomCommittedEvent[];
+      rawSsePayloads: string[];
+    }
+  | {
+      status: "duplicate";
+      result: unknown;
+      events: RoomCommittedEvent[];
+      rawSsePayloads: string[];
+    };
+
+export interface RoomCommitStore {
+  commit(staged: StagedRoomCommit): Promise<RoomCommitResult>;
+  loadSnapshot(gameRoomId: string): Promise<RoomSnapshot | null>;
+  readEventsAfter(
+    gameRoomId: string,
+    afterEventId: string,
+    limit: number
+  ): Promise<RoomCommittedEvent[]>;
+}
+
+interface StoredCommand {
+  result: unknown;
+  events: RoomCommittedEvent[];
+  rawSsePayloads: string[];
+}
+
+interface OwnershipLease {
+  fencingToken: bigint;
+  leaseExpiresAt: Date;
+}
+
+export class InMemoryRoomCommitStore implements RoomCommitStore {
+  private readonly ownership = new Map<string, OwnershipLease>();
+  private readonly commands = new Map<string, StoredCommand>();
+  private readonly eventsByRoom = new Map<string, RoomCommittedEvent[]>();
+  private readonly snapshots = new Map<string, RoomSnapshot>();
+
+  seedOwnership(
+    gameRoomId: string,
+    fencingToken: bigint,
+    leaseExpiresAt = new Date(Date.now() + 60_000)
+  ): void {
+    this.ownership.set(gameRoomId, { fencingToken, leaseExpiresAt });
+  }
+
+  async commit(staged: StagedRoomCommit): Promise<RoomCommitResult> {
+    this.assertOwned(staged.gameRoomId, staged.fencingToken);
+
+    const commandKey = commandMapKey(staged.gameRoomId, staged.commandId);
+    const existing = this.commands.get(commandKey);
+    if (existing) {
+      return {
+        status: "duplicate",
+        result: existing.result,
+        events: [...existing.events],
+        rawSsePayloads: [...existing.rawSsePayloads],
+      };
+    }
+
+    const events = staged.events.map(copyEvent);
+    const rawSsePayloads = [...staged.rawSsePayloads];
+    const snapshotEventId = events.at(-1)?.id ?? staged.baseSnapshotEventId;
+    const snapshot: RoomSnapshot = {
+      gameRoomId: staged.gameRoomId,
+      snapshotEventId,
+      canonicalState: staged.canonicalState,
+      displayState: staged.displayState,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.commands.set(commandKey, {
+      result: staged.result,
+      events,
+      rawSsePayloads,
+    });
+    this.eventsByRoom.set(staged.gameRoomId, [
+      ...(this.eventsByRoom.get(staged.gameRoomId) ?? []),
+      ...events,
+    ]);
+    this.snapshots.set(staged.gameRoomId, snapshot);
+
+    return {
+      status: "committed",
+      result: staged.result,
+      events: [...events],
+      rawSsePayloads: [...rawSsePayloads],
+    };
+  }
+
+  async loadSnapshot(gameRoomId: string): Promise<RoomSnapshot | null> {
+    return this.snapshots.get(gameRoomId) ?? null;
+  }
+
+  async readEventsAfter(
+    gameRoomId: string,
+    afterEventId: string,
+    limit: number
+  ): Promise<RoomCommittedEvent[]> {
+    return (this.eventsByRoom.get(gameRoomId) ?? [])
+      .filter((event) => !afterEventId || isEventIdAfter(event.id, afterEventId))
+      .sort((a, b) => compareEventIds(a.id, b.id))
+      .slice(0, limit)
+      .map(copyEvent);
+  }
+
+  private assertOwned(gameRoomId: string, fencingToken: bigint): void {
+    const ownership = this.ownership.get(gameRoomId);
+    if (
+      !ownership ||
+      ownership.fencingToken !== fencingToken ||
+      ownership.leaseExpiresAt <= new Date()
+    ) {
+      throw new Error("lost ownership");
+    }
+  }
+}
+
+export class DrizzleRoomCommitStore implements RoomCommitStore {
+  constructor(private readonly db: DbClient) {}
+
+  async commit(staged: StagedRoomCommit): Promise<RoomCommitResult> {
+    return this.db.transaction(async (tx) => {
+      const ownershipRows = await tx
+        .select({ gameRoomId: roomOwnership.gameRoomId })
+        .from(roomOwnership)
+        .where(
+          and(
+            eq(roomOwnership.gameRoomId, staged.gameRoomId),
+            eq(roomOwnership.fencingToken, staged.fencingToken),
+            gt(roomOwnership.leaseExpiresAt, new Date())
+          )
+        )
+        .limit(1)
+        .for("update");
+      if (ownershipRows.length === 0) {
+        throw new Error("lost ownership");
+      }
+
+      const existingCommands = await tx
+        .select()
+        .from(gameCommands)
+        .where(
+          and(
+            eq(gameCommands.gameRoomId, staged.gameRoomId),
+            eq(gameCommands.commandId, staged.commandId)
+          )
+        )
+        .limit(1);
+      const existingCommand = existingCommands[0];
+      if (existingCommand) {
+        const eventRows = await tx
+          .select()
+          .from(gameEvents)
+          .where(
+            and(
+              eq(gameEvents.gameRoomId, staged.gameRoomId),
+              eq(gameEvents.commandId, staged.commandId)
+            )
+          )
+          .orderBy(asc(gameEvents.commandEventIndex));
+        return {
+          status: "duplicate",
+          result: existingCommand.resultJson,
+          events: eventRows.map(eventFromRow),
+          rawSsePayloads: eventRows.map((event) => event.rawSsePayload),
+        };
+      }
+
+      const now = new Date();
+      const events = staged.events.map(copyEvent);
+      const firstEventId = events[0]?.id ?? null;
+      const lastEventId = events.at(-1)?.id ?? null;
+      const snapshotEventId = lastEventId ?? staged.baseSnapshotEventId;
+
+      await tx.insert(gameCommands).values({
+        gameRoomId: staged.gameRoomId,
+        commandId: staged.commandId,
+        kind: staged.kind,
+        actorUserId: staged.actorUserId,
+        status: "committed",
+        resultJson: staged.result,
+        firstEventId,
+        lastEventId,
+        errorCode: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      if (events.length > 0) {
+        await tx.insert(gameEvents).values(
+          events.map((event, index) =>
+            eventToRow(
+              staged.commandId,
+              index,
+              event,
+              staged.rawSsePayloads[index]
+            )
+          )
+        );
+      }
+
+      await tx
+        .insert(roomSnapshots)
+        .values({
+          gameRoomId: staged.gameRoomId,
+          snapshotEventId,
+          canonicalStateJson: staged.canonicalState,
+          displayStateJson: staged.displayState,
+          updatedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: roomSnapshots.gameRoomId,
+          set: {
+            snapshotEventId,
+            canonicalStateJson: rawSql`excluded.canonical_state_json`,
+            displayStateJson: rawSql`excluded.display_state_json`,
+            updatedAt: now,
+          },
+        });
+
+      return {
+        status: "committed",
+        result: staged.result,
+        events,
+        rawSsePayloads: [...staged.rawSsePayloads],
+      };
+    });
+  }
+
+  async loadSnapshot(gameRoomId: string): Promise<RoomSnapshot | null> {
+    const rows = await this.db
+      .select()
+      .from(roomSnapshots)
+      .where(eq(roomSnapshots.gameRoomId, gameRoomId))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      gameRoomId: row.gameRoomId,
+      snapshotEventId: row.snapshotEventId,
+      canonicalState: row.canonicalStateJson,
+      displayState: row.displayStateJson,
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+
+  async readEventsAfter(
+    gameRoomId: string,
+    afterEventId: string,
+    limit: number
+  ): Promise<RoomCommittedEvent[]> {
+    const rows = await this.db
+      .select()
+      .from(gameEvents)
+      .where(eq(gameEvents.gameRoomId, gameRoomId));
+    return rows
+      .map(eventFromRow)
+      .filter((event) => !afterEventId || isEventIdAfter(event.id, afterEventId))
+      .sort((a, b) => compareEventIds(a.id, b.id))
+      .slice(0, limit);
+  }
+}
+
+type GameEventRow = typeof gameEvents.$inferSelect;
+type GameEventInsert = typeof gameEvents.$inferInsert;
+
+function commandMapKey(gameRoomId: string, commandId: string): string {
+  return `${gameRoomId}\0${commandId}`;
+}
+
+function copyEvent(event: RoomCommittedEvent): RoomCommittedEvent {
+  return {
+    id: event.id,
+    gameRoomId: event.gameRoomId,
+    type: event.type,
+    visibility: event.visibility,
+    ...(event.actorId !== undefined ? { actorId: event.actorId } : {}),
+    ...(event.subjectId !== undefined ? { subjectId: event.subjectId } : {}),
+    payload: { ...event.payload },
+    createdAt: event.createdAt,
+  };
+}
+
+function eventFromRow(row: GameEventRow): RoomCommittedEvent {
+  return {
+    id: row.id,
+    gameRoomId: row.gameRoomId,
+    type: row.type,
+    visibility: row.visibility,
+    ...(row.actorId !== null ? { actorId: row.actorId } : {}),
+    ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
+    payload: row.payload as Record<string, unknown>,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function eventToRow(
+  commandId: string,
+  commandEventIndex: number,
+  event: RoomCommittedEvent,
+  rawSsePayload: string | undefined
+): GameEventInsert {
+  return {
+    id: event.id,
+    gameRoomId: event.gameRoomId,
+    commandId,
+    commandEventIndex,
+    type: event.type,
+    visibility: event.visibility,
+    actorId: event.actorId ?? null,
+    subjectId: event.subjectId ?? null,
+    payload: event.payload,
+    rawEventJson: JSON.stringify(event),
+    rawSsePayload: rawSsePayload ?? `data: ${JSON.stringify(event)}\n\n`,
+    visibleToPlayerIds: [],
+    createdAt: new Date(event.createdAt),
+  };
+}
