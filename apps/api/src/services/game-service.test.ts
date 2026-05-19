@@ -56,7 +56,89 @@ function passAgentTurn(input: RuntimeAgentTurnInput) {
   });
 }
 
+function fakeLivekitMeeting() {
+  return {
+    ensureRoom: vi.fn(async () => undefined),
+    setRoomSnapshotProvider: vi.fn(),
+    syncForRoom: vi.fn(async () => undefined),
+    syncForLivekitEvent: vi.fn(async () => undefined),
+    syncPublicSpeaker: vi.fn(async () => undefined),
+    syncWolfDiscussion: vi.fn(async () => undefined),
+    clearPlayerAudio: vi.fn(async () => undefined),
+  };
+}
+
 describe("InMemoryGameService rules", () => {
+  it("installs a room snapshot provider for LiveKit event resync", () => {
+    const games = new InMemoryGameService();
+    const livekitMeeting = fakeLivekitMeeting();
+
+    games.setLivekitMeetingController(livekitMeeting);
+
+    expect(livekitMeeting.setRoomSnapshotProvider).toHaveBeenCalledWith(expect.any(Function));
+    const provider = livekitMeeting.setRoomSnapshotProvider.mock.calls[0]![0];
+    expect(provider("missing")).toBeNull();
+  });
+
+  it("syncs GM subscriptions before playing phase narration", async () => {
+    const games = new InMemoryGameService();
+    const livekitMeeting = fakeLivekitMeeting();
+    const calls: string[] = [];
+    livekitMeeting.syncForRoom.mockImplementation(async () => {
+      calls.push("sync");
+    });
+    games.setLivekitMeetingController(livekitMeeting);
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: () => undefined,
+        playAudioFiles: async () => {
+          calls.push("gm");
+        },
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Rules",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 6)) games.join(room.id, userId, name);
+
+    games.start(room.id, players[0][0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(calls[0]).toBe("sync");
+  });
+
+  it("syncs wolf discussion with living wolves only", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const livekitMeeting = fakeLivekitMeeting();
+    games.setLivekitMeetingController(livekitMeeting);
+    const room = games.snapshot(gameRoomId);
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+    const livingWolves = room.privateStates
+      .filter((state) => state.role === "werewolf" && state.alive)
+      .map((state) => state.playerId);
+
+    await games.advanceGame(gameRoomId, passAgentTurn);
+
+    expect(livekitMeeting.syncWolfDiscussion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: gameRoomId }),
+      livingWolves,
+      "nightWolfDiscussionWindow"
+    );
+  });
+
   it("registers Matrix identities with the voice agent instead of internal player ids", async () => {
     const games = new InMemoryGameService();
     const registrations: Array<{ playerId: string; matrixUserId: string }> = [];

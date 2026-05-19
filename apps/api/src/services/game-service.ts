@@ -21,6 +21,10 @@ import { GmAudioLibrary, type GmAudioAnnouncementContext } from "./gm-audio";
 import type { SseBroker } from "./sse-broker";
 import type { VoiceAgentRegistry } from "./voice-agent";
 import type { GameStore } from "./game-store";
+import type {
+  LivekitMeetingController,
+  LivekitMeetingRoomState,
+} from "./livekit-meeting-controller";
 
 export interface StoredPlayer {
   id: string;
@@ -140,6 +144,13 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function toLivekitMeetingRoomState(
+  room: StoredGameRoom
+): LivekitMeetingRoomState | null {
+  if (!room.projection) return null;
+  return room as unknown as LivekitMeetingRoomState;
+}
+
 export class InMemoryGameService {
   private rooms = new Map<string, StoredGameRoom>();
   private advanceTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -148,6 +159,7 @@ export class InMemoryGameService {
   private runAgentTurnImpl: ((input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>) | null = null;
   private broker: SseBroker | null = null;
   private voiceAgents: VoiceAgentRegistry | null = null;
+  private livekitMeeting: LivekitMeetingController | null = null;
   private store: GameStore | null = null;
   private speechFinalizations = new Map<string, Promise<GameEvent | null>>();
   private gmAudio = new GmAudioLibrary();
@@ -166,6 +178,14 @@ export class InMemoryGameService {
         text: update.text,
         final: update.final,
       });
+    });
+  }
+
+  setLivekitMeetingController(controller: LivekitMeetingController): void {
+    this.livekitMeeting = controller;
+    controller.setRoomSnapshotProvider((gameRoomId) => {
+      const room = this.rooms.get(gameRoomId);
+      return room ? toLivekitMeetingRoomState(room) : null;
     });
   }
 
@@ -410,6 +430,7 @@ export class InMemoryGameService {
     player.leftAt = new Date().toISOString();
     player.onlineState = "offline";
     this.emitPlayerRemovedEvent(room, player, userId);
+    this.syncLivekitMeeting(room, "leave");
     return player;
   }
 
@@ -493,6 +514,7 @@ export class InMemoryGameService {
     player.leftAt = new Date().toISOString();
     player.onlineState = "offline";
     this.emitPlayerRemovedEvent(room, player, callerUserId);
+    this.syncLivekitMeeting(room, "removePlayer");
     this.persistRoom(room);
     return player;
   }
@@ -1315,6 +1337,11 @@ export class InMemoryGameService {
                 createdAt: now.toISOString(),
               },
             ]);
+            this.syncLivekitWolfDiscussion(
+              room,
+              wolves,
+              "nightWolfDiscussionWindow"
+            );
           }
           return this.tickResult(room, before);
         }
@@ -1748,6 +1775,7 @@ export class InMemoryGameService {
         createdAt: now.toISOString(),
       },
     ]);
+    this.syncLivekitMeeting(room, "startPhase");
   }
 
   private async startPhaseAfterAnnouncement(
@@ -1772,6 +1800,7 @@ export class InMemoryGameService {
     context: GmAudioAnnouncementContext
   ): Promise<void> {
     if (!this.voiceAgents) return;
+    await this.syncLivekitMeetingBeforeNarration(room, "beforeGmNarration");
     const voiceAgent = await this.ensureVoiceAgentRegistered(room);
     if (!voiceAgent) return;
     const files = this.gmAudio.resolve(room, context);
@@ -1789,6 +1818,55 @@ export class InMemoryGameService {
     } finally {
       this.announcingRooms.delete(room.id);
     }
+  }
+
+  private async syncLivekitMeetingBeforeNarration(
+    room: StoredGameRoom,
+    reason: string
+  ): Promise<void> {
+    const livekitRoom = toLivekitMeetingRoomState(room);
+    if (!this.livekitMeeting || !livekitRoom) return;
+    await this.livekitMeeting.syncForRoom(livekitRoom, reason);
+  }
+
+  private syncLivekitMeeting(room: StoredGameRoom, reason: string): void {
+    const livekitRoom = toLivekitMeetingRoomState(room);
+    if (!this.livekitMeeting || !livekitRoom) return;
+    void this.livekitMeeting.syncForRoom(livekitRoom, reason);
+  }
+
+  private syncLivekitPublicSpeaker(
+    room: StoredGameRoom,
+    speakerPlayerId: string | null,
+    reason: string
+  ): void {
+    const livekitRoom = toLivekitMeetingRoomState(room);
+    if (!this.livekitMeeting || !livekitRoom) return;
+    void this.livekitMeeting.syncPublicSpeaker(
+      livekitRoom,
+      speakerPlayerId,
+      reason
+    );
+  }
+
+  private syncLivekitWolfDiscussion(
+    room: StoredGameRoom,
+    wolfPlayerIds: string[],
+    reason: string
+  ): void {
+    const livekitRoom = toLivekitMeetingRoomState(room);
+    if (!this.livekitMeeting || !livekitRoom) return;
+    void this.livekitMeeting.syncWolfDiscussion(
+      livekitRoom,
+      wolfPlayerIds,
+      reason
+    );
+  }
+
+  private clearLivekitPlayerAudio(room: StoredGameRoom, reason: string): void {
+    const livekitRoom = toLivekitMeetingRoomState(room);
+    if (!this.livekitMeeting || !livekitRoom) return;
+    void this.livekitMeeting.clearPlayerAudio(livekitRoom, reason);
   }
 
   private async ensureVoiceAgentRegistered(room: StoredGameRoom) {
@@ -1829,6 +1907,11 @@ export class InMemoryGameService {
       version: room.events.length + 1,
     };
     this.emitSpeechTurnStarted(room, previousSpeakerPlayerId, now);
+    this.syncLivekitPublicSpeaker(
+      room,
+      currentSpeakerPlayerId,
+      "beginSpeechQueue"
+    );
   }
 
   private deadlineForSpeechSpeaker(
@@ -2787,6 +2870,11 @@ export class InMemoryGameService {
       deadlineAt: nextDeadlineAt,
       version: room.events.length + 1,
     };
+    this.syncLivekitPublicSpeaker(
+      room,
+      nextSpeakerPlayerId,
+      "advanceSpeechSpeaker"
+    );
   }
 
   private emitSpeechTurnStarted(
@@ -2824,6 +2912,7 @@ export class InMemoryGameService {
         (playerId) => !eliminated.has(playerId)
       ),
     };
+    this.syncLivekitMeeting(room, "markEliminated");
   }
 
   private endGame(
@@ -2855,6 +2944,7 @@ export class InMemoryGameService {
       deadlineAt: null,
       currentSpeakerPlayerId: null,
     };
+    this.clearLivekitPlayerAudio(room, "endGame");
     // Tear down voice agent when the game ends.
     if (this.voiceAgents) {
       void this.voiceAgents
