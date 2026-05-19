@@ -398,6 +398,23 @@
   width: var(--action-secondary-button-width) !important;
 }
 
+.game-layout-root .action-region .stage-add-player {
+  --ww-button-content-inset-x: 0px;
+  --ww-button-label-optical-y: 0px;
+}
+
+.game-layout-root .action-region .stage-add-player .ww-game-button__content,
+.game-layout-root .action-region .stage-add-player .ww-game-button__label {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.game-layout-root .action-region .stage-add-player .ww-game-button__label {
+  transform: none;
+}
+
 .game-layout-root .action-region .phase-card > .stage-identity,
 .game-layout-root .action-region .phase-card > .phase-kicker,
 .game-layout-root .action-region .phase-card > .phase-title,

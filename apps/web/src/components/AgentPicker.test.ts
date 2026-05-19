@@ -70,4 +70,13 @@ describe("AgentPicker", () => {
     expect(html).toContain('<span class="ww-game-button__label">-</span>');
     expect(html).not.toContain("已入座");
   });
+
+  it("tells users to select an agent without showing the source room description", () => {
+    const html = renderPicker();
+
+    expect(html).toContain("选择 Agent 进入");
+    expect(html).not.toContain("从源 Matrix 房间挑选 AI");
+    expect(html).not.toContain("源房间 id");
+    expect(html).not.toContain("!source:keepsecret.io");
+  });
 });

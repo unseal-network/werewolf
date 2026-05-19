@@ -60,6 +60,24 @@ describe("new UI primitives", () => {
     expect(css).toContain("--ww-agent-add-size: 44px");
   });
 
+  it("keeps compact agent add/remove glyphs visible inside the circular button", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
+      "utf8"
+    );
+    const agentButtonCss = css.slice(
+      css.indexOf(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button"),
+      css.indexOf("@media (max-width: 560px)")
+    );
+
+    expect(agentButtonCss).toContain("--ww-button-content-inset-x: 0px");
+    expect(agentButtonCss).toContain("width: 100%");
+    expect(agentButtonCss).toContain("height: 100%");
+    expect(agentButtonCss).toContain("display: grid");
+    expect(agentButtonCss).toContain("place-items: center");
+    expect(agentButtonCss).toContain("transform: none");
+  });
+
   it("renders decision buttons with live text and verified 9-slice variants", () => {
     const html = renderToStaticMarkup(
       createElement(
@@ -111,6 +129,53 @@ describe("new UI primitives", () => {
 
     expect(html).toContain("ww-game-button--primary");
     expect(html).not.toContain("ww-game-button--confirm");
+  });
+
+  it("centers the lobby add-agent glyph inside its short stage button", () => {
+    const html = renderToStaticMarkup(
+      createElement(StageActionButton, {
+        className: "stage-skip stage-add-player",
+        label: "+",
+        variant: "secondary",
+      })
+    );
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
+
+    expect(html).toContain("stage-add-player");
+    expect(html).toContain('<span class="ww-game-button__label">+</span>');
+    expect(css).toContain(".game-layout-root .action-region .stage-add-player .ww-game-button__label");
+    expect(css).toContain("--ww-button-label-optical-y: 0px");
+    expect(css).toContain("width: 100%");
+    expect(css).toContain("height: 100%");
+    expect(css).toContain("display: grid");
+    expect(css).toContain("place-items: center");
+    expect(css).toContain("transform: none");
+  });
+
+  it("keeps native one-glyph buttons centered across responsive layouts", () => {
+    const hudCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/hud.css"),
+      "utf8"
+    );
+    const legacyCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/legacy.css"),
+      "utf8"
+    );
+
+    expect(hudCss).toContain(".game-layout-root .hud-back-button");
+    expect(hudCss).toContain("display: grid");
+    expect(hudCss).toContain("place-items: center");
+    expect(hudCss).toContain("padding: 0");
+    expect(legacyCss).toContain(".sheet-close,");
+    expect(legacyCss).toContain(".profile-close,");
+    expect(legacyCss).toContain(".seer-result-close");
+    expect(legacyCss).toContain("display: grid");
+    expect(legacyCss).toContain("place-items: center");
+    expect(legacyCss).toContain("padding: 0");
+    expect(legacyCss).toContain("line-height: 1");
   });
 
   it("removes legacy action button press overlays from the new button skins", () => {

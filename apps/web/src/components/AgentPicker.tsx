@@ -24,7 +24,6 @@ export function AgentPicker({
   loading,
   agents,
   errorMessage,
-  sourceRoomId,
   remainingSeats,
   canStartNow,
   onAdd,
@@ -86,11 +85,6 @@ export function AgentPicker({
         <div className="agent-picker-head">
           <div>
             <div className="agent-picker-title">{t("agentPicker.title")}</div>
-            <div className="agent-picker-sub">
-              {sourceRoomId
-                ? t("agentPicker.empty.help", { room: sourceRoomId })
-                : ""}
-            </div>
           </div>
           <button
             type="button"

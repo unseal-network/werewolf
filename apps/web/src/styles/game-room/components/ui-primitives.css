@@ -547,6 +547,7 @@
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button {
   --ww-agent-add-size: 44px;
+  --ww-button-content-inset-x: 0px;
   width: var(--ww-agent-add-size);
   height: var(--ww-agent-add-size);
   aspect-ratio: 1;
@@ -571,7 +572,19 @@
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button .ww-game-button__content {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
   padding: 0;
+}
+
+.game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button .ww-game-button__label {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  transform: none;
 }
 
 @media (max-width: 560px) {
