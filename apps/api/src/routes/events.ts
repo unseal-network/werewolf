@@ -95,6 +95,9 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
                 const event = eventFromSsePayload(row.rawSsePayload);
                 return event ? [{ ...row, event }] : [];
               });
+              for (const row of dbEvents) {
+                replayedEventIds.add(row.id);
+              }
               const visibleEventIds = new Set(
                 filterEventsForUser(
                   dbEvents.map((row) => row.event),
@@ -105,7 +108,6 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
               );
               for (const row of dbEvents) {
                 if (!visibleEventIds.has(row.event.id)) continue;
-                replayedEventIds.add(row.id);
                 controller.enqueue(encoder.encode(row.rawSsePayload));
               }
             } catch (err) {
