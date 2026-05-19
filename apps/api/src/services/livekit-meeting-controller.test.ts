@@ -140,4 +140,84 @@ describe("ServerLivekitMeetingController", () => {
     expect(bobAllowed?.trackSids).not.toContain("TR_ALICE");
     expect(bobAllowed?.trackSids).not.toContain("TR_CARA");
   });
+
+  it("resyncs newly published microphone tracks through the room snapshot provider", async () => {
+    const service = fakeRoomService();
+    service.listParticipants
+      .mockResolvedValueOnce([
+        { identity: "@alice:example.com", tracks: [] },
+        { identity: "@bob:example.com", tracks: [] },
+        { identity: "voice-agent:game_1", tracks: [{ sid: "TR_GM", type: 0 }] },
+      ])
+      .mockResolvedValueOnce([
+        { identity: "@alice:example.com", tracks: [] },
+        { identity: "@bob:example.com", tracks: [{ sid: "TR_BOB_LATE", type: 0 }] },
+        { identity: "voice-agent:game_1", tracks: [{ sid: "TR_GM", type: 0 }] },
+      ]);
+    const controller = new ServerLivekitMeetingController(service);
+    controller.setRoomSnapshotProvider((roomId) =>
+      roomId === "game_1" ? makeRoom("day_speak", "player_2", 11) : null
+    );
+
+    await controller.syncForRoom(makeRoom("day_speak", "player_2", 10));
+    await controller.syncForLivekitEvent("game_1", "trackPublished");
+
+    expect(service.updateSubscriptions).toHaveBeenCalledWith(
+      "game_1",
+      "@alice:example.com",
+      ["TR_BOB_LATE", "TR_GM"],
+      true
+    );
+  });
+
+  it("does not let an older queued sync restore stale permissions after a newer version", async () => {
+    const service = fakeRoomService();
+    let releaseFirstList: (() => void) | null = null;
+    service.listParticipants.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseFirstList = () =>
+            resolve([
+              { identity: "@alice:example.com", tracks: [{ sid: "TR_ALICE", type: 0 }] },
+              { identity: "@bob:example.com", tracks: [{ sid: "TR_BOB", type: 0 }] },
+              { identity: "voice-agent:game_1", tracks: [{ sid: "TR_GM", type: 0 }] },
+            ]);
+        })
+    );
+    const controller = new ServerLivekitMeetingController(service);
+
+    const oldSync = controller.syncForRoom(makeRoom("day_speak", "player_2", 10));
+    await vi.waitFor(() => expect(service.listParticipants).toHaveBeenCalledTimes(1));
+    const newSync = controller.syncForRoom(makeRoom("night_wolf", null, 11));
+    releaseFirstList?.();
+    await Promise.all([oldSync, newSync]);
+
+    const bobGrants = service.updateParticipant.mock.calls.filter(
+      ([, identity]) => identity === "@bob:example.com"
+    );
+    expect(bobGrants.at(-1)?.[2]).toEqual(
+      expect.objectContaining({
+        permission: expect.objectContaining({ canPublish: false }),
+      })
+    );
+  });
+
+  it("continues syncing other participants when one participant update fails", async () => {
+    const service = fakeRoomService();
+    service.updateParticipant.mockImplementation(async (_room, identity) => {
+      if (identity === "@alice:example.com") throw new Error("participant not found");
+      return {};
+    });
+    const controller = new ServerLivekitMeetingController(service);
+
+    await controller.syncForRoom(makeRoom("day_speak", "player_2"));
+
+    expect(service.updateParticipant).toHaveBeenCalledWith(
+      "game_1",
+      "@bob:example.com",
+      expect.objectContaining({
+        permission: expect.objectContaining({ canPublish: true }),
+      })
+    );
+  });
 });
