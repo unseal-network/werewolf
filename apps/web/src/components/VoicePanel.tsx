@@ -23,6 +23,17 @@ export interface VoicePanelProps {
   switchToTextLabel: string;
 }
 
+function micStartErrorMessage(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  if (
+    message.toLowerCase().includes("insufficient permissions") ||
+    message.includes("PublishTrackError")
+  ) {
+    return "还没轮到你发言";
+  }
+  return message;
+}
+
 /**
  * Speech input panel. Lets a player choose between microphone (voice) and
  * keyboard (text) input. When the player ends voice input, the server flushes
@@ -78,7 +89,7 @@ export function VoicePanel({
       }
     } catch (err) {
       console.error("[VoicePanel] mic start error:", err);
-      setMicError(err instanceof Error ? err.message : String(err));
+      setMicError(micStartErrorMessage(err));
       if (micPressTokenRef.current === pressToken) {
         micPressActiveRef.current = false;
         setMicPressing(false);

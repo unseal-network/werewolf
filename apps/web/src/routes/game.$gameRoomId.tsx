@@ -444,6 +444,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   const [actionLoading, setActionLoading] = useState(false);
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitServerUrl, setLivekitServerUrl] = useState<string | null>(null);
+  const livekitCredentialKeyRef = useRef<string>("");
   const [roleRevealNonce, setRoleRevealNonce] = useState(0);
   const [roleRevealOpen, setRoleRevealOpen] = useState(false);
   // Tick once per second so countdown text re-renders smoothly between SSE
@@ -629,24 +630,20 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   }, [myPrivateState]);
   const isCreator = room?.creatorUserId === matrixUserId;
 
-  // Fetch LiveKit token once the player is in the room. Token is reused for
-  // the whole session; the VoiceRoomProvider handles connect/disconnect.
-  //
-  // Keying the effect on `myPlayer?.id` (a stable string) rather than the
-  // whole `myPlayer` object is critical — `myPlayer` is recomputed via
-  // useMemo whenever `room` changes (which happens on every SSE-triggered
-  // refresh), and re-fetching would create a new JWT every time, which in
-  // turn would cause VoiceRoomProvider to tear down and re-establish the
-  // LiveKit connection. With the stable id, we fetch once per game session.
   const myPlayerId = myPlayer?.id;
-  const roomIdForVoice = room?.id;
-  const voiceIdentityMode = roomIdForVoice
-    ? `${roomIdForVoice}:${myPlayerId ?? "spectator"}`
-    : "";
   useEffect(() => {
-    if (!room || !matrixUserId || !myPlayerId) {
+    if (!matrixUserId) {
+      livekitCredentialKeyRef.current = "";
       setLivekitToken(null);
       setLivekitServerUrl(null);
+      return;
+    }
+    const credentialKey = `${gameRoomId}:${matrixUserId}`;
+    if (
+      livekitCredentialKeyRef.current === credentialKey &&
+      livekitToken &&
+      livekitServerUrl
+    ) {
       return;
     }
     let cancelled = false;
@@ -657,22 +654,23 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         console.info("[VoiceRoom] livekit token ready", {
           gameRoomId,
           identity: res.identity,
-          canPublish: Boolean(res.canPublish),
           hasServerUrl: Boolean(res.serverUrl),
         });
+        livekitCredentialKeyRef.current = credentialKey;
         setLivekitToken(res.token);
         setLivekitServerUrl(res.serverUrl);
       })
       .catch((err) => {
         if (cancelled) return;
         console.warn("[LiveKit] token fetch failed:", err);
+        livekitCredentialKeyRef.current = "";
         setLivekitToken(null);
         setLivekitServerUrl(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [voiceIdentityMode, matrixUserId, client, gameRoomId, roomIdForVoice]);
+  }, [matrixUserId, client, gameRoomId, livekitToken, livekitServerUrl]);
 
   useEffect(() => {
     return () => {

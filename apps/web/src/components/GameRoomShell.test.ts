@@ -429,13 +429,36 @@ describe("game room seat layout", () => {
     expect(leaveBody).not.toContain("void stopMicrophone()");
   });
 
-  it("only fetches a LiveKit token after the viewer is seated as a player", () => {
-    const gameRoute = readFileSync(
+  it("does not fetch a new LiveKit token when voice recording starts", () => {
+    const route = readFileSync(
       resolve(process.cwd(), "apps/web/src/routes/game.$gameRoomId.tsx"),
       "utf8"
     );
+    const centerStage = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/CenterStage.tsx"),
+      "utf8"
+    );
+    const voicePanel = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoicePanel.tsx"),
+      "utf8"
+    );
 
-    expect(gameRoute).toContain("if (!room || !matrixUserId || !myPlayerId)");
+    expect(route).not.toContain("requestPublishVoiceToken");
+    expect(route).not.toContain("livekitCanPublish");
+    expect(route).not.toContain("livekitPublishTokenInFlightRef");
+    expect(centerStage).not.toContain("onRequestPublishVoice");
+    expect(centerStage).not.toContain("canPublishVoice");
+    expect(voicePanel).not.toContain("onRequestPublishVoice");
+    expect(voicePanel).not.toContain("canPublishVoice");
+  });
+
+  it("does not auto-subscribe to LiveKit tracks in the browser", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+    expect(voiceRoom).toContain("autoSubscribe: false");
+    expect(voiceRoom).not.toContain("publication.setSubscribed(true)");
   });
 
   it("does not preflight LiveKit immediately before connecting", () => {

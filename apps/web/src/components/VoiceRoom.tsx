@@ -214,7 +214,6 @@ export function VoiceRoomProvider({
             trackSid: publication.trackSid,
             participantIdentity: participant.identity,
           });
-          publication.setSubscribed(true);
         }
       })
       .on(RoomEvent.TrackSubscribed, attachAudio)
@@ -261,7 +260,7 @@ export function VoiceRoomProvider({
     eagerStartAudio();
 
     void lkRoom
-      .connect(serverUrl, token, { autoSubscribe: true })
+      .connect(serverUrl, token, { autoSubscribe: false })
       .then(() => {
         if (cancelled) {
           void lkRoom.disconnect().catch(() => {});
@@ -273,9 +272,6 @@ export function VoiceRoomProvider({
         setRoom(lkRoom);
         for (const participant of lkRoom.remoteParticipants.values()) {
           for (const publication of participant.trackPublications.values()) {
-            if (publication.kind === Track.Kind.Audio) {
-              publication.setSubscribed(true);
-            }
             if (publication.track && publication.isSubscribed) {
               attachAudio(publication.track, publication, participant);
             }
@@ -307,7 +303,7 @@ export function VoiceRoomProvider({
               // on a fresh room — effect deps (serverUrl/token) haven't changed.
               setState("connecting");
               void lkRoom
-                .connect(serverUrl, token, { autoSubscribe: true })
+                .connect(serverUrl, token, { autoSubscribe: false })
                 .then(() => {
                   if (cancelled) {
                     void lkRoom.disconnect().catch(() => {});
@@ -318,9 +314,6 @@ export function VoiceRoomProvider({
                   setRoom(lkRoom);
                   for (const participant of lkRoom.remoteParticipants.values()) {
                     for (const publication of participant.trackPublications.values()) {
-                      if (publication.kind === Track.Kind.Audio) {
-                        publication.setSubscribed(true);
-                      }
                       if (publication.track && publication.isSubscribed) {
                         attachAudio(publication.track, publication, participant);
                       }
