@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { createEventIdFactory, validateWorkerId } from "./event-id";
+import {
+  createEventIdFactory,
+  readRequiredWorkerIdFromEnv,
+  validateWorkerId,
+} from "./event-id";
 
 describe("snowflake event ids", () => {
   it("are unique and sortable within one worker", () => {
@@ -24,5 +28,15 @@ describe("snowflake event ids", () => {
     expect(() => validateWorkerId(-1)).toThrow("workerId");
     expect(() => validateWorkerId(1024)).toThrow("workerId");
     expect(() => validateWorkerId(Number.NaN)).toThrow("workerId");
+  });
+
+  it("parses worker id env as strict decimal integers", () => {
+    expect(readRequiredWorkerIdFromEnv({ EVENT_ID_WORKER_ID: "0" })).toBe(0);
+    expect(readRequiredWorkerIdFromEnv({ EVENT_ID_WORKER_ID: "1023" })).toBe(1023);
+    expect(() => readRequiredWorkerIdFromEnv({})).toThrow("EVENT_ID_WORKER_ID");
+    expect(() => readRequiredWorkerIdFromEnv({ EVENT_ID_WORKER_ID: "" })).toThrow("EVENT_ID_WORKER_ID");
+    expect(() => readRequiredWorkerIdFromEnv({ EVENT_ID_WORKER_ID: " " })).toThrow("EVENT_ID_WORKER_ID");
+    expect(() => readRequiredWorkerIdFromEnv({ EVENT_ID_WORKER_ID: "1.0" })).toThrow("EVENT_ID_WORKER_ID");
+    expect(() => readRequiredWorkerIdFromEnv({ EVENT_ID_WORKER_ID: "0x1" })).toThrow("EVENT_ID_WORKER_ID");
   });
 });

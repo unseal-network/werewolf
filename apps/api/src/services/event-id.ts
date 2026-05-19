@@ -41,7 +41,7 @@ export function createEventIdFactory(options: EventIdFactoryOptions) {
 
 export function readRequiredWorkerIdFromEnv(env = process.env): number {
   const raw = env.EVENT_ID_WORKER_ID;
-  if (raw === undefined || raw === "") {
+  if (raw === undefined || !/^(0|[1-9]\d*)$/.test(raw)) {
     throw new Error("EVENT_ID_WORKER_ID is required; assign a unique worker id per API/runtime process");
   }
   return validateWorkerId(Number(raw));
