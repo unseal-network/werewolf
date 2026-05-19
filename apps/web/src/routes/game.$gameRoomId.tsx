@@ -27,6 +27,7 @@ import {
   upsertRoomPlayers,
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
+import { isActionStateConflictError } from "../game/actionConflict";
 import { buildActionExpectation } from "../game/actionExpectation";
 import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
@@ -518,6 +519,44 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       setTimeline((current) => appendTimelineEvent(current, event));
     },
     []
+  );
+
+  const refreshGameSnapshot = useCallback(async () => {
+    const readModel = await client.getGame(gameRoomId);
+    const display = readModel.snapshot.displayState;
+    setRoomSnapshot(display.room);
+    setProjectionSnapshot(display.projection ?? display.room.projection);
+    setPrivateStates(display.privateStates);
+    setTimelineBaseEventId(readModel.snapshot.snapshotEventId);
+    const timelinePage = await client.getTimeline(gameRoomId, {
+      after: readModel.timelineCursor.after,
+      limit: 100,
+    });
+    setTimeline((current) => {
+      const byId = new Map(current.map((event) => [event.id, event]));
+      for (const event of timelinePage.events) byId.set(event.id, event);
+      return Array.from(byId.values()).slice(-260);
+    });
+  }, [client, gameRoomId]);
+
+  const handleActionError = useCallback(
+    async (error: unknown) => {
+      if (isActionStateConflictError(error)) {
+        try {
+          await refreshGameSnapshot();
+          setErrorMessage("行动阶段已变化，已同步最新状态");
+        } catch (refreshError) {
+          setErrorMessage(
+            refreshError instanceof Error
+              ? refreshError.message
+              : String(refreshError)
+          );
+        }
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    },
+    [refreshGameSnapshot]
   );
 
   useEffect(() => {
@@ -1328,7 +1367,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       setSelectedTargetId(null);
       // Server auto-advances after action
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
+      await handleActionError(error);
     } finally {
       setActionLoading(false);
     }
@@ -1361,7 +1400,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       setSpeechDraft("");
       // Server auto-advances after action
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
+      await handleActionError(error);
     } finally {
       setActionLoading(false);
     }
