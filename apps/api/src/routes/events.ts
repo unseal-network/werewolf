@@ -8,6 +8,7 @@ import {
 import type { SseBroker } from "../services/sse-broker";
 import type { GameStore } from "../services/game-store";
 import type { InMemoryGameService } from "../services/game-service";
+import { compareEventIds, isEventIdAfter } from "../services/event-id-cursor";
 import { filterEventsForUser } from "./games";
 
 export interface EventsRouteDeps {
@@ -79,10 +80,21 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
           controller.enqueue(encoder.encode(serializeSnapshot()));
 
+          const liveBuffer: Array<{ id: string; payload: string }> = [];
+          let initialReplayComplete = false;
+          const pushOrBufferLive = (payload: string) => {
+            if (initialReplayComplete) {
+              pushVisible(payload);
+              return;
+            }
+            const event = eventFromSsePayload(payload);
+            if (event) liveBuffer.push({ id: event.id, payload });
+          };
+
           const { replay, unsubscribe } = broker.subscribe(
             gameRoomId,
             lastEventId,
-            pushVisible
+            pushOrBufferLive
           );
 
           const replayedEventIds = new Set<string>();
@@ -117,8 +129,18 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
           for (const item of replay) {
             if (replayedEventIds.has(item.id)) continue;
+            replayedEventIds.add(item.id);
             pushVisible(item.payload);
           }
+
+          for (const item of liveBuffer.sort((a, b) => compareEventIds(a.id, b.id))) {
+            if (!isEventIdAfter(item.id, lastEventId)) continue;
+            if (replayedEventIds.has(item.id)) continue;
+            replayedEventIds.add(item.id);
+            pushVisible(item.payload);
+          }
+          liveBuffer.length = 0;
+          initialReplayComplete = true;
 
           c.req.raw.signal.addEventListener("abort", () => unsubscribe(), {
             once: true,

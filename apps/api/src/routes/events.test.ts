@@ -124,6 +124,65 @@ describe("events API", () => {
     expect(replay).toBe(phasePayload);
     expect(noExtra).toBe("timeout");
   });
+
+  it("buffers live events until durable replay has been sent", async () => {
+    const deps = createTestDeps();
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+
+    const durableEvent = {
+      id: "game_1_2",
+      gameRoomId: room.id,
+      type: "phase_started",
+      visibility: "public",
+      payload: { phase: "day_discussion" },
+      createdAt: "2026-05-19T00:00:00.000Z",
+    } as unknown as GameEvent;
+    const liveEvent = {
+      id: "game_1_3",
+      gameRoomId: room.id,
+      type: "speech_submitted",
+      visibility: "public",
+      payload: { text: "hello" },
+      createdAt: "2026-05-19T00:00:01.000Z",
+    } as unknown as GameEvent;
+    const durablePayload = `id: ${durableEvent.id}\ndata: ${JSON.stringify(durableEvent)}\n\n`;
+    const livePayload = `id: ${liveEvent.id}\ndata: ${JSON.stringify(liveEvent)}\n\n`;
+    const broker = new SseBroker();
+
+    const store = {
+      async loadRawSsePayloadsAfter() {
+        broker.publish(room.id, liveEvent.id, liveEvent);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return [{ id: durableEvent.id, rawSsePayload: durablePayload }];
+      },
+    } as unknown as GameStore;
+    const app = createApp({ ...deps, broker, store });
+
+    const response = await app.request(`/games/${room.id}/subscribe`, {
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "last-event-id": "game_1_1",
+      },
+    });
+    const reader = response.body!.getReader();
+
+    await readNextSseChunk(reader);
+    const durableReplay = await readNextSseChunk(reader);
+    const liveReplay = await readNextSseChunk(reader);
+    await reader.cancel();
+
+    expect(durableReplay).toBe(durablePayload);
+    expect(liveReplay).toBe(livePayload);
+  });
 });
 
 async function readNextSseChunk(
