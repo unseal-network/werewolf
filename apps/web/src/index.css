@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+/* ── Design tokens ───────────────────────────────────────────────── */
+@theme {
+  --color-gold:           #d4b15c;
+  --color-gold-muted:     rgb(212 177 92 / 0.18);
+  --color-gold-border:    rgb(207 176 91 / 0.28);
+  --color-purple-text:    #c4b5fd;
+  --color-purple-dim:     rgb(109 40 217 / 0.25);
+  --color-purple-glow:    rgb(139 92 246 / 0.3);
+  --color-ink:            #e2e8f0;
+  --color-ink-muted:      #64748b;
+  --color-ink-faint:      #475569;
+  --color-surface-1:      rgb(255 255 255 / 0.04);
+  --color-surface-2:      rgb(255 255 255 / 0.07);
+}
+
 /* ── Safe area CSS variables ─────────────────────────────────────── */
 :root {
   --web-safe-area-top: 0px;

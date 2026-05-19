@@ -173,6 +173,11 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
             className={`seat-role-badge seat-role-badge-${badgeId}`}
           />
         ) : null}
+        {seat.isCurrentSpeaker && !seat.isEmpty ? (
+          <span className="seat-speaking-badge" aria-hidden>
+            <span /><span /><span />
+          </span>
+        ) : null}
         {!seat.isEmpty ? <span className="seat-number-badge">{seat.seatNo}</span> : null}
       </div>
     </button>

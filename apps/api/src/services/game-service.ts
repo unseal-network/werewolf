@@ -1794,7 +1794,16 @@ export class InMemoryGameService {
   private async ensureVoiceAgentRegistered(room: StoredGameRoom) {
     if (!this.voiceAgents) return null;
     if (typeof this.voiceAgents.getOrCreate !== "function") return null;
-    const voiceAgent = await this.voiceAgents.getOrCreate(room.id);
+    let voiceAgent: import("./voice-agent").VoiceAgentService;
+    try {
+      voiceAgent = await this.voiceAgents.getOrCreate(room.id);
+    } catch (err) {
+      console.error("[VoiceAgent] ensureVoiceAgentRegistered: connect failed, voice unavailable", {
+        gameRoomId: room.id,
+        err,
+      });
+      return null;
+    }
     for (const player of room.players) {
       if (player.leftAt) continue;
       const matrixUserId = resolvePlayerMatrixUserId(player);

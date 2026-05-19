@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createApiClient, defaultApiBaseUrl, type GameEventDto, type GameRoom, type RoomPlayer, type PlayerPrivateState, type RoomProjection } from "../api/client";
+import { createApiClient, defaultApiBaseUrl, type AgentCandidate, type GameEventDto, type GameRoom, type RoomPlayer, type PlayerPrivateState, type RoomProjection } from "../api/client";
+import { useIframeAuth } from "../hooks/useIframeAuth";
+import { isHostRuntime } from "../runtime/hostBridge";
+import type { MemberInfo } from "@unseal-network/game-sdk";
 import { GameRoomShell } from "../components/GameRoomShell";
 import { CenterStage, type ActionMode, type ConfirmMode } from "../components/CenterStage";
 import { CenterInfoPanel } from "../components/CenterInfoPanel";
@@ -10,7 +13,6 @@ import { StartDialog } from "../components/StartDialog";
 import { AgentPicker } from "../components/AgentPicker";
 import { SeerResultDialog } from "../components/SeerResultDialog";
 import { VoiceRoomProvider } from "../components/VoiceRoom";
-import type { AgentCandidate } from "../api/client";
 import { getPhaseAnimationCue } from "../animation/phaseCatalog";
 import { useT } from "../i18n/I18nProvider";
 import type { SceneId } from "../components/GameRoomShell";
@@ -296,6 +298,26 @@ function mapServerPhaseToUi(phase: string | null): PhaseUiSpec {
   }
 }
 
+function memberToAgentCandidate(
+  member: MemberInfo,
+  roomPlayers: RoomPlayer[]
+): AgentCandidate {
+  const alreadyJoined = roomPlayers.some(
+    (p) =>
+      !p.leftAt &&
+      (p.userId === member.userId ||
+        (member.agentId != null && p.agentId === member.agentId))
+  );
+  return {
+    userId: member.userId,
+    displayName: member.displayName,
+    userType: member.isAgent ? "agent" : "user",
+    membership: "join",
+    alreadyJoined,
+    ...(member.avatarUrl !== undefined ? { avatarUrl: member.avatarUrl } : {}),
+  };
+}
+
 function uniqueSeatOrder(players: RoomPlayer[]): RoomPlayer[] {
   const bySeat = new Map<number, RoomPlayer>();
   for (const player of players) {
@@ -392,6 +414,8 @@ function parseCurrentSpeakerSeat(
 
 export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLeave?: (() => void) | undefined }) {
   const t = useT();
+  const { iframeMessage } = useIframeAuth();
+  const hostRuntime = useMemo(() => isHostRuntime(), []);
   const [matrixToken] = useState(() => readMatrixToken());
   const [matrixUserId, setMatrixUserId] = useState(
     () => readStoredMatrixUserId() ?? DEMO_USER_ID
@@ -1159,15 +1183,24 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setAgentLoading(true);
     setAgentError(undefined);
     try {
-      const result = await client.listAgentCandidates(gameRoomId);
-      setAgentCandidates(result.agents);
-      setAgentSourceRoomId(result.roomId);
+      if (hostRuntime) {
+        const members = await iframeMessage.getMembers();
+        const candidates = members
+          .filter((m) => !m.isSelf)
+          .map((m) => memberToAgentCandidate(m, room?.players ?? []));
+        setAgentCandidates(candidates);
+        setAgentSourceRoomId(undefined);
+      } else {
+        const result = await client.listAgentCandidates(gameRoomId);
+        setAgentCandidates(result.agents);
+        setAgentSourceRoomId(result.roomId);
+      }
     } catch (error) {
       setAgentError(error instanceof Error ? error.message : String(error));
     } finally {
       setAgentLoading(false);
     }
-  }, [client, gameRoomId]);
+  }, [client, gameRoomId, hostRuntime, iframeMessage, room?.players]);
 
   async function addAgentToSeat(agent: AgentCandidate) {
     try {

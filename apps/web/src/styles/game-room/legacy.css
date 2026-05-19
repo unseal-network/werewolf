@@ -247,7 +247,7 @@ button {
   isolation: isolate;
   overflow: hidden;
   transition: color 320ms ease;
-  padding-top: var(--web-safe-area-top);
+  /* padding-top: var(--web-safe-area-top); */
 }
 
 /* Deal: warm gold moment */

@@ -422,19 +422,10 @@ export function TestCreatePage({
           <button
             type="submit"
             disabled={submitting}
-            className="w-full min-h-[54px] mt-2 rounded-[9px] text-[#141009] font-black text-lg transition-all hover:-translate-y-px active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0"
+            className="w-full min-h-[54px] mt-2 rounded-[9px] text-[#141009] font-black text-lg transition-all hover:-translate-y-px hover:shadow-[0_18px_42px_rgba(212,177,92,0.34)] active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-y-0"
             style={{
               background: "linear-gradient(180deg, #f1d58a, #d4b15c)",
               boxShadow: "0 14px 34px rgba(212,177,92,0.24)",
-            }}
-            onMouseEnter={(e) => {
-              if (!submitting)
-                (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                  "0 18px 42px rgba(212,177,92,0.34)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                "0 14px 34px rgba(212,177,92,0.24)";
             }}
           >
             {submitting ? "..." : t("create.submit")}

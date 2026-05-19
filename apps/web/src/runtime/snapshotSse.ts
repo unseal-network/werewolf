@@ -227,6 +227,7 @@ export function useSnapshotSse({
     close();
     const source = new EventSource(subscribeUrl);
     source.onmessage = (event) => {
+      // un.log('[onmessage]', event.data)
       const parsed = parseSubscribeMessage(event.data);
       if (!parsed) return;
       onMessageRef.current?.(parsed);

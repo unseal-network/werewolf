@@ -12,6 +12,7 @@ export default defineConfig({
   base: normalizeBasePath(process.env.VITE_APP_BASE_PATH ?? process.env.BASE_PATH),
   plugins: [tailwindcss(), react()],
   server: {
+    host: '0.0.0.0',
     allowedHosts: ["keepsecret.io"],
     hmr: process.env.VITE_HMR_HOST
       ? {

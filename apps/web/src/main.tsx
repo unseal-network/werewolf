@@ -228,10 +228,10 @@ function App() {
 
   // Loading states (host runtime only)
   if (hostRuntime && hostBootstrap.status === "checking") {
-    return <LoadingPage isAdmin={isAdmin} />;
+    return <LoadingPage isAdmin={isAdmin} onLeave={() => iframeAuth.iframeMessage.closeApp()} />;
   }
   if (hostRuntime && hostBootstrap.status === "waiting") {
-    return <LoadingPage isAdmin={isAdmin} error="等待房主创建并绑定游戏房间..." />;
+    return <LoadingPage isAdmin={isAdmin} error="等待房主创建并绑定游戏房间..." onLeave={() => iframeAuth.iframeMessage.closeApp()} />;
   }
   if (hostRuntime && hostBootstrap.status === "error") {
     return (
@@ -239,6 +239,7 @@ function App() {
         isAdmin={isAdmin}
         error={hostBootstrap.message}
         onRetry={() => window.location.reload()}
+        onLeave={() => iframeAuth.iframeMessage.closeApp()}
       />
     );
   }

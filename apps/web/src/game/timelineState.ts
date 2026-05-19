@@ -1,3 +1,4 @@
+import { un } from "@unseal-network/mobile-log";
 import type {
   GameEventDto,
   GameRoom,
@@ -563,6 +564,7 @@ export function deriveTimelineDisplayState(
   );
   const room = deriveRoomFromTimeline(roomSnapshot, liveEvents, "");
 
+  // un.log('room', room)
   return {
     room: room
       ? {
