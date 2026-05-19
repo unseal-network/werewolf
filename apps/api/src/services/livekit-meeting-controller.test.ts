@@ -74,7 +74,7 @@ describe("ServerLivekitMeetingController", () => {
       expect.objectContaining({
         permission: expect.objectContaining({
           canPublish: true,
-          canSubscribe: false,
+          canSubscribe: true,
           canPublishData: false,
           canPublishSources: expect.any(Array),
         }),

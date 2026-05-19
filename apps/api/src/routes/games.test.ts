@@ -283,7 +283,7 @@ describe("games API", () => {
     expect(body.card.targetPlayerCount).toBe(6);
   });
 
-  it("issues LiveKit tokens with Matrix identity but no speaker or subscriber grants", async () => {
+  it("issues LiveKit tokens with Matrix identity and listen-only grants", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);
     const { room } = deps.games.createGame(
@@ -313,7 +313,7 @@ describe("games API", () => {
     expect(body.identity).toBe("@alice:example.com");
     expect(body.identity).not.toBe(player.id);
     expect(body.canPublish).toBe(false);
-    expect(body.canSubscribe).toBe(false);
+    expect(body.canSubscribe).toBe(true);
   });
 
   it("delegates LiveKit room creation and event resync to the meeting controller", () => {

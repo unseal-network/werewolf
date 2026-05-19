@@ -58,7 +58,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         room: gameRoomId,
         roomJoin: true,
         canPublish: false,
-        canSubscribe: false,
+        canSubscribe: true,
         canPublishData: false,
       });
 
@@ -83,7 +83,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         room: gameRoomId,
         identity,
         canPublish: false,
-        canSubscribe: false,
+        canSubscribe: true,
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);

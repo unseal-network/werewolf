@@ -267,7 +267,7 @@ export class ServerLivekitMeetingController implements LivekitMeetingController 
       if (!identity) continue;
       await this.tryUpdateParticipant(room.id, identity, {
         canPublish: publishPlayerIds.has(player.id),
-        canSubscribe: false,
+        canSubscribe: true,
         canPublishData: false,
         canPublishSources: [TrackSource.MICROPHONE],
       });
