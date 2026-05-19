@@ -89,16 +89,24 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
           if (store) {
             try {
               const view = perspective();
-              const dbEvents = filterEventsForUser(
-                await store.loadEventsAfter(gameRoomId, lastEventId),
-                view.myPlayerId,
-                view.isWolf,
-                view.revealAll
+              const dbEvents = (
+                await store.loadRawSsePayloadsAfter(gameRoomId, lastEventId)
+              ).flatMap((row) => {
+                const event = eventFromSsePayload(row.rawSsePayload);
+                return event ? [{ ...row, event }] : [];
+              });
+              const visibleEventIds = new Set(
+                filterEventsForUser(
+                  dbEvents.map((row) => row.event),
+                  view.myPlayerId,
+                  view.isWolf,
+                  view.revealAll
+                ).map((event) => event.id)
               );
-              for (const event of dbEvents) {
-                replayedEventIds.add(event.id);
-                const serialized = `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
-                controller.enqueue(encoder.encode(serialized));
+              for (const row of dbEvents) {
+                if (!visibleEventIds.has(row.event.id)) continue;
+                replayedEventIds.add(row.id);
+                controller.enqueue(encoder.encode(row.rawSsePayload));
               }
             } catch (err) {
               console.error("[SSE] DB replay failed:", err);

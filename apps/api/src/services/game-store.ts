@@ -493,6 +493,22 @@ export class GameStore {
       .map(rowToGameEvent);
   }
 
+  async loadRawSsePayloadsAfter(
+    gameRoomId: string,
+    afterEventId: string | null | undefined
+  ): Promise<Array<{ id: string; rawSsePayload: string }>> {
+    const rows = await this.db
+      .select({
+        id: gameEvents.id,
+        rawSsePayload: gameEvents.rawSsePayload,
+      })
+      .from(gameEvents)
+      .where(eq(gameEvents.gameRoomId, gameRoomId));
+    return rows
+      .filter((row) => !afterEventId || isEventIdAfter(row.id, afterEventId))
+      .sort((a, b) => compareEventIds(a.id, b.id));
+  }
+
   /** Drop everything for a room — only used by tests / dev tools. */
   async deleteRoom(roomId: string): Promise<void> {
     await this.db.transaction(async (tx) => {
@@ -525,7 +541,7 @@ function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
 type GameEventRow = typeof gameEvents.$inferSelect;
 type GameEventInsert = typeof gameEvents.$inferInsert;
 
-function toLegacyGameEventRow(
+export function toLegacyGameEventRow(
   roomId: string,
   event: GameEvent
 ): GameEventInsert {
@@ -550,7 +566,7 @@ function toLegacyGameEventRow(
     subjectId: event.subjectId ?? null,
     payload: event.payload,
     rawEventJson: JSON.stringify(rawEvent),
-    rawSsePayload: `data: ${JSON.stringify(event)}\n\n`,
+    rawSsePayload: `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`,
     visibleToPlayerIds: [],
     createdAt: new Date(event.createdAt),
   };
