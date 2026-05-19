@@ -378,7 +378,7 @@ export class GameStore {
     if (roomRows.length === 0) return [];
     const roomIds = roomRows.map((r) => r.id);
 
-    const [playerRows, projRows, privateRows] = await Promise.all([
+    const [playerRows, projRows, privateRows, eventWatermarkRows] = await Promise.all([
       this.db
         .select()
         .from(gameRoomPlayers)
@@ -391,11 +391,19 @@ export class GameStore {
         .select()
         .from(playerPrivateState)
         .where(inArray(playerPrivateState.gameRoomId, roomIds)),
+      this.db
+        .select({
+          gameRoomId: gameEvents.gameRoomId,
+          id: gameEvents.id,
+        })
+        .from(gameEvents)
+        .where(inArray(gameEvents.gameRoomId, roomIds)),
     ]);
 
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
     const projByRoom = new Map(projRows.map((p) => [p.gameRoomId, p]));
     const privateByRoom = groupBy(privateRows, (p) => p.gameRoomId);
+    const eventIdsByRoom = groupBy(eventWatermarkRows, (e) => e.gameRoomId);
 
     return roomRows.map<StoredGameRoom>((r) => {
       const projRow = projByRoom.get(r.id);
@@ -435,6 +443,10 @@ export class GameStore {
         projection: payload?.projection ?? null,
         privateStates,
         events: [],
+        nextEventIndex: nextLegacyEventIndex(
+          r.id,
+          eventIdsByRoom.get(r.id)?.map((event) => event.id) ?? []
+        ),
         pendingNightActions: (payload?.runtime?.pendingNightActions ??
           []) as StoredGameRoom["pendingNightActions"],
         pendingVotes: payload?.runtime?.pendingVotes ?? [],
@@ -523,6 +535,18 @@ function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
     else out.set(k, [item]);
   }
   return out;
+}
+
+export function nextLegacyEventIndex(roomId: string, eventIds: string[]): number {
+  let maxIndex = 0;
+  const prefix = `${roomId}_`;
+  for (const id of eventIds) {
+    if (!id.startsWith(prefix)) continue;
+    const suffix = id.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    maxIndex = Math.max(maxIndex, Number(suffix));
+  }
+  return Math.max(maxIndex, eventIds.length) + 1;
 }
 
 type GameEventInsert = typeof gameEvents.$inferInsert;

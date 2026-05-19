@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent } from "@werewolf/shared";
-import { toLegacyGameEventRow } from "./game-store";
+import { nextLegacyEventIndex, toLegacyGameEventRow } from "./game-store";
 
 describe("GameStore event persistence", () => {
   it("stores raw SSE payloads with id and data lines while keeping raw event JSON as the body", () => {
@@ -28,5 +28,12 @@ describe("GameStore event persistence", () => {
         createdAt: event.createdAt,
       })
     );
+  });
+
+  it("restores the next legacy event index from durable event ids without relying on seq", () => {
+    expect(
+      nextLegacyEventIndex("game_1", ["game_1_2", "game_1_10", "game_1_3"])
+    ).toBe(11);
+    expect(nextLegacyEventIndex("game_1", ["snowflake_a", "snowflake_b"])).toBe(3);
   });
 });

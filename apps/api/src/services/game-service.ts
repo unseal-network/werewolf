@@ -51,6 +51,7 @@ export interface StoredGameRoom {
   projection: RoomProjection | null;
   privateStates: PlayerPrivateState[];
   events: GameEvent[];
+  nextEventIndex?: number;
   pendingNightActions: RuntimeNightAction[];
   pendingVotes: Array<{ actorPlayerId: string; targetPlayerId: string }>;
   speechQueue: string[];
@@ -1698,11 +1699,13 @@ export class InMemoryGameService {
     room: StoredGameRoom,
     events: GameEvent[]
   ): GameEvent[] {
+    const startIndex = room.nextEventIndex ?? room.events.length + 1;
     const assigned = events.map((event, index) => {
-      const seq = room.events.length + index + 1;
+      const seq = startIndex + index;
       return { ...event, id: `${room.id}_${seq}`, seq };
     });
     room.events.push(...assigned);
+    room.nextEventIndex = startIndex + assigned.length;
     if (this.broker) {
       for (const event of assigned) {
         this.broker.publish(room.id, event.id, event);
