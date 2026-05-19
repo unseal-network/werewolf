@@ -272,9 +272,6 @@ export function GameRoomShell({
         }
       }}
     >
-      {co.isMobile && (
-        <MobileHeader onClose={onMobileClose} />
-      )}
       <div className="scene-layer" aria-hidden>
         <GameEngine gameState={engineGameState} />
       </div>
