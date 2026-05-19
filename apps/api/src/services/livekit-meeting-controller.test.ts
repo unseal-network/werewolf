@@ -37,16 +37,16 @@ function makeRoom(
 
 function fakeRoomService() {
   return {
-    createRoom: vi.fn(async () => undefined),
-    listParticipants: vi.fn(async () => [
+    createRoom: vi.fn(async (_options: unknown) => ({})),
+    listParticipants: vi.fn(async (): Promise<Array<{ identity: string; tracks: Array<{ sid: string; type: number }> }>> => [
       { identity: "@alice:example.com", tracks: [{ sid: "TR_ALICE", type: 0 }] },
       { identity: "@bob:example.com", tracks: [{ sid: "TR_BOB", type: 0 }] },
       { identity: "@cara:example.com", tracks: [{ sid: "TR_CARA", type: 0 }] },
       { identity: "@dan:example.com", tracks: [{ sid: "TR_DAN", type: 0 }] },
       { identity: "voice-agent:game_1", tracks: [{ sid: "TR_GM", type: 0 }] },
     ]),
-    updateParticipant: vi.fn(async () => ({})),
-    updateSubscriptions: vi.fn(async () => undefined),
+    updateParticipant: vi.fn(async (_room: string, _identity: string, _options: unknown) => ({})),
+    updateSubscriptions: vi.fn(async (_room: string, _identity: string, _trackSids: string[], _subscribe: boolean) => undefined),
   };
 }
 
@@ -64,7 +64,7 @@ function subscriptionCalls(service: ReturnType<typeof fakeRoomService>) {
 describe("ServerLivekitMeetingController", () => {
   it("public speech lets all living users hear only the current speaker and GM", async () => {
     const service = fakeRoomService();
-    const controller = new ServerLivekitMeetingController(service);
+    const controller = new ServerLivekitMeetingController(service as never);
 
     await controller.syncForRoom(makeRoom("day_speak", "player_2"));
 
@@ -101,7 +101,7 @@ describe("ServerLivekitMeetingController", () => {
 
   it("wolf discussion lets living wolves hear wolf tracks and keeps non-wolves on GM only", async () => {
     const service = fakeRoomService();
-    const controller = new ServerLivekitMeetingController(service);
+    const controller = new ServerLivekitMeetingController(service as never);
 
     await controller.syncForRoom(makeRoom("night_wolf", null));
 
@@ -154,7 +154,7 @@ describe("ServerLivekitMeetingController", () => {
         { identity: "@bob:example.com", tracks: [{ sid: "TR_BOB_LATE", type: 0 }] },
         { identity: "voice-agent:game_1", tracks: [{ sid: "TR_GM", type: 0 }] },
       ]);
-    const controller = new ServerLivekitMeetingController(service);
+    const controller = new ServerLivekitMeetingController(service as never);
     controller.setRoomSnapshotProvider((roomId) =>
       roomId === "game_1" ? makeRoom("day_speak", "player_2", 11) : null
     );
@@ -172,7 +172,9 @@ describe("ServerLivekitMeetingController", () => {
 
   it("does not let an older queued sync restore stale permissions after a newer version", async () => {
     const service = fakeRoomService();
-    let releaseFirstList: (() => void) | null = null;
+    let releaseFirstList: () => void = () => {
+      throw new Error("first listParticipants call did not start");
+    };
     service.listParticipants.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
@@ -184,12 +186,12 @@ describe("ServerLivekitMeetingController", () => {
             ]);
         })
     );
-    const controller = new ServerLivekitMeetingController(service);
+    const controller = new ServerLivekitMeetingController(service as never);
 
     const oldSync = controller.syncForRoom(makeRoom("day_speak", "player_2", 10));
     await vi.waitFor(() => expect(service.listParticipants).toHaveBeenCalledTimes(1));
     const newSync = controller.syncForRoom(makeRoom("night_wolf", null, 11));
-    releaseFirstList?.();
+    releaseFirstList();
     await Promise.all([oldSync, newSync]);
 
     const bobGrants = service.updateParticipant.mock.calls.filter(
@@ -204,11 +206,11 @@ describe("ServerLivekitMeetingController", () => {
 
   it("continues syncing other participants when one participant update fails", async () => {
     const service = fakeRoomService();
-    service.updateParticipant.mockImplementation(async (_room, identity) => {
+    service.updateParticipant.mockImplementation(async (_room: string, identity: string) => {
       if (identity === "@alice:example.com") throw new Error("participant not found");
       return {};
     });
-    const controller = new ServerLivekitMeetingController(service);
+    const controller = new ServerLivekitMeetingController(service as never);
 
     await controller.syncForRoom(makeRoom("day_speak", "player_2"));
 
