@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createApp } from "../app";
 import { createTestDeps } from "../test-utils";
 
@@ -281,7 +283,7 @@ describe("games API", () => {
     expect(body.card.targetPlayerCount).toBe(6);
   });
 
-  it("issues LiveKit tokens with Matrix user id as participant identity", async () => {
+  it("issues LiveKit tokens with Matrix identity but no speaker or subscriber grants", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);
     const { room } = deps.games.createGame(
@@ -310,7 +312,19 @@ describe("games API", () => {
     const body = await response.json();
     expect(body.identity).toBe("@alice:example.com");
     expect(body.identity).not.toBe(player.id);
-    expect(body.canPublish).toBe(true);
+    expect(body.canPublish).toBe(false);
+    expect(body.canSubscribe).toBe(false);
+  });
+
+  it("delegates LiveKit room creation and event resync to the meeting controller", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/api/src/routes/livekit.ts"),
+      "utf8"
+    );
+    expect(source).toContain("livekitMeeting.ensureRoom(gameRoomId)");
+    expect(source).toContain("livekitMeeting.syncForLivekitEvent");
+    expect(source).not.toContain("new RoomServiceClient");
+    expect(source).not.toContain("const ensuredLivekitRooms = new Set<string>()");
   });
 
   it("downloads a visible transcript event by id", async () => {

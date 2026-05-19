@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
+import { AccessToken, WebhookReceiver } from "livekit-server-sdk";
 import { AppError } from "@werewolf/shared";
 import {
   authenticateRequest,
@@ -7,11 +7,13 @@ import {
   type MatrixProfileCache,
 } from "../context/auth";
 import type { InMemoryGameService } from "../services/game-service";
+import type { LivekitMeetingController } from "../services/livekit-meeting-controller";
 
 export interface LivekitRouteDeps {
   matrix: MatrixAuthClient;
   profileCache?: MatrixProfileCache | undefined;
   games: InMemoryGameService;
+  livekitMeeting: LivekitMeetingController;
 }
 
 const LIVEKIT_URL = process.env.LIVEKIT_URL || "ws://localhost:7880";
@@ -20,8 +22,8 @@ const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "secret";
 
 export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
   const app = new Hono();
-  const roomService = new RoomServiceClient(
-    LIVEKIT_URL,
+  const { livekitMeeting } = deps;
+  const webhookReceiver = new WebhookReceiver(
     LIVEKIT_API_KEY,
     LIVEKIT_API_SECRET
   );
@@ -45,7 +47,6 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       const player = room.players.find(
         (p) => p.userId === user.id && !p.leftAt
       );
-      const isPlayer = Boolean(player);
       const identity = user.id;
 
       const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
@@ -56,9 +57,9 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       at.addGrant({
         room: gameRoomId,
         roomJoin: true,
-        canPublish: isPlayer,
-        canSubscribe: true,
-        canPublishData: isPlayer,
+        canPublish: false,
+        canSubscribe: false,
+        canPublishData: false,
       });
 
       const token = await at.toJwt();
@@ -66,21 +67,14 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         gameRoomId,
         userId: user.id,
         identity,
-        canPublish: isPlayer,
+        canPublish: false,
       });
 
       // Ensure the LiveKit room exists before the client tries to connect.
       try {
-        await roomService.createRoom({
-          name: gameRoomId,
-          emptyTimeout: 30 * 60,
-          maxParticipants: 20,
-        });
+        await livekitMeeting.ensureRoom(gameRoomId);
       } catch (err) {
-        // Room may already exist — ignore conflict errors
-        if (err instanceof Error && !err.message.toLowerCase().includes("already")) {
-          console.error("[LiveKit] createRoom failed:", err);
-        }
+        console.error("[LiveKit] createRoom failed:", err);
       }
 
       return c.json({
@@ -88,7 +82,8 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         serverUrl: LIVEKIT_URL,
         room: gameRoomId,
         identity,
-        canPublish: isPlayer,
+        canPublish: false,
+        canSubscribe: false,
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
@@ -106,16 +101,9 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       const gameRoomId = c.req.param("gameRoomId");
       deps.games.snapshot(gameRoomId);
       try {
-        await roomService.createRoom({
-          name: gameRoomId,
-          emptyTimeout: 30 * 60,
-          maxParticipants: 20,
-        });
+        await livekitMeeting.ensureRoom(gameRoomId);
       } catch (err) {
-        // Room may already exist — ignore conflict errors
-        if (err instanceof Error && !err.message.toLowerCase().includes("already")) {
-          throw err;
-        }
+        throw err;
       }
       return c.json({ success: true, room: gameRoomId });
     } catch (error) {
@@ -124,6 +112,27 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         { error: error instanceof Error ? error.message : String(error) },
         400
       );
+    }
+  });
+
+  app.post("/livekit-webhook", async (c) => {
+    try {
+      const body = await c.req.text();
+      const authHeader = c.req.header("authorization") ?? "";
+      const event = await webhookReceiver.receive(body, authHeader);
+      const roomName = event.room?.name;
+      if (
+        roomName &&
+        (event.event === "participant_joined" ||
+          event.event === "track_published" ||
+          event.event === "track_unpublished")
+      ) {
+        void livekitMeeting.syncForLivekitEvent(roomName, event.event);
+      }
+      return c.json({ ok: true });
+    } catch (error) {
+      console.warn("[LiveKit] webhook rejected", error);
+      return c.json({ error: "invalid webhook" }, 401);
     }
   });
 
