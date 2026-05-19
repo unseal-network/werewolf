@@ -85,6 +85,11 @@ interface OwnershipLease {
   leaseExpiresAt: Date;
 }
 
+interface CommandResultEnvelope {
+  result: unknown;
+  snapshotEventId: string;
+}
+
 export class InMemoryRoomCommitStore implements RoomCommitStore {
   private readonly ownership = new Map<string, OwnershipLease>();
   private readonly commands = new Map<string, StoredCommand>();
@@ -100,6 +105,7 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
   }
 
   async commit(staged: StagedRoomCommit): Promise<RoomCommitResult> {
+    assertRawSsePayloadCount(staged);
     this.assertOwned(staged.gameRoomId, staged.fencingToken);
 
     const commandKey = commandMapKey(staged.gameRoomId, staged.commandId);
@@ -107,8 +113,8 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
     if (existing) {
       return {
         status: "duplicate",
-        result: existing.result,
-        events: [...existing.events],
+        result: cloneJsonLike(existing.result),
+        events: existing.events.map(copyEvent),
         rawSsePayloads: [...existing.rawSsePayloads],
         snapshotEventId: existing.snapshotEventId,
       };
@@ -120,13 +126,13 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
     const snapshot: RoomSnapshot = {
       gameRoomId: staged.gameRoomId,
       snapshotEventId,
-      canonicalState: staged.canonicalState,
-      displayState: staged.displayState,
+      canonicalState: cloneJsonLike(staged.canonicalState),
+      displayState: cloneJsonLike(staged.displayState),
       updatedAt: new Date().toISOString(),
     };
 
     this.commands.set(commandKey, {
-      result: staged.result,
+      result: cloneJsonLike(staged.result),
       events,
       rawSsePayloads,
       snapshotEventId,
@@ -139,8 +145,8 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
 
     return {
       status: "committed",
-      result: staged.result,
-      events: [...events],
+      result: cloneJsonLike(staged.result),
+      events: events.map(copyEvent),
       rawSsePayloads: [...rawSsePayloads],
       snapshotEventId,
     };
@@ -153,7 +159,7 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
     const existing = this.commands.get(commandMapKey(gameRoomId, commandId));
     if (!existing) return null;
     return {
-      result: existing.result,
+      result: cloneJsonLike(existing.result),
       events: existing.events.map(copyEvent),
       rawSsePayloads: [...existing.rawSsePayloads],
       snapshotEventId: existing.snapshotEventId,
@@ -161,7 +167,8 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
   }
 
   async loadSnapshot(gameRoomId: string): Promise<RoomSnapshot | null> {
-    return this.snapshots.get(gameRoomId) ?? null;
+    const snapshot = this.snapshots.get(gameRoomId);
+    return snapshot ? copySnapshot(snapshot) : null;
   }
 
   async readEventsAfter(
@@ -192,6 +199,7 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
   constructor(private readonly db: DbClient) {}
 
   async commit(staged: StagedRoomCommit): Promise<RoomCommitResult> {
+    assertRawSsePayloadCount(staged);
     return this.db.transaction(async (tx) => {
       const ownershipRows = await tx
         .select({ gameRoomId: roomOwnership.gameRoomId })
@@ -236,13 +244,17 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
           .from(roomSnapshots)
           .where(eq(roomSnapshots.gameRoomId, staged.gameRoomId))
           .limit(1);
+        const result = decodeCommandResultEnvelope(
+          existingCommand.resultJson,
+          existingCommand.lastEventId,
+          snapshotRows[0]?.snapshotEventId ?? ""
+        );
         return {
           status: "duplicate",
-          result: existingCommand.resultJson,
+          result: result.result,
           events: eventRows.map(eventFromRow),
           rawSsePayloads: eventRows.map((event) => event.rawSsePayload),
-          snapshotEventId:
-            existingCommand.lastEventId ?? snapshotRows[0]?.snapshotEventId ?? "",
+          snapshotEventId: result.snapshotEventId,
         };
       }
 
@@ -258,7 +270,7 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
         kind: staged.kind,
         actorUserId: staged.actorUserId,
         status: "committed",
-        resultJson: staged.result,
+        resultJson: encodeCommandResultEnvelope(staged.result, snapshotEventId),
         firstEventId,
         lastEventId,
         errorCode: null,
@@ -300,7 +312,7 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
 
       return {
         status: "committed",
-        result: staged.result,
+        result: cloneJsonLike(staged.result),
         events,
         rawSsePayloads: [...staged.rawSsePayloads],
         snapshotEventId,
@@ -340,12 +352,17 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
       .from(roomSnapshots)
       .where(eq(roomSnapshots.gameRoomId, gameRoomId))
       .limit(1);
+    const decoded = decodeCommandResultEnvelope(
+      command.resultJson,
+      command.lastEventId,
+      snapshotRows[0]?.snapshotEventId ?? ""
+    );
 
     return {
-      result: command.resultJson,
+      result: decoded.result,
       events: eventRows.map(eventFromRow),
       rawSsePayloads: eventRows.map((event) => event.rawSsePayload),
-      snapshotEventId: command.lastEventId ?? snapshotRows[0]?.snapshotEventId ?? "",
+      snapshotEventId: decoded.snapshotEventId,
     };
   }
 
@@ -360,8 +377,8 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
     return {
       gameRoomId: row.gameRoomId,
       snapshotEventId: row.snapshotEventId,
-      canonicalState: row.canonicalStateJson,
-      displayState: row.displayStateJson,
+      canonicalState: cloneJsonLike(row.canonicalStateJson),
+      displayState: cloneJsonLike(row.displayStateJson),
       updatedAt: row.updatedAt.toISOString(),
     };
   }
@@ -398,8 +415,18 @@ function copyEvent(event: RoomCommittedEvent): RoomCommittedEvent {
     visibility: event.visibility,
     ...(event.actorId !== undefined ? { actorId: event.actorId } : {}),
     ...(event.subjectId !== undefined ? { subjectId: event.subjectId } : {}),
-    payload: { ...event.payload },
+    payload: cloneJsonLike(event.payload) as Record<string, unknown>,
     createdAt: event.createdAt,
+  };
+}
+
+function copySnapshot(snapshot: RoomSnapshot): RoomSnapshot {
+  return {
+    gameRoomId: snapshot.gameRoomId,
+    snapshotEventId: snapshot.snapshotEventId,
+    canonicalState: cloneJsonLike(snapshot.canonicalState),
+    displayState: cloneJsonLike(snapshot.displayState),
+    updatedAt: snapshot.updatedAt,
   };
 }
 
@@ -411,7 +438,7 @@ function eventFromRow(row: GameEventRow): RoomCommittedEvent {
     visibility: row.visibility,
     ...(row.actorId !== null ? { actorId: row.actorId } : {}),
     ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
-    payload: row.payload as Record<string, unknown>,
+    payload: cloneJsonLike(row.payload) as Record<string, unknown>,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -431,10 +458,62 @@ function eventToRow(
     visibility: event.visibility,
     actorId: event.actorId ?? null,
     subjectId: event.subjectId ?? null,
-    payload: event.payload,
-    rawEventJson: JSON.stringify(event),
+    payload: cloneJsonLike(event.payload),
+    rawEventJson: JSON.stringify(copyEvent(event)),
     rawSsePayload: rawSsePayload ?? `data: ${JSON.stringify(event)}\n\n`,
     visibleToPlayerIds: [],
     createdAt: new Date(event.createdAt),
   };
 }
+
+function assertRawSsePayloadCount(staged: StagedRoomCommit): void {
+  if (staged.rawSsePayloads.length !== staged.events.length) {
+    throw new Error("raw SSE payload count must match event count");
+  }
+}
+
+function encodeCommandResultEnvelope(
+  result: unknown,
+  snapshotEventId: string
+): CommandResultEnvelope {
+  return {
+    result: cloneJsonLike(result),
+    snapshotEventId,
+  };
+}
+
+function decodeCommandResultEnvelope(
+  stored: unknown,
+  legacyLastEventId: string | null,
+  legacySnapshotEventId: string
+): CommandResultEnvelope {
+  if (isCommandResultEnvelope(stored)) {
+    return {
+      result: cloneJsonLike(stored.result),
+      snapshotEventId: stored.snapshotEventId,
+    };
+  }
+
+  return {
+    result: cloneJsonLike(stored),
+    snapshotEventId: legacyLastEventId ?? legacySnapshotEventId,
+  };
+}
+
+function isCommandResultEnvelope(value: unknown): value is CommandResultEnvelope {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return "result" in record && typeof record.snapshotEventId === "string";
+}
+
+function cloneJsonLike<T>(value: T): T {
+  if (value === undefined) {
+    return value;
+  }
+  return structuredClone(value);
+}
+
+export const encodeCommandResultEnvelopeForTest = encodeCommandResultEnvelope;
+export const decodeCommandResultEnvelopeForTest = decodeCommandResultEnvelope;
