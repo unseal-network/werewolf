@@ -39,14 +39,13 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
       const user = await authenticateRequest(c.req.raw, matrix, deps.profileCache);
       const gameRoomId = c.req.param("gameRoomId");
       games.snapshot(gameRoomId);
-      const lastEventId = c.req.header("last-event-id");
-      const lastSeq = lastEventId ? Number(lastEventId) : 0;
+      const lastEventId = c.req.header("last-event-id") ?? "";
 
       const stream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
           const perspective = () => buildPerspective(games, gameRoomId, user.id);
-          const serializeSnapshot = (eventId?: string | number) => {
+          const serializeSnapshot = (eventId?: string) => {
             const view = perspective();
             const data = `data: ${JSON.stringify({
               snapshot: {
@@ -71,7 +70,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
               ).length
             );
             if (eventRefreshesPerspectiveSnapshot(event, visible)) {
-              controller.enqueue(encoder.encode(serializeSnapshot(event.seq)));
+              controller.enqueue(encoder.encode(serializeSnapshot(event.id)));
               return;
             }
             if (!visible) return;
@@ -82,23 +81,12 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
           const { replay, unsubscribe } = broker.subscribe(
             gameRoomId,
-            Number.isFinite(lastSeq) ? lastSeq : 0,
+            lastEventId,
             pushVisible
           );
 
-          // If the broker can't fully cover everything since `lastSeq` (e.g.,
-          // after a process restart its in-memory history is empty), fall back
-          // to the durable event log in the DB so the client gets a complete
-          // catch-up before live events start streaming. Without this, clients
-          // reconnecting after an API restart would silently miss events.
-          const replayStart =
-            replay.length > 0 && replay[0]?.seq !== undefined
-              ? replay[0].seq
-              : Infinity;
-          const needsDbReplay =
-            store && (replay.length === 0 || replayStart > lastSeq + 1);
-
-          if (needsDbReplay) {
+          const replayedEventIds = new Set<string>();
+          if (store) {
             try {
               const view = perspective();
               const dbEvents = filterEventsForUser(
@@ -108,6 +96,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
                 view.revealAll
               );
               for (const event of dbEvents) {
+                replayedEventIds.add(event.id);
                 const serialized = `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`;
                 controller.enqueue(encoder.encode(serialized));
               }
@@ -117,6 +106,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
           }
 
           for (const item of replay) {
+            if (replayedEventIds.has(item.id)) continue;
             pushVisible(item.payload);
           }
 

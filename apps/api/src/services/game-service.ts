@@ -1610,7 +1610,7 @@ export class InMemoryGameService {
       existing.visibility = input.visibility ?? "public";
       existing.payload = { ...existing.payload, ...payload };
       if (this.broker) {
-        this.broker.publish(room.id, existing.seq, existing);
+        this.broker.publish(room.id, existing.id, existing);
       }
     if (this.store) {
       this.enqueuePersistRoom(room, [existing], "updateStreamEvent");
@@ -1705,7 +1705,7 @@ export class InMemoryGameService {
     room.events.push(...assigned);
     if (this.broker) {
       for (const event of assigned) {
-        this.broker.publish(room.id, event.seq, event);
+        this.broker.publish(room.id, event.id, event);
       }
     }
     // Persist async — events table has (room, seq) UNIQUE so duplicates
