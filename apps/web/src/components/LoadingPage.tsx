@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Fingerprint, Globe } from "lucide-react";
+import { Fingerprint, Globe, ChevronLeft } from "lucide-react";
 
 interface LoadingPageProps {
   isAdmin?: boolean;
   onAdminAction?: () => void;
   error?: string | null;
   onRetry?: () => void;
+  onLeave?: () => void;
 }
 
 export function LoadingPage({
@@ -13,6 +14,7 @@ export function LoadingPage({
   onAdminAction,
   error,
   onRetry,
+  onLeave,
 }: LoadingPageProps) {
   const [dots, setDots] = useState("");
 
@@ -41,6 +43,18 @@ export function LoadingPage({
           </div>
         </div>
       </div>
+
+      {/* Back button */}
+      {onLeave && (
+        <button
+          onClick={onLeave}
+          aria-label="返回"
+          className="fixed z-10 w-[42px] h-[42px] rounded-[10px] flex items-center justify-center bg-violet-500/[0.12] border border-violet-500/30 text-[#c4b5fd] shadow-[0_0_12px_rgba(139,92,246,0.25),0_4px_12px_rgba(0,0,0,0.40)] active:scale-90 hover:bg-violet-500/20 hover:border-violet-500/50 transition-all duration-150 cursor-pointer"
+          style={{ top: "calc(var(--web-safe-area-top, 0px) + 20px)", left: "20px" }}
+        >
+          <ChevronLeft size={18} strokeWidth={2} />
+        </button>
+      )}
 
       {/* Admin button */}
       {isAdmin && onAdminAction && (

@@ -10,8 +10,7 @@
  * No dependency on iframeMessage / HostBridge inside this file.
  */
 import { useState } from "react";
-import { co } from "@unseal-network/mobile-sdk";
-import { MobileHeader } from "../components/MobileHeader";
+import { ChevronLeft } from "lucide-react";
 import { BottomSheet } from "../components/BottomSheet";
 import { useCreateGame } from "../hooks/useCreateGame";
 import {
@@ -122,28 +121,42 @@ export function IframeCreatePage({
             }}
           />
         ))}
+
       </div>
+
       {/* ── Scrollable main content ─────────────────────────────────────── */}
       <div
         className="flex-1 relative z-10 overflow-y-auto flex flex-col gap-2.5"
-        style={{ padding: "calc(var(--web-safe-area-top, 0px) + 2p) 20px 0" }}
+        style={{ padding: "calc(var(--web-safe-area-top, 0px) + 12px) 20px 0" }}
       >
-        {/* User identity chip */}
-        {userId && (
-          <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-[14px] bg-white/[0.03] border border-white/[0.07]">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-purple-text shrink-0 bg-violet-500/20 border border-violet-500/30">
-              {getInitial(displayName)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-[13px] text-slate-200 font-semibold truncate">
-                {displayName}
+        {/* 返回按钮 + User identity chip */}
+        <div className="flex items-center gap-2.5">
+          {/* 返回按钮：方形 */}
+          <button
+            onClick={handleLeave}
+            aria-label="返回"
+            className="shrink-0 w-[42px] h-[42px] rounded-[10px] flex items-center justify-center bg-violet-500/[0.12] border border-violet-500/30 text-[#c4b5fd] shadow-[0_0_12px_rgba(139,92,246,0.25),0_4px_12px_rgba(0,0,0,0.40)] active:scale-90 active:shadow-[0_0_18px_rgba(139,92,246,0.45),0_4px_12px_rgba(0,0,0,0.40)] hover:bg-violet-500/20 hover:border-violet-500/50 transition-all duration-150 cursor-pointer"
+          >
+            <ChevronLeft size={18} strokeWidth={2} />
+          </button>
+
+          {/* Identity chip */}
+          {userId && (
+            <div className="flex-1 min-w-0 flex items-center gap-2.5 px-3.5 py-2.5 rounded-[14px] bg-white/[0.03] border border-white/[0.07]">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-purple-text shrink-0 bg-violet-500/20 border border-violet-500/30">
+                {getInitial(displayName)}
               </div>
-              <div className="text-[10px] text-ink-faint truncate">
-                {userId}
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] text-slate-200 font-semibold truncate">
+                  {displayName}
+                </div>
+                <div className="text-[10px] text-ink-faint truncate">
+                  {userId}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Section header */}
         <div className="flex items-center gap-2.5 mt-1">
@@ -235,13 +248,6 @@ export function IframeCreatePage({
           )}
         </button>
 
-        {/* Leave */}
-        <button
-          onClick={handleLeave}
-          className="bg-transparent border-0 text-slate-400/50 text-xs cursor-pointer py-2 tracking-[0.12em] font-semibold"
-        >
-          ← Abandon
-        </button>
       </div>
 
       {/* ── BottomSheets ─────────────────────────────────────────────────── */}

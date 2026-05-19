@@ -49,8 +49,3 @@ export function MobileHeader({ onClose, onMore }: MobileHeaderProps) {
   );
 }
 
-export const BackButton = () => {
-  return () => {
-    
-  }
-}

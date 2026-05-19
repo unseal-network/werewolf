@@ -402,7 +402,7 @@
   --ww-button-width: calc(260px * var(--ww-button-scale));
   --ww-button-aspect-ratio: 3;
   --ww-button-font-size: calc(18px * var(--ww-button-scale));
-  --ww-button-label-optical-y: 0.08em;
+  --ww-button-label-optical-y: 0;
   --ww-button-chrome-slice: 40 64;
   --ww-button-chrome-width: calc(22px * var(--ww-button-scale)) calc(32px * var(--ww-button-scale));
   --ww-button-chrome-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
@@ -500,7 +500,7 @@
 
 .game-layout-root .ww-game-button__content {
   position: absolute;
-  top: 0;
+  top: 10px;
   right: var(--ww-button-content-inset-x);
   bottom: 0;
   left: var(--ww-button-content-inset-x);
