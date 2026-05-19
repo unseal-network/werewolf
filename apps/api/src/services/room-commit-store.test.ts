@@ -75,6 +75,25 @@ describe("RoomCommitStore", () => {
     expect((await store.readEventsAfter("game_1", "", 10)).map((event) => event.id)).toEqual(["0001"]);
   });
 
+  it("returns duplicate result before validating new staged payloads", async () => {
+    const store = new InMemoryRoomCommitStore();
+    store.seedOwnership("game_1", 1n);
+    await store.commit(staged("0001", "cmd_1"));
+
+    const malformedRetry = {
+      ...staged("0002", "cmd_1"),
+      rawSsePayloads: [],
+    };
+
+    await expect(store.commit(malformedRetry)).resolves.toMatchObject({
+      status: "duplicate",
+      result: { kind: "joined", playerId: "player_1" },
+      snapshotEventId: "0001",
+      events: [{ id: "0001" }],
+    });
+    expect((await store.readEventsAfter("game_1", "", 10)).map((event) => event.id)).toEqual(["0001"]);
+  });
+
   it("rejects stale fencing tokens inside commit", async () => {
     const store = new InMemoryRoomCommitStore();
     store.seedOwnership("game_1", 2n);

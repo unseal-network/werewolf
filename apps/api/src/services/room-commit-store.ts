@@ -105,7 +105,6 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
   }
 
   async commit(staged: StagedRoomCommit): Promise<RoomCommitResult> {
-    assertRawSsePayloadCount(staged);
     this.assertOwned(staged.gameRoomId, staged.fencingToken);
 
     const commandKey = commandMapKey(staged.gameRoomId, staged.commandId);
@@ -119,6 +118,7 @@ export class InMemoryRoomCommitStore implements RoomCommitStore {
         snapshotEventId: existing.snapshotEventId,
       };
     }
+    assertRawSsePayloadCount(staged);
 
     const events = staged.events.map(copyEvent);
     const rawSsePayloads = [...staged.rawSsePayloads];
@@ -199,7 +199,6 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
   constructor(private readonly db: DbClient) {}
 
   async commit(staged: StagedRoomCommit): Promise<RoomCommitResult> {
-    assertRawSsePayloadCount(staged);
     return this.db.transaction(async (tx) => {
       const ownershipRows = await tx
         .select({ gameRoomId: roomOwnership.gameRoomId })
@@ -257,6 +256,7 @@ export class DrizzleRoomCommitStore implements RoomCommitStore {
           snapshotEventId: result.snapshotEventId,
         };
       }
+      assertRawSsePayloadCount(staged);
 
       const now = new Date();
       const events = staged.events.map(copyEvent);
