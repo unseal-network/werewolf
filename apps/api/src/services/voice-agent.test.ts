@@ -235,7 +235,49 @@ describe("VoiceAgentService TTS LiveKit framing", () => {
       })
     ).resolves.toBe(true);
 
-    expect(progress).toEqual(["我先说", "我先说结论"]);
+    expect(progress).toEqual(["我先说结论"]);
+  });
+
+  it("finishes speech after captured audio even when the TTS final frame is missing", async () => {
+    const agent = new VoiceAgentService("game_1", config);
+    const progress: string[] = [];
+    const attempts: Array<{ close: ReturnType<typeof vi.fn> }> = [];
+    (agent as any).connect = vi.fn(async () => {
+      (agent as any).connected = true;
+    });
+    (agent as any).audioSource = {
+      captureFrame: vi.fn(async () => undefined),
+      waitForPlayout: vi.fn(async () => undefined),
+      queuedDuration: 0,
+    };
+    (agent as any).createTtsClient = vi.fn((opts) => {
+      const attempt = {
+        connect: vi.fn(async () => undefined),
+        synthesize: vi.fn(async () => {
+          opts.onAlignment?.({
+            alignment: {
+              chars: ["天", "亮", "了"],
+              charStartTimesMs: [0, 120, 240],
+              charDurationsMs: [120, 120, 120],
+            },
+          });
+          opts.onAudioChunk?.(Buffer.alloc(8_000), 16_000);
+          throw new Error("TTS synthesize timed out");
+        }),
+        close: vi.fn(),
+      };
+      attempts.push(attempt);
+      return attempt;
+    });
+
+    await expect(
+      agent.speak("天亮了", "player_1", 1, {
+        onSpeechProgress: (text) => progress.push(text),
+      })
+    ).resolves.toBe(true);
+
+    expect(attempts).toHaveLength(1);
+    expect(progress).toEqual(["天亮了"]);
   });
 
   it("retries TTS synthesis once after a transient websocket failure", async () => {

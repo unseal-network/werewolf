@@ -538,6 +538,59 @@ export class VoiceAgentService {
     let playoutMs = 0;
     let firstChunkMs: number | null = null;
     let generatedAudioMs = 0;
+    let ttsCaptureStartedAtMs: number | null = null;
+    let mergedAlignment: TtsSpeechAlignment | null = null;
+    let speechProgressCheckpoints: SpeechProgressCheckpoint[] = [];
+    let scheduledSpeechProgressCount = 0;
+    let lastSpeechProgressText = "";
+    const speechProgressTimers = new Set<ReturnType<typeof setTimeout>>();
+    const normalizedPlaybackRate = normalizeSpeechPlaybackRate(playbackRate);
+    const clearSpeechProgressTimers = () => {
+      for (const timer of speechProgressTimers) clearTimeout(timer);
+      speechProgressTimers.clear();
+    };
+    const emitSpeechProgress = (
+      nextText: string,
+      targetAudioMs: number | null
+    ) => {
+      const progressText = nextText.trim();
+      if (
+        !options.onSpeechProgress ||
+        !progressText ||
+        progressText === lastSpeechProgressText
+      ) {
+        return;
+      }
+      lastSpeechProgressText = progressText;
+      console.debug("[VoiceAgent] TTS speech progress", {
+        gameRoomId: this.gameRoomId,
+        playerId: playerId ?? null,
+        matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+        textLength: progressText.length,
+        targetAudioMs,
+      });
+      options.onSpeechProgress(progressText);
+    };
+    const scheduleSpeechProgress = () => {
+      if (!options.onSpeechProgress || ttsCaptureStartedAtMs === null) return;
+      for (
+        let index = scheduledSpeechProgressCount;
+        index < speechProgressCheckpoints.length;
+        index += 1
+      ) {
+        const checkpoint = speechProgressCheckpoints[index]!;
+        const delayMs = Math.max(
+          0,
+          ttsCaptureStartedAtMs + checkpoint.audioMs - Date.now()
+        );
+        const timer = setTimeout(() => {
+          speechProgressTimers.delete(timer);
+          emitSpeechProgress(checkpoint.text, checkpoint.audioMs);
+        }, delayMs);
+        speechProgressTimers.add(timer);
+      }
+      scheduledSpeechProgressCount = speechProgressCheckpoints.length;
+    };
     console.info("[VoiceAgent] speak start", {
       gameRoomId: this.gameRoomId,
       playerId: playerId ?? null,
@@ -562,33 +615,10 @@ export class VoiceAgentService {
     const sampleRate = TTS_AUDIO_SOURCE_SAMPLE_RATE; // we always request pcm_16000
     let capturedAny = false;
     let firstChunkLogged = false;
-    let capturedAudioMs = 0;
-    let lastProgressText = "";
-    let lastProgressMarkerMs = 0;
-    const progressMarkers: Array<{ atMs: number; text: string }> = [];
     // Serialize captureFrame calls — the LiveKit rtc-node AudioSource native
     // FFI rejects concurrent captures with "InvalidState - failed to capture
     // frame", so we feed PCM chunks one at a time through a Promise chain.
     let captureChain: Promise<void> = Promise.resolve();
-
-    const flushSpeechProgress = () => {
-      if (!options.onSpeechProgress) return;
-      let nextText = lastProgressText;
-      while (
-        progressMarkers.length > 0 &&
-        progressMarkers[0]!.atMs <= capturedAudioMs
-      ) {
-        nextText = progressMarkers.shift()!.text;
-      }
-      if (nextText && nextText !== lastProgressText) {
-        lastProgressText = nextText;
-        try {
-          options.onSpeechProgress(nextText);
-        } catch (err) {
-          console.error("[VoiceAgent] speech progress callback failed:", err);
-        }
-      }
-    };
 
     const ttsClientOptions: TtsClientOptions = {
       apiBaseUrl: this.config.unsealApiBaseUrl,
@@ -596,18 +626,25 @@ export class VoiceAgentService {
       apiKey: this.config.unsealApiKey,
       connectTimeoutMs: TTS_CONNECT_TIMEOUT_MS,
       onAlignment: (event) => {
-        const markers = alignmentProgressMarkers(
-          event,
+        const alignment = parseTtsSpeechAlignment(event);
+        if (!alignment) return;
+        mergedAlignment = mergeTtsSpeechAlignment(mergedAlignment, alignment);
+        speechProgressCheckpoints = buildSpeechProgressCheckpoints(
+          mergedAlignment,
           trimmed,
-          playbackRate,
-          lastProgressMarkerMs,
-          lastProgressText
+          normalizedPlaybackRate
         );
-        if (markers.length === 0) return;
-        lastProgressMarkerMs = markers[markers.length - 1]!.atMs;
-        progressMarkers.push(...markers);
-        progressMarkers.sort((a, b) => a.atMs - b.atMs);
-        flushSpeechProgress();
+        console.debug("[VoiceAgent] TTS alignment progress checkpoints", {
+          gameRoomId: this.gameRoomId,
+          playerId: playerId ?? null,
+          matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+          alignmentChars: mergedAlignment.chars.length,
+          checkpointCount: speechProgressCheckpoints.length,
+          lastAudioMs:
+            speechProgressCheckpoints[speechProgressCheckpoints.length - 1]
+              ?.audioMs ?? null,
+        });
+        scheduleSpeechProgress();
       },
       onAudioChunk: (chunk, frameRate) => {
         const rate = frameRate ?? sampleRate;
@@ -631,14 +668,13 @@ export class VoiceAgentService {
           int16[i] = chunk.readInt16LE(i * Int16Array.BYTES_PER_ELEMENT);
         }
         const playbackSamples = resamplePcmForPlaybackRate(int16, playbackRate);
-        const chunkAudioMs = Math.round((playbackSamples.length / rate) * 1000);
-        generatedAudioMs += chunkAudioMs;
+        generatedAudioMs += Math.round((playbackSamples.length / rate) * 1000);
         captureChain = captureChain
           .then(async () => {
+            ttsCaptureStartedAtMs ??= Date.now();
+            scheduleSpeechProgress();
             if (await this.captureTtsPcmFrames(playbackSamples, rate)) {
               capturedAny = true;
-              capturedAudioMs += chunkAudioMs;
-              flushSpeechProgress();
             }
           })
           .catch(() => undefined);
@@ -646,40 +682,64 @@ export class VoiceAgentService {
       onError: (err) => console.error("[VoiceAgent] TTS error:", err),
     };
 
-    for (let attempt = 1; attempt <= TTS_ATTEMPTS; attempt += 1) {
-      const ttsClient = this.createTtsClient(ttsClientOptions);
-      try {
-        const ttsConnectStartedAtMs = Date.now();
-        await ttsClient.connect();
-        ttsConnectMs = Date.now() - ttsConnectStartedAtMs;
-        const synthStartedAtMs = Date.now();
-        await ttsClient.synthesize(trimmed, {
-          outputFormat: TTS_OUTPUT_FORMAT,
-          modelId: "eleven_multilingual_v2",
-          flush: true,
-          timeoutMs: TTS_SYNTH_TIMEOUT_MS,
-        });
-        ttsSynthesizeMs = Date.now() - synthStartedAtMs;
-        // Wait for the serialized capture chain so every PCM frame from the
-        // completed TTS WebSocket response is handed to the AudioSource.
-        const captureDrainStartedAtMs = Date.now();
-        await captureChain;
-        captureDrainMs = Date.now() - captureDrainStartedAtMs;
-        if (capturedAny) {
-          const playoutStartedAtMs = Date.now();
-          await this.waitForTtsPlayout();
-          playoutMs = Date.now() - playoutStartedAtMs;
+    try {
+      for (let attempt = 1; attempt <= TTS_ATTEMPTS; attempt += 1) {
+        const ttsClient = this.createTtsClient(ttsClientOptions);
+        try {
+          const ttsConnectStartedAtMs = Date.now();
+          await ttsClient.connect();
+          ttsConnectMs = Date.now() - ttsConnectStartedAtMs;
+          const synthStartedAtMs = Date.now();
+          await ttsClient.synthesize(trimmed, {
+            outputFormat: TTS_OUTPUT_FORMAT,
+            modelId: "eleven_multilingual_v2",
+            flush: true,
+            timeoutMs: TTS_SYNTH_TIMEOUT_MS,
+          });
+          ttsSynthesizeMs = Date.now() - synthStartedAtMs;
+          // Wait for the serialized capture chain so every PCM frame from the
+          // completed TTS WebSocket response is handed to the AudioSource.
+          const captureDrainStartedAtMs = Date.now();
+          await captureChain;
+          captureDrainMs = Date.now() - captureDrainStartedAtMs;
+          if (capturedAny) {
+            const playoutStartedAtMs = Date.now();
+            await this.waitForTtsPlayout();
+            playoutMs = Date.now() - playoutStartedAtMs;
+            emitSpeechProgress(trimmed, generatedAudioMs);
+          }
+          break;
+        } catch (err) {
+          console.error("[VoiceAgent] speak failed:", {
+            attempt,
+            maxAttempts: TTS_ATTEMPTS,
+            err,
+          });
+          const captureDrainStartedAtMs = Date.now();
+          await captureChain;
+          captureDrainMs = Date.now() - captureDrainStartedAtMs;
+          if (capturedAny) {
+            console.warn(
+              "[VoiceAgent] TTS failed after audio was captured; skipping retry",
+              {
+                gameRoomId: this.gameRoomId,
+                playerId: playerId ?? null,
+                matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
+                attempt,
+              }
+            );
+            const playoutStartedAtMs = Date.now();
+            await this.waitForTtsPlayout();
+            playoutMs = Date.now() - playoutStartedAtMs;
+            emitSpeechProgress(trimmed, generatedAudioMs);
+            break;
+          }
+        } finally {
+          ttsClient.close();
         }
-        break;
-      } catch (err) {
-        console.error("[VoiceAgent] speak failed:", {
-          attempt,
-          maxAttempts: TTS_ATTEMPTS,
-          err,
-        });
-      } finally {
-        ttsClient.close();
       }
+    } finally {
+      clearSpeechProgressTimers();
     }
 
     console.info("[VoiceAgent] speak complete", {
@@ -695,6 +755,8 @@ export class VoiceAgentService {
       captureDrainMs,
       playoutMs,
       generatedAudioMs,
+      alignmentChars: countTtsSpeechAlignmentChars(mergedAlignment),
+      speechProgressCheckpoints: speechProgressCheckpoints.length,
       totalMs: Date.now() - startedAtMs,
     });
 
@@ -1144,98 +1206,171 @@ function chunkInt16(samples: Int16Array, chunkSize: number): Int16Array[] {
   return chunks;
 }
 
-function alignmentProgressMarkers(
-  event: Record<string, unknown>,
-  speech: string,
-  playbackRate: number,
-  afterMs: number,
-  previousText: string
-): Array<{ atMs: number; text: string }> {
-  const alignment =
-    objectValue(event.normalizedAlignment) ?? objectValue(event.alignment);
-  if (!alignment) return [];
-  const chars = arrayValue(alignment.chars);
-  const starts =
-    numberArrayValue(alignment.charStartTimesMs) ??
-    numberArrayValue(alignment.char_start_times_ms);
-  const durations =
-    numberArrayValue(alignment.charDurationsMs) ??
-    numberArrayValue(alignment.char_durations_ms);
-  if (!chars || !starts || !durations) return [];
-  const count = Math.min(chars.length, starts.length, durations.length);
-  if (count === 0) return [];
+interface TtsSpeechAlignment {
+  chars: string[];
+  charStartTimesMs: number[];
+  charDurationsMs: number[];
+}
 
-  const markers: Array<{ atMs: number; text: string }> = [];
-  for (let index = 0; index < count; index += 1) {
-    const alignedText = chars
-      .slice(0, index + 1)
-      .map((char) => String(char))
-      .join("");
-    const isFullSpeechAlignment = speech.startsWith(alignedText);
-    const text = speechPrefixForAlignmentChars(
-      speech,
-      isFullSpeechAlignment ? alignedText : `${previousText}${alignedText}`
-    );
-    if (!text) continue;
-    const rawAtMs = Math.max(
-      0,
-      Math.round(((starts[index] ?? 0) + (durations[index] ?? 0)) / playbackRate)
-    );
-    const atMs = Math.max(
-      0,
-      isFullSpeechAlignment ? rawAtMs : afterMs + rawAtMs
-    );
-    if (atMs <= afterMs) continue;
-    if (markers.at(-1)?.text === text) continue;
-    markers.push({ atMs, text });
+interface SpeechProgressCheckpoint {
+  text: string;
+  audioMs: number;
+}
+
+function parseTtsSpeechAlignment(
+  event: Record<string, unknown>
+): TtsSpeechAlignment | null {
+  const rawAlignment =
+    objectValue(event.alignment) ?? objectValue(event.normalizedAlignment);
+  if (!rawAlignment) return null;
+  const chars = rawAlignment.chars;
+  const starts =
+    rawAlignment.charStartTimesMs ?? rawAlignment.char_start_times_ms;
+  const durations =
+    rawAlignment.charDurationsMs ?? rawAlignment.char_durations_ms;
+  if (!Array.isArray(chars) || !Array.isArray(starts) || !Array.isArray(durations)) {
+    return null;
   }
-  return markers;
+  if (chars.length === 0 || chars.length !== starts.length || chars.length !== durations.length) {
+    return null;
+  }
+  const parsedChars: string[] = [];
+  const parsedStarts: number[] = [];
+  const parsedDurations: number[] = [];
+  for (let index = 0; index < chars.length; index += 1) {
+    const char = chars[index];
+    const start = starts[index];
+    const duration = durations[index];
+    if (
+      typeof char !== "string" ||
+      typeof start !== "number" ||
+      typeof duration !== "number" ||
+      !Number.isFinite(start) ||
+      !Number.isFinite(duration)
+    ) {
+      return null;
+    }
+    parsedChars.push(char);
+    parsedStarts.push(Math.max(0, start));
+    parsedDurations.push(Math.max(0, duration));
+  }
+  return {
+    chars: parsedChars,
+    charStartTimesMs: parsedStarts,
+    charDurationsMs: parsedDurations,
+  };
+}
+
+function mergeTtsSpeechAlignment(
+  previous: TtsSpeechAlignment | null,
+  next: TtsSpeechAlignment
+): TtsSpeechAlignment {
+  if (!previous) return next;
+  const previousText = previous.chars.join("");
+  const nextText = next.chars.join("");
+  if (!nextText) return previous;
+  if (nextText.startsWith(previousText)) return next;
+  if (previousText.includes(nextText)) return previous;
+
+  const previousEndMs = alignmentEndMs(previous);
+  const nextFirstMs = next.charStartTimesMs[0] ?? 0;
+  const offsetMs = nextFirstMs >= previousEndMs - 100 ? 0 : previousEndMs;
+  return {
+    chars: [...previous.chars, ...next.chars],
+    charStartTimesMs: [
+      ...previous.charStartTimesMs,
+      ...next.charStartTimesMs.map((timeMs) => timeMs + offsetMs),
+    ],
+    charDurationsMs: [...previous.charDurationsMs, ...next.charDurationsMs],
+  };
+}
+
+function buildSpeechProgressCheckpoints(
+  alignment: TtsSpeechAlignment,
+  originalText: string,
+  playbackRate: number
+): SpeechProgressCheckpoint[] {
+  const checkpoints: SpeechProgressCheckpoint[] = [];
+  let lastCheckpointIndex = -1;
+  let lastCheckpointAudioMs = 0;
+  for (let index = 0; index < alignment.chars.length; index += 1) {
+    const char = alignment.chars[index] ?? "";
+    const endMs =
+      alignment.charStartTimesMs[index]! + alignment.charDurationsMs[index]!;
+    const elapsedSinceLast = endMs - lastCheckpointAudioMs;
+    const charsSinceLast = index - lastCheckpointIndex;
+    const isPunctuation = /[。！？!?；;，,、\n]/u.test(char);
+    const isLongEnough = elapsedSinceLast >= 900 && charsSinceLast >= 4;
+    if (!isPunctuation && !isLongEnough) continue;
+    const text = alignment.chars.slice(0, index + 1).join("").trim();
+    if (!text) continue;
+    checkpoints.push({
+      text,
+      audioMs: Math.round(endMs / playbackRate),
+    });
+    lastCheckpointIndex = index;
+    lastCheckpointAudioMs = endMs;
+  }
+
+  const finalText = originalText.trim();
+  const finalAudioMs = Math.round(alignmentEndMs(alignment) / playbackRate);
+  const alignmentCoversFinalText =
+    compactSpeechText(alignment.chars.join("")) === compactSpeechText(finalText);
+  if (
+    alignmentCoversFinalText &&
+    finalText &&
+    checkpoints[checkpoints.length - 1]?.text.trim() !== finalText
+  ) {
+    checkpoints.push({ text: finalText, audioMs: finalAudioMs });
+  }
+  return dedupeSpeechProgressCheckpoints(checkpoints);
+}
+
+function dedupeSpeechProgressCheckpoints(
+  checkpoints: SpeechProgressCheckpoint[]
+): SpeechProgressCheckpoint[] {
+  const deduped: SpeechProgressCheckpoint[] = [];
+  let lastText = "";
+  for (const checkpoint of checkpoints) {
+    if (!checkpoint.text || checkpoint.text === lastText) continue;
+    deduped.push(checkpoint);
+    lastText = checkpoint.text;
+  }
+  return deduped;
+}
+
+function alignmentEndMs(alignment: TtsSpeechAlignment): number {
+  let endMs = 0;
+  for (let index = 0; index < alignment.chars.length; index += 1) {
+    endMs = Math.max(
+      endMs,
+      (alignment.charStartTimesMs[index] ?? 0) +
+        (alignment.charDurationsMs[index] ?? 0)
+    );
+  }
+  return endMs;
+}
+
+function countTtsSpeechAlignmentChars(
+  alignment: TtsSpeechAlignment | null
+): number {
+  return alignment?.chars.length ?? 0;
+}
+
+function normalizeSpeechPlaybackRate(playbackRate: number): number {
+  return Number.isFinite(playbackRate)
+    ? Math.min(2, Math.max(0.75, playbackRate))
+    : 1;
+}
+
+function compactSpeechText(text: string): string {
+  return text.replace(/\s+/gu, "");
 }
 
 function objectValue(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
-}
-
-function arrayValue(value: unknown): unknown[] | null {
-  return Array.isArray(value) ? value : null;
-}
-
-function numberArrayValue(value: unknown): number[] | null {
-  if (!Array.isArray(value)) return null;
-  const numbers = value
-    .map((candidate) =>
-      typeof candidate === "number"
-        ? candidate
-        : typeof candidate === "string"
-          ? Number(candidate)
-          : NaN
-    )
-    .filter((candidate) => Number.isFinite(candidate));
-  return numbers.length === value.length ? numbers : null;
-}
-
-function speechPrefixForAlignmentChars(speech: string, alignedText: string): string {
-  if (!alignedText) return "";
-  if (speech.startsWith(alignedText)) return alignedText;
-  const compactAligned = compactSpeechText(alignedText);
-  if (!compactAligned) return "";
-  let compactIndex = 0;
-  for (let index = 0; index < speech.length; index += 1) {
-    const char = speech[index]!;
-    if (/\s/u.test(char)) continue;
-    if (char !== compactAligned[compactIndex]) continue;
-    compactIndex += 1;
-    if (compactIndex >= compactAligned.length) {
-      return speech.slice(0, index + 1);
-    }
-  }
-  return "";
-}
-
-function compactSpeechText(text: string): string {
-  return text.replace(/\s+/gu, "");
 }
 
 /** One VoiceAgentService per game room. */
