@@ -40,12 +40,14 @@ export const roomCommandSchema = z.discriminatedUnion("kind", [
 
 export type RoomCommand = z.infer<typeof roomCommandSchema>;
 
+export type RoomActorEvent = Omit<GameEvent, "seq">;
+
 export type StagedRoomChange = {
   commandId: string;
   kind: RoomCommand["kind"];
   actorUserId: string;
   baseSnapshotEventId: string;
-  events: GameEvent[];
+  events: RoomActorEvent[];
   rawSsePayloads: string[];
   canonicalState: unknown;
   displayState: unknown;

@@ -1,5 +1,4 @@
-import type { GameEvent } from "@werewolf/shared";
-import type { RoomCommand, StagedRoomChange } from "./types";
+import type { RoomActorEvent, RoomCommand, StagedRoomChange } from "./types";
 
 export class RoomRuntime {
   private state: unknown;
@@ -46,7 +45,7 @@ function applyCommand(
   state: unknown,
   command: RoomCommand,
   createEventId: () => string
-): GameEvent[] {
+): RoomActorEvent[] {
   switch (command.kind) {
     case "join":
     case "leave":
@@ -70,7 +69,6 @@ function applyCommand(
     {
       id: createEventId(),
       gameRoomId: command.gameRoomId,
-      seq: 1,
       type: "stream",
       visibility: "public",
       actorId: command.actorUserId,
