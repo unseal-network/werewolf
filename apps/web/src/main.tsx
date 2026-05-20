@@ -13,6 +13,7 @@ import { useIframeAuth } from "./hooks/useIframeAuth";
 import {
   SOURCE_ROOM_STORAGE_KEY,
   hasStoredMatrixSession,
+  setMatrixTokenRefresher,
   writeMatrixIdentity,
   writeMatrixToken,
 } from "./matrix/session";
@@ -74,6 +75,13 @@ function App() {
     if (!hostRuntime) return;
     let cancelled = false;
     let pollTimer: number | null = null;
+    const refreshHostToken = async () => {
+      const fresh = (await iframeAuth.getToken()).trim();
+      if (!fresh) throw new Error("未从 Unseal app 刷新到登录 token，请重新打开游戏");
+      writeMatrixToken(fresh);
+      return fresh;
+    };
+    const unregisterMatrixTokenRefresher = setMatrixTokenRefresher(refreshHostToken);
 
     const setGameUrl = (nextGameRoomId: string) => {
       const nextUrl = buildGameRoomUrl(
@@ -146,7 +154,28 @@ function App() {
         un.log("[werewolf] run: unsealBase =", unsealBase);
 
         if (unsealBase && hostToken) {
-          unsealClient = createUnsealClient(unsealBase);
+          let unsealClientForRefresh: UnsealClient;
+          unsealClient = createUnsealClient(unsealBase, {
+            refreshJwt: async () => {
+              const freshHostToken = await refreshHostToken();
+              const refreshed = await unsealClientForRefresh.enter(freshHostToken);
+              unsealJwt = refreshed.token;
+              hostSessionRef.current = {
+                ...hostSessionRef.current,
+                hostRoomId,
+                unsealClient: unsealClientForRefresh,
+                unsealJwt,
+              };
+              if (refreshed.user?.userId) {
+                writeMatrixIdentity(
+                  refreshed.user.userId,
+                  refreshed.user.displayName ?? refreshed.user.userId
+                );
+              }
+              return refreshed.token;
+            },
+          });
+          unsealClientForRefresh = unsealClient;
           un.log("[werewolf] run: hostToken", hostToken);
           const entered = await unsealClient.enter(hostToken);
           un.log("[werewolf] run: 2222", hostToken);
@@ -214,6 +243,7 @@ function App() {
     void run();
     return () => {
       cancelled = true;
+      unregisterMatrixTokenRefresher();
       if (pollTimer !== null) window.clearTimeout(pollTimer);
     };
   }, [hostRuntime]); // eslint-disable-line react-hooks/exhaustive-deps

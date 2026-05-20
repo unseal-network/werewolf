@@ -18,6 +18,27 @@ export interface MatrixSessionProfile {
   displayName: string;
 }
 
+export type MatrixTokenRefresher = () => Promise<string>;
+
+let matrixTokenRefresher: MatrixTokenRefresher | null = null;
+
+export function setMatrixTokenRefresher(
+  refresher: MatrixTokenRefresher | null
+): () => void {
+  matrixTokenRefresher = refresher;
+  return () => {
+    if (matrixTokenRefresher === refresher) matrixTokenRefresher = null;
+  };
+}
+
+export async function refreshMatrixToken(): Promise<string | null> {
+  if (!matrixTokenRefresher) return null;
+  const token = (await matrixTokenRefresher()).trim();
+  if (!token) return null;
+  writeMatrixToken(token);
+  return token;
+}
+
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const encodedName = `${encodeURIComponent(name)}=`;

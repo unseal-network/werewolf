@@ -32,14 +32,48 @@ export interface UnsealClient {
   linkRoom(roomId: string, linkRoomId: string, jwt: string): Promise<void>;
 }
 
-export function createUnsealClient(baseUrl: string): UnsealClient {
+export interface UnsealClientOptions {
+  refreshJwt?: (() => Promise<string | null | undefined>) | undefined;
+}
+
+export function createUnsealClient(
+  baseUrl: string,
+  options: UnsealClientOptions = {}
+): UnsealClient {
   const normalized = baseUrl.replace(/\/+$/, "");
+  let refreshedJwt: string | null = null;
 
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  function headersWithRefreshedJwt(init: RequestInit): HeadersInit | undefined {
+    if (!refreshedJwt) return init.headers;
+    const headers = new Headers(init.headers);
+    if (headers.has("authorization")) {
+      headers.set("authorization", `Bearer ${refreshedJwt}`);
+    }
+    return Object.fromEntries(headers.entries());
+  }
 
-    const response = await fetch(`${normalized}${path}`, init);
+  async function refreshJwt(): Promise<string | null> {
+    const nextJwt = (await options.refreshJwt?.())?.trim();
+    if (!nextJwt) return null;
+    refreshedJwt = nextJwt;
+    return nextJwt;
+  }
+
+  async function request<T>(
+    path: string,
+    init: RequestInit = {},
+    retryOnUnauthorized = true
+  ): Promise<T> {
+    const headers = headersWithRefreshedJwt(init);
+    const requestInit: RequestInit = { ...init };
+    if (headers) requestInit.headers = headers;
+    const response = await fetch(`${normalized}${path}`, requestInit);
     un.log('[werewolf] request request', response)
     if (!response.ok) {
+      if (response.status === 401 && retryOnUnauthorized) {
+        const nextJwt = await refreshJwt().catch(() => null);
+        if (nextJwt) return request<T>(path, init, false);
+      }
       const body = (await response.json().catch(() => null)) as {
         code?: string;
         message?: string;

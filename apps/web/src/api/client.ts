@@ -1,3 +1,5 @@
+import { refreshMatrixToken as refreshStoredMatrixToken } from "../matrix/session";
+
 type PlayerKind = "user" | "agent";
 
 type RoomStatus = "created" | "waiting" | "active" | "paused" | "ended";
@@ -9,6 +11,7 @@ type PlayerRoleState = "wolf" | "good";
 export interface ApiClientOptions {
   baseUrl: string;
   getMatrixToken(): string;
+  refreshMatrixToken?: (() => Promise<string | null | undefined>) | undefined;
 }
 
 export interface CreatedGame {
@@ -225,18 +228,41 @@ export function defaultApiBaseUrl(): string {
 
 export function createApiClient(options: ApiClientOptions) {
   const baseUrl = trimTrailingSlash(options.baseUrl);
+  let refreshedMatrixToken: string | null = null;
 
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  function currentMatrixToken(): string {
+    return refreshedMatrixToken ?? options.getMatrixToken();
+  }
+
+  async function refreshMatrixToken(): Promise<string | null> {
+    const nextToken = (
+      (await options.refreshMatrixToken?.()) ??
+      (await refreshStoredMatrixToken())
+    )?.trim();
+    if (!nextToken) return null;
+    refreshedMatrixToken = nextToken;
+    return nextToken;
+  }
+
+  async function request<T>(
+    path: string,
+    init: RequestInit = {},
+    retryOnUnauthorized = true
+  ): Promise<T> {
     const response = await fetch(`${baseUrl}${path}`, {
       ...init,
       headers: {
         "content-type": "application/json",
-        authorization: `Bearer ${options.getMatrixToken()}`,
+        authorization: `Bearer ${currentMatrixToken()}`,
         ...(init.headers ?? {}),
       },
     });
 
     if (!response.ok) {
+      if (response.status === 401 && retryOnUnauthorized) {
+        const nextToken = await refreshMatrixToken().catch(() => null);
+        if (nextToken) return request<T>(path, init, false);
+      }
       throw new Error(await response.text());
     }
 
