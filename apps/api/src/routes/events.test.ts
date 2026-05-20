@@ -124,6 +124,7 @@ describe("events API", () => {
 
     expect(snapshotRefresh.startsWith(`id: ${hiddenRoles.id}\n`)).toBe(true);
     expect(snapshotRefresh).toContain("snapshot");
+    expect(snapshotRefresh).toContain(`"snapshotEventId":"${hiddenRoles.id}"`);
     expect(replay).toBe(phasePayload);
     expect(noExtra).toBe("timeout");
   });
@@ -182,6 +183,7 @@ describe("events API", () => {
 
     expect(snapshotRefresh.startsWith(`id: ${hiddenRoles.id}\n`)).toBe(true);
     expect(snapshotRefresh).toContain("snapshot");
+    expect(snapshotRefresh).toContain(`"snapshotEventId":"${hiddenRoles.id}"`);
     expect(noExtra).toBe("timeout");
   });
 

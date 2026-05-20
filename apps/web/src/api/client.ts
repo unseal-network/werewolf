@@ -336,9 +336,6 @@ export function createApiClient(options: ApiClientOptions) {
         kind: "speech" | "speechComplete" | "vote" | "nightAction" | "pass";
         targetMatrixUserId?: string;
         speech?: string;
-        expectedPhase?: string | null;
-        expectedDay?: number;
-        expectedVersion?: number;
       }
     ) {
       return request<{ success: boolean; event?: GameEventDto }>(

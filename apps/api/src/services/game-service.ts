@@ -124,22 +124,49 @@ type RuntimeNightAction =
   | (RuntimeNightActionScope & { kind: "passAction" });
 
 export type PlayerSubmittedAction =
-  (
-    | { kind: "speech"; speech: string }
-    | { kind: "speechComplete" }
-    | { kind: "vote"; targetPlayerId: string }
-    | { kind: "nightAction"; targetPlayerId: string }
-    | { kind: "pass" }
-  ) & {
-    expectedPhase?: GamePhase | undefined;
-    expectedDay?: number | undefined;
-    expectedVersion?: number | undefined;
-  };
+  | { kind: "speech"; speech: string }
+  | { kind: "speechComplete" }
+  | { kind: "vote"; targetPlayerId: string }
+  | { kind: "nightAction"; targetPlayerId: string }
+  | { kind: "pass" };
 
 const absentNightActorAutoAdvanceMs = 15_000;
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function nightActionTargetId(event: GameEvent): string | undefined {
+  const action = event.payload?.action;
+  if (!action || typeof action !== "object" || Array.isArray(action)) {
+    return undefined;
+  }
+  const targetPlayerId = (action as { targetPlayerId?: unknown }).targetPlayerId;
+  return typeof targetPlayerId === "string" ? targetPlayerId : undefined;
+}
+
+function hasSeerInspectedTarget(
+  room: StoredGameRoom,
+  seerPlayerId: string,
+  targetPlayerId: string
+): boolean {
+  return room.events.some(
+    (event) =>
+      event.type === "seer_result_revealed" &&
+      event.payload?.seerPlayerId === seerPlayerId &&
+      event.payload?.inspectedPlayerId === targetPlayerId
+  );
+}
+
+function lastGuardTarget(room: StoredGameRoom, guardPlayerId: string): string | undefined {
+  const event = [...room.events].reverse().find(
+    (candidate) =>
+      candidate.type === "night_action_submitted" &&
+      candidate.actorId === guardPlayerId &&
+      (candidate.payload?.action as { kind?: unknown } | undefined)?.kind ===
+        "guardProtect"
+  );
+  return event?.subjectId ?? (event ? nightActionTargetId(event) : undefined);
 }
 
 function toLivekitMeetingRoomState(
@@ -834,8 +861,6 @@ export class InMemoryGameService {
 
     const phase = room.projection.phase;
     const now = new Date();
-    this.assertActionExpectation(room, action);
-
     if (action.kind === "speech") {
       const privateState = this.requirePrivateState(room, playerId);
       const isWolfDiscussion =
@@ -1007,6 +1032,26 @@ export class InMemoryGameService {
       if (phase === "night_witch_poison" && !privateState.witchItems?.poisonAvailable) {
         throw new AppError("invalid_action", "Poison item is not available", 400);
       }
+      if (
+        phase === "night_guard" &&
+        lastGuardTarget(room, playerId) === action.targetPlayerId
+      ) {
+        throw new AppError(
+          "invalid_action",
+          "Guard cannot protect the same target on consecutive nights",
+          400
+        );
+      }
+      if (
+        phase === "night_seer" &&
+        hasSeerInspectedTarget(room, playerId, action.targetPlayerId)
+      ) {
+        throw new AppError(
+          "invalid_action",
+          "Seer cannot inspect the same target twice",
+          400
+        );
+      }
       const alreadyActed = this.hasNightActionForCurrentPhase(room, playerId);
       if (alreadyActed) {
         throw new AppError("conflict", "You have already acted this phase", 409);
@@ -1103,31 +1148,6 @@ export class InMemoryGameService {
     }
 
     throw new AppError("invalid_action", "Unknown action kind", 400);
-  }
-
-  private assertActionExpectation(
-    room: StoredGameRoom,
-    action: PlayerSubmittedAction
-  ): void {
-    if (!room.projection) return;
-    if (
-      action.expectedPhase !== undefined &&
-      action.expectedPhase !== room.projection.phase
-    ) {
-      throw new AppError("conflict", "Action phase has changed", 409);
-    }
-    if (
-      action.expectedDay !== undefined &&
-      action.expectedDay !== room.projection.day
-    ) {
-      throw new AppError("conflict", "Action day has changed", 409);
-    }
-    if (
-      action.expectedVersion !== undefined &&
-      action.expectedVersion !== room.projection.version
-    ) {
-      throw new AppError("conflict", "Action turn has changed", 409);
-    }
   }
 
   async scheduleAdvance(gameRoomId: string): Promise<void> {
@@ -2391,6 +2411,18 @@ export class InMemoryGameService {
       }
     }
     if (action.kind === "witchPoison" && !state.witchItems?.poisonAvailable) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    if (
+      action.kind === "guardProtect" &&
+      lastGuardTarget(room, actorPlayerId) === action.targetPlayerId
+    ) {
+      return { actorPlayerId, kind: "passAction" };
+    }
+    if (
+      action.kind === "seerInspect" &&
+      hasSeerInspectedTarget(room, actorPlayerId, action.targetPlayerId)
+    ) {
       return { actorPlayerId, kind: "passAction" };
     }
     if (this.hasNightActionForCurrentPhase(room, actorPlayerId)) {

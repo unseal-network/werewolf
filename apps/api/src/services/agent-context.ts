@@ -313,14 +313,7 @@ function buildActionInfo(
   const phase = room.projection?.phase ?? "";
   const result: string[] = [];
 
-  // Pre-compute legal targetPlayerId values so the LLM doesn't have to
-  // guess. We always exclude the actor themselves; specific phases may
-  // narrow it further (e.g. seer skips already-inspected players), but
-  // that filtering happens in the engine — surfacing the full alive
-  // roster here is enough for the LLM to make a tool call that will pass
-  // validation.
-  const aliveIds = room.projection?.alivePlayerIds ?? [];
-  const targetIds = aliveIds.filter((id) => id !== playerId);
+  const targetIds = legalTargetPlayerIds(room, playerId, state);
   const targetList = targetIds
     .map((id) => {
       const p = playersById.get(id);
@@ -449,4 +442,86 @@ function buildActionInfo(
   }
 
   return result;
+}
+
+function legalTargetPlayerIds(
+  room: StoredGameRoom,
+  playerId: string,
+  state: PlayerPrivateState
+): string[] {
+  if (!room.projection) return [];
+  const phase = room.projection.phase;
+  let targetIds = room.projection.alivePlayerIds.filter((id) => id !== playerId);
+
+  if (phase === "night_guard" && state.role === "guard") {
+    const previousTargetId = lastGuardTarget(room, playerId);
+    if (previousTargetId) {
+      targetIds = targetIds.filter((id) => id !== previousTargetId);
+    }
+    if (
+      room.projection.alivePlayerIds.includes(playerId) &&
+      previousTargetId !== playerId
+    ) {
+      targetIds = [playerId, ...targetIds];
+    }
+  }
+
+  if (phase === "night_witch_heal" && state.role === "witch") {
+    if (!state.witchItems?.healAvailable) return [];
+    const wolfTargetId = currentWolfKillTarget(room);
+    return wolfTargetId ? [wolfTargetId] : [];
+  }
+
+  if (phase === "night_witch_poison" && state.role === "witch") {
+    if (!state.witchItems?.poisonAvailable) return [];
+  }
+
+  if (phase === "night_seer" && state.role === "seer") {
+    const inspectedIds = new Set(
+      room.events
+        .filter(
+          (event) =>
+            event.type === "seer_result_revealed" &&
+            event.payload?.seerPlayerId === playerId
+        )
+        .map((event) => String(event.payload?.inspectedPlayerId ?? ""))
+        .filter(Boolean)
+    );
+    targetIds = targetIds.filter((id) => !inspectedIds.has(id));
+  }
+
+  return targetIds;
+}
+
+function currentWolfKillTarget(room: StoredGameRoom): string | undefined {
+  const day = room.projection?.day;
+  const event = [...room.events].reverse().find(
+    (candidate) =>
+      candidate.type === "night_action_submitted" &&
+      candidate.payload?.phase === "night_wolf" &&
+      candidate.payload?.day === day &&
+      (candidate.payload?.action as { kind?: unknown } | undefined)?.kind ===
+        "wolfKill"
+  );
+  return event?.subjectId ?? nightActionTargetId(event);
+}
+
+function lastGuardTarget(room: StoredGameRoom, guardPlayerId: string): string | undefined {
+  const event = [...room.events].reverse().find(
+    (candidate) =>
+      candidate.type === "night_action_submitted" &&
+      candidate.actorId === guardPlayerId &&
+      (candidate.payload?.action as { kind?: unknown } | undefined)?.kind ===
+        "guardProtect"
+  );
+  return event?.subjectId ?? nightActionTargetId(event);
+}
+
+function nightActionTargetId(event: GameEvent | undefined): string | undefined {
+  const action = event?.payload?.action;
+  if (!action || typeof action !== "object" || Array.isArray(action)) {
+    return undefined;
+  }
+  const targetPlayerId = (action as { targetPlayerId?: unknown }).targetPlayerId;
+  return typeof targetPlayerId === "string" ? targetPlayerId : undefined;
 }

@@ -377,53 +377,6 @@ describe("games API", () => {
     expect(await response.text()).toBe("live subtitle text\n");
   });
 
-  it("rejects malformed action expectation guards", async () => {
-    const deps = createTestDeps();
-    const app = createApp(deps);
-    const { room } = deps.games.createGame(
-      {
-        sourceMatrixRoomId: "!source:example.com",
-        title: "Friday Werewolf",
-        targetPlayerCount: 6,
-        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      },
-      "@alice:example.com"
-    );
-    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
-    for (const [userId, name] of [
-      ["@bob:example.com", "Bob"],
-      ["@cara:example.com", "Cara"],
-      ["@dan:example.com", "Dan"],
-      ["@erin:example.com", "Erin"],
-      ["@finn:example.com", "Finn"],
-    ] as const) {
-      deps.games.join(room.id, userId, name);
-    }
-    deps.games.start(room.id, "@alice:example.com");
-
-    const response = await app.request(`/games/${room.id}/actions`, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer matrix-token-alice",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        kind: "pass",
-        expectedPhase: "night_guard",
-        expectedDay: "bogus",
-        expectedVersion: 1,
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual(
-      expect.objectContaining({
-        code: "invalid_action",
-        error: "expectedDay must be a positive integer",
-      })
-    );
-  });
-
   it("accepts Matrix user id as the action target at the API boundary", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);
@@ -470,9 +423,6 @@ describe("games API", () => {
       body: JSON.stringify({
         kind: "vote",
         targetMatrixUserId: "@bob:example.com",
-        expectedPhase: "day_vote",
-        expectedDay: room.projection.day,
-        expectedVersion: room.projection.version,
       }),
     });
 
@@ -524,9 +474,6 @@ describe("games API", () => {
       body: JSON.stringify({
         kind: "vote",
         targetPlayerId: bob.id,
-        expectedPhase: "day_vote",
-        expectedDay: room.projection.day,
-        expectedVersion: room.projection.version,
       }),
     });
 

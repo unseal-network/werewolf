@@ -547,12 +547,11 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
-  it("allows pass to affect only the phase version it was submitted for", async () => {
+  it("accepts pass based on the server's current phase", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const seer = room.privateStates.find((state) => state.role === "seer");
     expect(seer).toBeDefined();
-    const staleVersion = 24;
     room.projection = {
       ...room.projection!,
       phase: "night_seer",
@@ -562,32 +561,8 @@ describe("InMemoryGameService rules", () => {
     };
     room.pendingNightActions = [];
 
-    await expect(
-      games.submitAction(gameRoomId, seer!.playerId, {
-        kind: "pass",
-        expectedPhase: "night_witch_poison",
-        expectedDay: room.projection.day,
-        expectedVersion: staleVersion,
-      })
-    ).rejects.toThrow("Action phase has changed");
-
-    expect(room.projection.phase).toBe("night_seer");
-    expect(
-      room.pendingNightActions.some((action) => action.actorPlayerId === seer!.playerId)
-    ).toBe(false);
-    expect(
-      room.events.some(
-        (event) =>
-          event.type === "night_action_submitted" &&
-          event.actorId === seer!.playerId
-      )
-    ).toBe(false);
-
     const event = await games.submitAction(gameRoomId, seer!.playerId, {
       kind: "pass",
-      expectedPhase: "night_seer",
-      expectedDay: room.projection.day,
-      expectedVersion: room.projection.version,
     });
     expect(event).toEqual(
       expect.objectContaining({
@@ -617,9 +592,6 @@ describe("InMemoryGameService rules", () => {
     room.pendingNightActions = [];
     await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "pass",
-      expectedPhase: "night_witch_heal",
-      expectedDay: 1,
-      expectedVersion: 30,
     });
 
     room.projection = {
@@ -630,9 +602,6 @@ describe("InMemoryGameService rules", () => {
     };
     const poisonPass = await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "pass",
-      expectedPhase: "night_witch_poison",
-      expectedDay: 1,
-      expectedVersion: 31,
     });
 
     expect(poisonPass).toEqual(
@@ -679,9 +648,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "nightAction",
       targetPlayerId: victim!.playerId,
-      expectedPhase: "night_witch_heal",
-      expectedDay: 1,
-      expectedVersion: 32,
     });
 
     expect(witch!.witchItems).toEqual({
@@ -710,9 +676,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, witch!.playerId, {
         kind: "nightAction",
         targetPlayerId: victim!.playerId,
-        expectedPhase: "night_witch_heal",
-        expectedDay: 2,
-        expectedVersion: 33,
       })
     ).rejects.toThrow("Heal item is not available");
   });
@@ -740,9 +703,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "nightAction",
       targetPlayerId: target!.playerId,
-      expectedPhase: "night_witch_poison",
-      expectedDay: 1,
-      expectedVersion: 34,
     });
 
     expect(witch!.witchItems).toEqual({
@@ -763,9 +723,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, witch!.playerId, {
         kind: "nightAction",
         targetPlayerId: target!.playerId,
-        expectedPhase: "night_witch_poison",
-        expectedDay: 2,
-        expectedVersion: 35,
       })
     ).rejects.toThrow("Poison item is not available");
   });
@@ -803,9 +760,6 @@ describe("InMemoryGameService rules", () => {
     await expect(
       games.submitAction(gameRoomId, speaker.id, {
         kind: "speechComplete",
-        expectedPhase: "day_speak",
-        expectedDay: 1,
-        expectedVersion: 40,
       })
     ).rejects.toThrow("Action turn has changed");
 
@@ -841,9 +795,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, witch!.playerId, {
         kind: "nightAction",
         targetPlayerId: wolf!.playerId,
-        expectedPhase: "night_seer",
-        expectedDay: 1,
-        expectedVersion: 50,
       })
     ).rejects.toThrow("You do not have the role for this action");
 
@@ -865,9 +816,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, wolf!.playerId, {
         kind: "nightAction",
         targetPlayerId: seer!.playerId,
-        expectedPhase: "night_witch_heal",
-        expectedDay: 1,
-        expectedVersion: 51,
       })
     ).rejects.toThrow("You do not have the role for this action");
   });
@@ -893,9 +841,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, wolves[0]!.playerId, {
       kind: "nightAction",
       targetPlayerId: wolves[1]!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 55,
     });
 
     expect(event).toEqual(
@@ -925,9 +870,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, guard!.playerId, {
       kind: "nightAction",
       targetPlayerId: guard!.playerId,
-      expectedPhase: "night_guard",
-      expectedDay: 1,
-      expectedVersion: 56,
     });
 
     expect(event).toEqual(
@@ -957,9 +899,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, wolf!.playerId, {
       kind: "nightAction",
       targetPlayerId: wolf!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 57,
     });
 
     expect(event).toEqual(
@@ -996,9 +935,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, wolves[0]!.playerId, {
       kind: "nightAction",
       targetPlayerId: goodTargets[0]!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 56,
     });
 
     expect(room.projection.phase).toBe("night_wolf");
@@ -1006,9 +942,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, wolves[1]!.playerId, {
       kind: "nightAction",
       targetPlayerId: goodTargets[0]!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 56,
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -1122,9 +1055,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "nightAction",
       targetPlayerId: witch!.playerId,
-      expectedPhase: "night_witch_heal",
-      expectedDay: 1,
-      expectedVersion: 58,
     });
 
     expect(event).toEqual(
@@ -1155,9 +1085,6 @@ describe("InMemoryGameService rules", () => {
     await expect(
       games.submitAction(gameRoomId, other.id, {
         kind: "speechComplete",
-        expectedPhase: "day_speak",
-        expectedDay: 1,
-        expectedVersion: 60,
       })
     ).rejects.toThrow("Not your turn to speak");
 
@@ -1181,9 +1108,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, villager!.playerId, {
         kind: "speech",
         speech: "I should not be in wolf chat.",
-        expectedPhase: "night_wolf",
-        expectedDay: 1,
-        expectedVersion: 70,
       })
     ).rejects.toThrow("Speech not allowed in this phase");
   });
@@ -1251,9 +1175,6 @@ describe("InMemoryGameService rules", () => {
 
     const event = await games.submitAction(gameRoomId, wolf!.playerId, {
       kind: "speechComplete",
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 73,
     });
 
     expect(event).toEqual(
@@ -2451,9 +2372,6 @@ describe("InMemoryGameService rules", () => {
 
     const complete = games.submitAction(gameRoomId, speaker.id, {
       kind: "speechComplete",
-      expectedPhase: "day_speak",
-      expectedDay: 1,
-      expectedVersion: 80,
     });
     await vi.waitFor(() => expect(flushCalls).toBe(1));
 
@@ -2521,9 +2439,6 @@ describe("InMemoryGameService rules", () => {
 
     const complete = games.submitAction(gameRoomId, speaker.id, {
       kind: "speechComplete",
-      expectedPhase: "day_speak",
-      expectedDay: 1,
-      expectedVersion: 90,
     });
     await vi.waitFor(() => expect(flushCalls).toBe(1));
 

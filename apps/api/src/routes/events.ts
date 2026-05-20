@@ -48,15 +48,17 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
           const perspective = () => buildPerspective(games, gameRoomId, user.id);
           const serializeSnapshot = (eventId?: string) => {
             const view = perspective();
+            const snapshotEventId = eventId ?? view.snapshotEventId;
             const data = `data: ${JSON.stringify({
               snapshot: {
                 room: view.room,
                 projection: view.room.projection,
                 privateStates: view.privateStates,
                 events: view.events,
+                snapshotEventId,
               },
             })}\n\n`;
-            return eventId ? `id: ${eventId}\n${data}` : data;
+            return eventId ? `id: ${snapshotEventId}\n${data}` : data;
           };
           const pushVisible = (payload: string) => {
             const event = eventFromSsePayload(payload);
@@ -181,6 +183,7 @@ function buildPerspective(
     room: { ...room, events, privateStates },
     events,
     privateStates,
+    snapshotEventId: room.events.at(-1)?.id ?? "",
     myPlayerId: myPlayer?.id,
     isWolf,
     revealAll,

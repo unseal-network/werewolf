@@ -76,6 +76,8 @@ export class TtsWebSocketClient {
     reject: (err: Error) => void;
     timer: NodeJS.Timeout | null;
     sampleRate: number | null;
+    finalizeAfterFirstAudio: boolean;
+    finalizeSent: boolean;
   } | null = null;
 
   constructor(opts: TtsClientOptions) {
@@ -147,6 +149,7 @@ export class TtsWebSocketClient {
     const sampleRate = sampleRateFor(outputFormat);
 
     const payload: Record<string, unknown> = {
+      message_type: "input_text_chunk",
       text: trimmed,
       output_format: outputFormat,
     };
@@ -163,7 +166,14 @@ export class TtsWebSocketClient {
         this.currentRequest = null;
         req.reject(new Error("TTS synthesize timed out"));
       }, timeoutMs);
-      this.currentRequest = { resolve, reject, timer, sampleRate };
+      this.currentRequest = {
+        resolve,
+        reject,
+        timer,
+        sampleRate,
+        finalizeAfterFirstAudio: opts.flush === true,
+        finalizeSent: false,
+      };
       this.send(payload);
     });
   }
@@ -224,6 +234,7 @@ export class TtsWebSocketClient {
         const rate = this.currentRequest?.sampleRate ?? null;
         this.opts.onAudioChunk(chunk, rate);
       }
+      this.sendFinalizeAfterFirstAudio();
     }
 
     if (
@@ -251,6 +262,18 @@ export class TtsWebSocketClient {
       this.currentRequest = null;
       req.reject(new Error("TTS websocket closed"));
     }
+  }
+
+  private sendFinalizeAfterFirstAudio(): void {
+    if (
+      !this.currentRequest ||
+      !this.currentRequest.finalizeAfterFirstAudio ||
+      this.currentRequest.finalizeSent
+    ) {
+      return;
+    }
+    this.currentRequest.finalizeSent = true;
+    this.send({ message_type: "finalize" });
   }
 }
 

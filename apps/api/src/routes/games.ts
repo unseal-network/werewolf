@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { AppError, gamePhaseSchema, type GameEvent } from "@werewolf/shared";
+import { AppError, type GameEvent } from "@werewolf/shared";
 import {
   authenticateRequest,
   type MatrixAuthClient,
@@ -249,15 +249,6 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
               : kind === "nightAction"
                 ? { kind: "nightAction", targetPlayerId }
                 : { kind: "pass" };
-      const expectedPhaseRaw = stringValue(body.expectedPhase);
-      const expectedPhase = expectedPhaseRaw
-        ? gamePhaseSchema.parse(expectedPhaseRaw)
-        : undefined;
-      const expectedDay = optionalPositiveInteger(body, "expectedDay");
-      const expectedVersion = optionalPositiveInteger(body, "expectedVersion");
-      if (expectedPhase !== undefined) action.expectedPhase = expectedPhase;
-      if (expectedDay !== undefined) action.expectedDay = expectedDay;
-      if (expectedVersion !== undefined) action.expectedVersion = expectedVersion;
       if (deps.roomActors) {
         return c.json(
           await dispatchActorCommand(deps, c.req.raw, {
@@ -713,22 +704,6 @@ function numberValue(value: unknown): number | undefined {
         ? Number(value)
         : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function optionalPositiveInteger(
-  body: Record<string, unknown>,
-  key: string
-): number | undefined {
-  if (!Object.prototype.hasOwnProperty.call(body, key)) return undefined;
-  const value = body[key];
-  const parsed =
-    typeof value === "number"
-      ? value
-      : typeof value === "string"
-        ? Number(value)
-        : NaN;
-  if (Number.isInteger(parsed) && parsed > 0) return parsed;
-  throw new AppError("invalid_action", `${key} must be a positive integer`, 400);
 }
 
 export function filterEventsForUser(

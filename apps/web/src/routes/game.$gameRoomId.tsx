@@ -28,7 +28,6 @@ import {
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
 import { isActionStateConflictError } from "../game/actionConflict";
-import { buildActionExpectation } from "../game/actionExpectation";
 import { getStableLivekitCredentials } from "../game/livekitCredentials";
 import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
@@ -108,26 +107,6 @@ function roleCardFrontUrl(roleId: string | undefined): string {
 
 function roleCardBackUrl(): string {
   return `${roleAssetBase}/card-back.avif`;
-}
-
-/**
- * Defensive mirror of server-side filterEventsForUser. The SSE route already
- * filters events, but the client keeps this guard for optimistic action
- * responses and future transport changes.
- */
-function sseEventVisibleToMe(
-  event: GameEventDto,
-  myPrivateState: PlayerPrivateState | undefined
-): boolean {
-  if (event.visibility === "public") return true;
-  if (event.visibility === "runtime") return false;
-  if (event.visibility === "private:team:wolf") {
-    return myPrivateState?.team === "wolf";
-  }
-  if (event.visibility.startsWith("private:user:")) {
-    return event.visibility === `private:user:${myPrivateState?.playerId}`;
-  }
-  return false;
 }
 
 interface PhaseUiSpec {
@@ -612,9 +591,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       );
     },
     onEvent(event) {
-      if (sseEventVisibleToMe(event, myPrivateStateRef.current)) {
-        applyServerEvent(event);
-      }
+      applyServerEvent(event);
     },
   });
 
@@ -661,13 +638,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       myPrivateState?.alive !== false &&
       (projection?.alivePlayerIds.includes(myPlayer.id) ?? true)
   );
-  // Mirror myPrivateState into a ref so the long-lived SSE handler (created
-  // once per gameRoomId) can read it without forcing a reconnect every time
-  // the value changes.
-  const myPrivateStateRef = useRef<PlayerPrivateState | undefined>(undefined);
-  useEffect(() => {
-    myPrivateStateRef.current = myPrivateState;
-  }, [myPrivateState]);
   const isCreator = room?.creatorUserId === matrixUserId;
 
   const myPlayerId = myPlayer?.id;
@@ -1333,10 +1303,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setSelectedTargetId(null);
   }
 
-  function actionExpectation() {
-    return buildActionExpectation(projection);
-  }
-
   async function onConfirmTarget(explicitTargetId?: string) {
     const targetPlayerId = explicitTargetId ?? selectedTargetId;
     if (!targetPlayerId || !myPlayer) return;
@@ -1357,9 +1323,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       const result = await client.submitAction(gameRoomId, {
         kind,
         targetMatrixUserId,
-        ...actionExpectation(),
       });
-      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+      if (result.event) {
         applyServerEvent(result.event);
       }
       setSelectedTargetId(null);
@@ -1380,18 +1345,16 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       if (!text) {
         const result = await client.submitAction(gameRoomId, {
           kind: "pass",
-          ...actionExpectation(),
         });
-        if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        if (result.event) {
           applyServerEvent(result.event);
         }
       } else {
         const result = await client.submitAction(gameRoomId, {
           kind: "speech",
           speech: text,
-          ...actionExpectation(),
         });
-        if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        if (result.event) {
           applyServerEvent(result.event);
         }
       }
@@ -1411,9 +1374,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     try {
       const result = await client.submitAction(gameRoomId, {
         kind: "pass",
-        ...actionExpectation(),
       });
-      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+      if (result.event) {
         applyServerEvent(result.event);
       }
       setSelectedTargetId(null);
@@ -1433,9 +1395,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     try {
       const result = await client.submitAction(gameRoomId, {
         kind: "speechComplete",
-        ...actionExpectation(),
       });
-      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+      if (result.event) {
         applyServerEvent(result.event);
       }
       setSpeechDraft("");

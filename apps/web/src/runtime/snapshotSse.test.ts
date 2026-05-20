@@ -98,6 +98,33 @@ describe("snapshot-first SSE state", () => {
     expect(next.timelineBaseEventId).toBe("evt_9");
   });
 
+  it("uses the server snapshot cursor even when visible events are older", () => {
+    const visibleEvent = {
+      id: "evt_7",
+      gameRoomId: "game_1",
+      type: "phase_started",
+      visibility: "public",
+      payload: { phase: "day_speak" },
+      createdAt: "2026-05-14T00:00:00.000Z",
+    } satisfies GameEventDto;
+    const parsed = parseSubscribeMessage(
+      JSON.stringify({
+        snapshot: {
+          room,
+          projection,
+          privateStates: [privateState],
+          events: [visibleEvent],
+          snapshotEventId: "evt_9",
+        },
+      })
+    );
+
+    const next = applySubscribeMessage(emptyState(), parsed);
+
+    expect(next.timeline).toEqual([visibleEvent]);
+    expect(next.timelineBaseEventId).toBe("evt_9");
+  });
+
   it("deduplicates replayed live events by id after a snapshot", () => {
     const state = {
       ...emptyState(),
