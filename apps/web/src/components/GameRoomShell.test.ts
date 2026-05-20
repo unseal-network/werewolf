@@ -572,6 +572,8 @@ describe("game room seat layout", () => {
     );
 
     expect(timeline).toContain('className="log-peek-icon"');
+    expect(timeline).toContain("timelineIconUrl");
+    expect(timeline).toContain("import.meta.env.BASE_URL");
     expect(timeline).not.toContain("{t(\"timeline.title\")}</button>");
 
     const logPeekRule = utilityCss.match(
@@ -585,6 +587,7 @@ describe("game room seat layout", () => {
     expect(utilityCss).toContain(".game-layout-root .utility-region .log-peek-icon");
     expect(utilityCss).toContain("width: 100%");
     expect(utilityCss).toContain("height: 100%");
+    expect(utilityCss).not.toContain('url("/assets/werewolf-ui/final/icon/book.webp")');
     expect(utilityCss).not.toContain(".game-layout-root .utility-region .log-peek::before");
   });
 

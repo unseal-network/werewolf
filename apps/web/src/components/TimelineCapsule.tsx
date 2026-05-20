@@ -37,6 +37,8 @@ interface TimelineCapsuleProps {
   revealAll?: boolean;
 }
 
+const timelineIconUrl = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/werewolf-ui/final/icon/book.webp`;
+
 function isVisibleEvent(
   event: GameEventLike,
   myPlayerId?: string,
@@ -309,7 +311,13 @@ export function TimelineCapsule({
         aria-label={t("timeline.capsule")}
         title={t("timeline.title")}
       >
-        <span className="log-peek-icon" aria-hidden="true" />
+        <img
+          className="log-peek-icon"
+          src={timelineIconUrl}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+        />
       </button>
 
       <div
