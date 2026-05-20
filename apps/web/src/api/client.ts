@@ -190,6 +190,11 @@ export interface AgentCandidatesResponse {
   roomId: string;
 }
 
+export interface FillAgentsResponse {
+  addedPlayers: RoomPlayer[];
+  targetPlayerCount: number;
+}
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, "");
 }
@@ -348,6 +353,13 @@ export function createApiClient(options: ApiClientOptions) {
         method: "POST",
         headers: idempotentHeaders("addAgent"),
         body: JSON.stringify({ agentUserId, displayName, avatarUrl }),
+      });
+    },
+    fillAgentPlayers(gameRoomId: string, targetPlayerCount: number) {
+      return request<FillAgentsResponse>(`/games/${gameRoomId}/agents/fill`, {
+        method: "POST",
+        headers: idempotentHeaders("fillAgents"),
+        body: JSON.stringify({ targetPlayerCount }),
       });
     },
     removePlayer(gameRoomId: string, matrixUserId: string) {

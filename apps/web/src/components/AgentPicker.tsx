@@ -12,9 +12,12 @@ interface AgentPickerProps {
   errorMessage?: string | undefined;
   sourceRoomId?: string | undefined;
   remainingSeats: number;
+  activePlayerCount: number;
+  targetPlayerCount: number;
   canStartNow: boolean;
   onAdd: (agent: AgentCandidate) => Promise<void>;
   onRemove: (agent: AgentCandidate) => Promise<void>;
+  onFill?: ((targetPlayerCount: number) => Promise<void>) | undefined;
   onRefresh: () => void;
   onStartNow?: () => void;
   onClose: () => void;
@@ -26,19 +29,31 @@ export function AgentPicker({
   agents,
   errorMessage,
   remainingSeats,
+  activePlayerCount,
+  targetPlayerCount,
   canStartNow,
   onAdd,
   onRemove,
+  onFill,
   onRefresh,
   onStartNow,
   onClose,
 }: AgentPickerProps) {
   const t = useT();
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [fillTargetCount, setFillTargetCount] = useState(targetPlayerCount);
+  const [filling, setFilling] = useState(false);
 
   useEffect(() => {
-    if (!open) setPendingId(null);
+    if (!open) {
+      setPendingId(null);
+      setFilling(false);
+    }
   }, [open]);
+
+  useEffect(() => {
+    if (open) setFillTargetCount(targetPlayerCount);
+  }, [open, targetPlayerCount]);
 
   const handleAdd = useCallback(
     async (agent: AgentCandidate) => {
@@ -65,6 +80,23 @@ export function AgentPicker({
   );
 
   if (!open) return null;
+
+  const minFillTarget = Math.max(activePlayerCount, 1);
+  const normalizedFillTarget = Math.min(
+    targetPlayerCount,
+    Math.max(minFillTarget, fillTargetCount)
+  );
+  const fillMissingCount = Math.max(normalizedFillTarget - activePlayerCount, 0);
+
+  const handleFill = async () => {
+    if (!onFill) return;
+    setFilling(true);
+    try {
+      await onFill(normalizedFillTarget);
+    } finally {
+      setFilling(false);
+    }
+  };
 
   return (
     <>
@@ -99,6 +131,35 @@ export function AgentPicker({
         {errorMessage ? (
           <div className="agent-picker-error-toast" role="alert" aria-live="polite">
             {t("agentPicker.error", { message: errorMessage })}
+          </div>
+        ) : null}
+
+        {onFill ? (
+          <div className="agent-fill-control">
+            <label className="agent-fill-label" htmlFor="agent-fill-target">
+              {t("agentPicker.fillTarget")}
+            </label>
+            <input
+              id="agent-fill-target"
+              className="agent-fill-input"
+              type="number"
+              min={minFillTarget}
+              max={targetPlayerCount}
+              value={normalizedFillTarget}
+              onChange={(event) => {
+                const next = Number(event.currentTarget.value);
+                if (Number.isFinite(next)) setFillTargetCount(Math.trunc(next));
+              }}
+            />
+            <GameButton
+              className="agent-fill-button"
+              variant="confirm"
+              size="sm"
+              label={t("agentPicker.fillNow", { count: fillMissingCount })}
+              loading={filling}
+              disabled={filling || fillMissingCount <= 0}
+              onClick={handleFill}
+            />
           </div>
         ) : null}
 

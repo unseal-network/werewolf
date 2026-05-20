@@ -558,6 +558,85 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     }
   });
 
+  app.post("/:gameRoomId/agents/fill", async (c) => {
+    try {
+      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const body = (await c.req.json()) as Record<string, unknown>;
+      const targetPlayerCount = positiveIntegerValue(body.targetPlayerCount);
+      if (!targetPlayerCount) {
+        throw new AppError("invalid_action", "targetPlayerCount is required", 400);
+      }
+
+      const room = deps.games.snapshot(c.req.param("gameRoomId"));
+      if (targetPlayerCount > room.targetPlayerCount) {
+        throw new AppError(
+          "invalid_action",
+          `targetPlayerCount is outside the room limit (1-${room.targetPlayerCount})`,
+          400
+        );
+      }
+
+      const activePlayers = room.players.filter((player) => !player.leftAt);
+      const missingSeats = Math.max(targetPlayerCount - activePlayers.length, 0);
+      if (missingSeats === 0) {
+        return c.json({ addedPlayers: [], targetPlayerCount }, 200);
+      }
+
+      const seenAgentIds = new Set(
+        activePlayers
+          .filter((player) => player.kind === "agent")
+          .map((player) => player.agentId)
+      );
+      const currentUserAgents = await listCurrentUserAgents(
+        c.req.raw,
+        seenAgentIds
+      );
+      const selectedById = new Set<string>();
+      const userOwnedCandidates = shuffled(
+        currentUserAgents.filter((agent) => !agent.alreadyJoined)
+      );
+      const fixedCandidates = shuffled(
+        DEFAULT_AGENT_CANDIDATES
+          .map((agent) => toAgentCandidate(agent, seenAgentIds))
+          .filter((agent) => !agent.alreadyJoined)
+      );
+      const candidates: AgentCandidateResponse[] = [];
+      for (const agent of [...userOwnedCandidates, ...fixedCandidates]) {
+        if (selectedById.has(agent.userId)) continue;
+        selectedById.add(agent.userId);
+        candidates.push(agent);
+      }
+
+      if (candidates.length < missingSeats) {
+        throw new AppError("conflict", "Not enough available agents to fill seats", 409);
+      }
+
+      const baseCommandId = commandId(c.req.raw);
+      const addedPlayers: unknown[] = [];
+      for (const [index, agent] of candidates.slice(0, missingSeats).entries()) {
+        const result = await dispatchActorCommand(deps, c.req.raw, {
+          commandId: `${baseCommandId}:fill:${index + 1}`,
+          gameRoomId: room.id,
+          actorUserId: user.id,
+          kind: "addAgent",
+          agentUserId: agent.userId,
+          displayName: agent.displayName,
+          ...(agent.avatarUrl ? { avatarUrl: matrixMediaUrl(agent.avatarUrl) } : {}),
+        });
+        const player = resultPlayer(result);
+        if (player) addedPlayers.push(player);
+      }
+
+      return c.json({ addedPlayers, targetPlayerCount }, 201);
+    } catch (error) {
+      if (error instanceof AppError) return appErrorResponse(error);
+      return c.json(
+        { error: error instanceof Error ? error.message : String(error) },
+        400
+      );
+    }
+  });
+
   app.post("/:gameRoomId/agents", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
@@ -706,6 +785,25 @@ function numberValue(value: unknown): number | undefined {
         ? Number(value)
         : NaN;
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function positiveIntegerValue(value: unknown): number | undefined {
+  const parsed = numberValue(value);
+  return parsed && Number.isInteger(parsed) ? parsed : undefined;
+}
+
+function shuffled<T>(items: readonly T[]): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex]!, result[index]!];
+  }
+  return result;
+}
+
+function resultPlayer(result: unknown): unknown | null {
+  if (!result || typeof result !== "object") return null;
+  return (result as { player?: unknown }).player ?? null;
 }
 
 export function filterEventsForUser(

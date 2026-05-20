@@ -707,6 +707,114 @@ describe("games API", () => {
       displayName: "Duplicate Fixed Agent",
     });
   });
+
+  it("fills missing seats to the requested target count with current user's agents first", async () => {
+    const deps = createTestDeps();
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          agents: [
+            {
+              user_id: "@custom-agent-1:example.com",
+              display_name: "Custom Agent 1",
+              user_type: "agent",
+              membership: "join",
+            },
+            {
+              user_id: "@custom-agent-2:example.com",
+              display_name: "Custom Agent 2",
+              user_type: "agent",
+              membership: "join",
+            },
+            {
+              user_id: "@custom-agent-3:example.com",
+              display_name: "Custom Agent 3",
+              user_type: "agent",
+              membership: "join",
+            },
+          ],
+        }),
+        { status: 200 }
+      )
+    );
+    const app = createApp({
+      ...deps,
+      matrixHomeserverUrl: "https://matrix.example",
+      fetchImpl,
+    });
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice");
+    deps.games.join(room.id, "@bob:example.com", "Bob");
+    deps.games.join(room.id, "@cara:example.com", "Cara");
+
+    const response = await app.request(`/games/${room.id}/agents/fill`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ targetPlayerCount: 6 }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.addedPlayers).toHaveLength(3);
+    expect(body.addedPlayers.map((player: { agentId: string }) => player.agentId).sort()).toEqual([
+      "@custom-agent-1:example.com",
+      "@custom-agent-2:example.com",
+      "@custom-agent-3:example.com",
+    ]);
+    expect(deps.games.snapshot(room.id).players.filter((player) => !player.leftAt)).toHaveLength(6);
+  });
+
+  it("fills six seats when a twelve-player room currently has six players", async () => {
+    const deps = createTestDeps();
+    const app = createApp({
+      ...deps,
+      fetchImpl: vi.fn(async () => new Response("{}", { status: 503 })),
+    });
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Big Friday Werewolf",
+        targetPlayerCount: 12,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    for (const [index, tokenUser] of [
+      "@alice:example.com",
+      "@bob:example.com",
+      "@cara:example.com",
+      "@dan:example.com",
+      "@erin:example.com",
+      "@finn:example.com",
+    ].entries()) {
+      deps.games.join(room.id, tokenUser, `User ${index + 1}`);
+    }
+
+    const response = await app.request(`/games/${room.id}/agents/fill`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ targetPlayerCount: 12 }),
+    });
+
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.addedPlayers).toHaveLength(6);
+    expect(deps.games.snapshot(room.id).players.filter((player) => !player.leftAt)).toHaveLength(12);
+  });
 });
 
 async function readNextSseJson(

@@ -19,10 +19,12 @@ function renderPicker({
   errorMessage,
   candidates = agents,
   canStart = true,
+  onFill,
 }: {
   errorMessage?: string;
   candidates?: AgentCandidate[];
   canStart?: boolean;
+  onFill?: (targetPlayerCount: number) => Promise<void>;
 } = {}) {
   return renderToStaticMarkup(
     createElement(
@@ -35,9 +37,12 @@ function renderPicker({
         errorMessage,
         sourceRoomId: "!source:keepsecret.io",
         remainingSeats: 1,
+        activePlayerCount: 5,
+        targetPlayerCount: 6,
         canStartNow: true,
         onAdd: async () => undefined,
         onRemove: async () => undefined,
+        ...(onFill ? { onFill } : {}),
         onRefresh: () => undefined,
         ...(canStart ? { onStartNow: () => undefined } : {}),
         onClose: () => undefined,
@@ -91,5 +96,13 @@ describe("AgentPicker", () => {
 
     expect(html).toContain("刷新列表");
     expect(html).not.toContain("立刻开始");
+  });
+
+  it("renders a target count control and one-click fill button when fill is available", () => {
+    const html = renderPicker({ onFill: async () => undefined });
+
+    expect(html).toContain("目标人数");
+    expect(html).toContain('value="6"');
+    expect(html).toContain("一键补齐");
   });
 });

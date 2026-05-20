@@ -62,4 +62,26 @@ describe("createApiClient auth refresh", () => {
       })
     );
   });
+
+  it("posts the target player count when filling seats with agents", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse(201, { addedPlayers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = createApiClient({
+      baseUrl: "https://werewolf.example",
+      getMatrixToken: () => "matrix-token",
+    });
+
+    await client.fillAgentPlayers("game_1", 12);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://werewolf.example/games/game_1/agents/fill",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ targetPlayerCount: 12 }),
+      })
+    );
+  });
 });

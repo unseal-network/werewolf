@@ -1045,6 +1045,16 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     }
   }
 
+  async function fillAgentsToTarget(targetPlayerCount: number) {
+    try {
+      const filled = await client.fillAgentPlayers(gameRoomId, targetPlayerCount);
+      setRoomSnapshot((current) => upsertRoomPlayers(current, filled.addedPlayers));
+      await refreshAgentCandidates();
+    } catch (error) {
+      setAgentError(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   async function removeAgentFromSeat(agent: AgentCandidate) {
     try {
       const removed = await client.removePlayer(gameRoomId, agent.userId);
@@ -1442,9 +1452,12 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
                 (room?.targetPlayerCount ?? 12) - activeSeatCount,
                 0
               )}
+              activePlayerCount={activeSeatCount}
+              targetPlayerCount={room?.targetPlayerCount ?? 12}
               canStartNow={hasEnoughPlayers}
               onAdd={addAgentToSeat}
               onRemove={removeAgentFromSeat}
+              onFill={fillAgentsToTarget}
               onRefresh={refreshAgentCandidates}
               {...(isCreator ? { onStartNow: onAgentPickerStartNow } : {})}
               onClose={onAgentPickerClose}
