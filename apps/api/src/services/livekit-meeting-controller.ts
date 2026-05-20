@@ -39,6 +39,10 @@ export interface LivekitMeetingController {
   setRoomSnapshotProvider(
     provider: (gameRoomId: string) => LivekitMeetingRoomState | null
   ): void;
+  waitForPlayersConnected(
+    room: LivekitMeetingRoomState,
+    timeoutMs: number
+  ): Promise<void>;
   syncForRoom(room: LivekitMeetingRoomState, reason?: string): Promise<void>;
   syncForLivekitEvent(gameRoomId: string, reason?: string): Promise<void>;
   syncPublicSpeaker(
@@ -126,6 +130,45 @@ export class ServerLivekitMeetingController implements LivekitMeetingController 
       });
     ensuringLivekitRooms.set(gameRoomId, pending);
     return pending;
+  }
+
+  async waitForPlayersConnected(
+    room: LivekitMeetingRoomState,
+    timeoutMs: number
+  ): Promise<void> {
+    const expectedIdentities = this.activePlayers(room)
+      .filter((player) => player.kind === "user")
+      .map(resolveLivekitIdentity)
+      .filter((identity): identity is string => Boolean(identity));
+    if (expectedIdentities.length === 0) return;
+
+    const deadline = Date.now() + Math.max(0, timeoutMs);
+    while (true) {
+      try {
+        await this.ensureRoom(room.id);
+        const participants = (await this.roomService.listParticipants(
+          room.id
+        )) as LivekitParticipantInfo[];
+        const connectedIdentities = new Set(
+          participants
+            .map((participant) => participant.identity)
+            .filter((identity): identity is string => Boolean(identity))
+        );
+        if (expectedIdentities.every((identity) => connectedIdentities.has(identity))) {
+          return;
+        }
+      } catch (err) {
+        console.warn("[LiveKitMeeting] player readiness check skipped", {
+          gameRoomId: room.id,
+          err,
+        });
+        return;
+      }
+
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) return;
+      await sleep(Math.min(250, remainingMs));
+    }
   }
 
   syncForLivekitEvent(
@@ -391,6 +434,11 @@ function versionKeyFor(room: LivekitMeetingRoomState): string {
 function resolveLivekitIdentity(player: LivekitMeetingPlayer): string | null {
   if (player.kind === "user") return player.userId ?? null;
   return player.agentId ?? null;
+}
+
+function sleep(ms: number): Promise<void> {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function isAudioTrack(track: LivekitTrackInfo): boolean {

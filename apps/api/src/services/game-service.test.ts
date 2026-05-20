@@ -60,6 +60,7 @@ function fakeLivekitMeeting() {
   return {
     ensureRoom: vi.fn(async () => undefined),
     setRoomSnapshotProvider: vi.fn(),
+    waitForPlayersConnected: vi.fn(async () => undefined),
     syncForRoom: vi.fn(async () => undefined),
     syncForLivekitEvent: vi.fn(async () => undefined),
     syncPublicSpeaker: vi.fn(async () => undefined),
@@ -114,6 +115,50 @@ describe("InMemoryGameService rules", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(calls[0]).toBe("sync");
+  });
+
+  it("waits for LiveKit players before opening narration at game start", async () => {
+    const games = new InMemoryGameService();
+    const livekitMeeting = fakeLivekitMeeting();
+    let releaseLivekitWait!: () => void;
+    livekitMeeting.waitForPlayersConnected.mockImplementation(
+      () => new Promise<undefined>((resolve) => {
+        releaseLivekitWait = () => resolve(undefined);
+      })
+    );
+    games.setLivekitMeetingController(livekitMeeting);
+    const playAudioFiles = vi.fn(async () => undefined);
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: () => undefined,
+        playAudioFiles,
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Rules",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 6)) games.join(room.id, userId, name);
+
+    games.start(room.id, players[0][0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(livekitMeeting.waitForPlayersConnected).toHaveBeenCalledWith(
+      expect.objectContaining({ id: room.id }),
+      5000
+    );
+    expect(playAudioFiles).not.toHaveBeenCalled();
+
+    releaseLivekitWait();
+    await vi.waitFor(() => expect(playAudioFiles).toHaveBeenCalled());
   });
 
   it("syncs wolf discussion with living wolves only", async () => {

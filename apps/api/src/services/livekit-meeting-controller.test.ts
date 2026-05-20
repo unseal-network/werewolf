@@ -170,6 +170,36 @@ describe("ServerLivekitMeetingController", () => {
     );
   });
 
+  it("waits for active user participants and ignores agent seats", async () => {
+    vi.useFakeTimers();
+    try {
+      const service = fakeRoomService();
+      service.listParticipants
+        .mockResolvedValueOnce([
+          { identity: "@alice:example.com", tracks: [] },
+          { identity: "@bob:example.com", tracks: [] },
+          { identity: "@cara:example.com", tracks: [] },
+        ])
+        .mockResolvedValueOnce([
+          { identity: "@alice:example.com", tracks: [] },
+          { identity: "@bob:example.com", tracks: [] },
+          { identity: "@cara:example.com", tracks: [] },
+          { identity: "@dan:example.com", tracks: [] },
+        ]);
+      const controller = new ServerLivekitMeetingController(service as never);
+
+      const waiting = controller.waitForPlayersConnected(makeRoom("night_guard"), 5000);
+      await vi.waitFor(() => expect(service.listParticipants).toHaveBeenCalledTimes(1));
+
+      await vi.advanceTimersByTimeAsync(250);
+      await waiting;
+
+      expect(service.listParticipants).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("does not let an older queued sync restore stale permissions after a newer version", async () => {
     const service = fakeRoomService();
     let releaseFirstList: () => void = () => {
