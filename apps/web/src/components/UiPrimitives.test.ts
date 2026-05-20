@@ -84,7 +84,7 @@ describe("new UI primitives", () => {
     expect(css).not.toContain(".game-layout-root .ww-icon-button__content");
   });
 
-  it("renders decision buttons as unstyled semantic buttons with live text", () => {
+  it("renders decision buttons with shared 9-slice art skins and live text", () => {
     const html = renderToStaticMarkup(
       createElement(
         "div",
@@ -109,12 +109,12 @@ describe("new UI primitives", () => {
     expect(html).not.toContain("ww-game-button__chrome");
     expect(html).not.toContain("ww-game-button__content");
     expect(html).not.toContain("ww-game-button__label");
-    expect(css).not.toContain("submit-button-9slice.webp");
-    expect(css).not.toContain("confirm-button-9slice.webp");
-    expect(css).not.toContain("cancel-button-9slice.webp");
-    expect(css).not.toContain(".game-layout-root .ww-game-button");
-    expect(css).not.toContain("--ww-button-chrome");
-    expect(css).not.toContain("border-image-source");
+    expect(css).toContain(".game-layout-root .ww-game-button");
+    expect(css).toContain("submit-button-9slice.webp");
+    expect(css).toContain("confirm-button-9slice.webp");
+    expect(css).toContain("cancel-button-9slice.webp");
+    expect(css).toContain("border-image-source: var(--ww-button-skin-image)");
+    expect(css).toContain("border-image-slice: var(--ww-button-skin-slice) fill");
   });
 
   it("renders reusable icon buttons without shared visual chrome", () => {
@@ -219,7 +219,7 @@ describe("new UI primitives", () => {
     const actionButtonCss = actionCss.slice(
       actionCss.indexOf(".game-layout-root .action-region .stage-start")
     );
-    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
     expect(primitiveCss).not.toContain(".game-layout-root .ww-icon-button");
     expect(actionButtonCss).toContain("width: var(--action-button-width) !important");
     expect(actionButtonCss).toContain("max-width: var(--action-button-width) !important");

@@ -388,6 +388,29 @@
   width: var(--action-secondary-button-width) !important;
 }
 
+.game-layout-root .action-region .ww-game-button.stage-start,
+.game-layout-root .action-region .ww-game-button.stage-confirm,
+.game-layout-root .action-region .ww-game-button.stage-skip,
+.game-layout-root .action-region .ww-game-button.player-picker-action {
+  min-height: calc(56px * var(--layout-action-scale, 1)) !important;
+  padding: var(--ww-button-padding-y) var(--ww-button-padding-x) !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  border-width: var(--ww-button-border-y) var(--ww-button-border-x) !important;
+  border-image-source: var(--ww-button-skin-image) !important;
+  border-image-slice: var(--ww-button-skin-slice) fill !important;
+  border-image-width: var(--ww-button-border-y) var(--ww-button-border-x) !important;
+  border-image-repeat: stretch !important;
+  background: transparent !important;
+  color: #fff7d8;
+  font-size: calc(var(--ww-button-font-size) * var(--layout-action-scale, 1));
+  font-weight: 950;
+  line-height: 1;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.86),
+    0 0 12px rgba(0, 0, 0, 0.46) !important;
+}
+
 .game-layout-root .action-region .phase-card > .stage-identity,
 .game-layout-root .action-region .phase-card > .phase-kicker,
 .game-layout-root .action-region .phase-card > .phase-title,

@@ -330,7 +330,10 @@ describe("game room seat layout", () => {
     expect(primitiveCss).toContain("center / 100% 100%");
     expect(primitiveCss).toContain("no-repeat");
     expect(primitiveCss).not.toContain("inset: var(--ww-panel-fill-inset)");
-    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).toContain("button/decision/submit-button-9slice.webp");
+    expect(primitiveCss).toContain("button/decision/confirm-button-9slice.webp");
+    expect(primitiveCss).toContain("button/decision/cancel-button-9slice.webp");
     expect(gameButton).toContain('"ww-game-button"');
     expect(gameButton).toContain("data-game-button-variant");
     expect(gameButton).not.toContain("ww-game-button__chrome");
@@ -364,10 +367,10 @@ describe("game room seat layout", () => {
 
     expect(shell).toContain("compact ? 340");
     expect(shell).toContain("compact ? 380");
-    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
     expect(primitiveCss).not.toContain(".game-layout-root .ww-icon-button");
-    expect(primitiveCss).not.toContain("button/decision");
-    expect(primitiveCss).not.toContain("--ww-button-chrome");
+    expect(primitiveCss).toContain("button/decision");
+    expect(primitiveCss).toContain("border-image-source: var(--ww-button-skin-image)");
     expect(actionCss).toContain(".game-layout-root .action-region .stage-start");
     expect(actionCss).toContain("width: var(--action-primary-button-width) !important");
     expect(actionCss).toContain("background: none !important");
@@ -562,8 +565,16 @@ describe("game room seat layout", () => {
 
     expect(endCardRule).toContain("backdrop-filter: none !important");
     expect(endCardRule).toContain("-webkit-backdrop-filter: none !important");
+    expect(endCardRule).toContain("top: 50dvh");
+    expect(endCardRule).toContain("max-height: calc(100dvh - 24px)");
+    expect(endCardRule).toContain("overflow: visible");
+    expect(modalCss).toContain(".endgame-phase-card .ww-ui-panel__fill");
+    expect(modalCss).toContain("background: transparent !important");
+    expect(modalCss).toContain(".endgame-phase-card-content");
+    expect(modalCss).toContain("overflow: visible !important");
     expect(exitButtonCss).toContain("max-width: 300px");
     expect(exitButtonCss).toContain("justify-self: center");
+    expect(exitButtonCss).toContain("width: min(300px, 100%)");
     expect(exitButtonCss).not.toContain("--ww-button-content-inset-x");
     expect(exitButtonCss).not.toContain("--ww-button-width");
     expect(exitButtonCss).not.toContain("--ww-button-font-size");

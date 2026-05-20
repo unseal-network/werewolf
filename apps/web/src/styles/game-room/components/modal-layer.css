@@ -18,9 +18,11 @@
   --ww-panel-content-left: 38px;
   position: fixed;
   left: 50%;
-  top: 46dvh;
+  top: 50dvh;
   width: min(380px, calc(100vw - 54px));
-  min-height: 260px;
+  max-height: calc(100dvh - 24px);
+  min-height: min(320px, calc(100dvh - 24px));
+  overflow: visible;
   transform: translate(-50%, -50%);
   padding:
     var(--ww-panel-content-top)
@@ -36,12 +38,17 @@
   color: #f6f0dc !important;
 }
 
+.game-layout-root[data-scene="end"] .modal-layer .endgame-phase-card .ww-ui-panel__fill {
+  background: transparent !important;
+}
+
 .game-layout-root[data-scene="end"] .modal-layer .endgame-phase-card-content {
-  min-height: 170px;
+  min-height: 0;
   display: grid;
   align-content: center;
   justify-items: center;
   gap: 14px;
+  overflow: visible !important;
   text-align: center;
 }
 
@@ -76,6 +83,7 @@
 
 .game-layout-root[data-scene="end"] .modal-layer .endgame-exit-button {
   margin-top: 8px;
+  width: min(300px, 100%);
   min-width: 0;
   max-width: 300px;
   justify-self: center;
