@@ -193,6 +193,7 @@ function App() {
         if (decision.kind === "wait-for-host-link") {
           setHostBootstrap({ status: "waiting", hostRoomId: decision.hostRoomId });
           if (unsealClient && unsealJwt) {
+            un.log('[wolf] waitting start')
             void pollForLink(unsealClient, decision.hostRoomId, unsealJwt);
           }
           return;
