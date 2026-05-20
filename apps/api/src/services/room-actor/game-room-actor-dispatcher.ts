@@ -2,45 +2,53 @@ import { AppError, type GameEvent } from "@werewolf/shared";
 import type {
   InMemoryGameService,
   PlayerSubmittedAction,
-} from "./game-service";
-import type { RoomCommand } from "./room-actor/types";
+} from "../game-service";
+import type { RoomActorDispatcher, RoomCommand } from "./types";
 
-export interface RoomActorDispatcher {
-  dispatch(command: RoomCommand): Promise<unknown>;
-}
-
-export class GameServiceRoomActors implements RoomActorDispatcher {
-  private readonly queues = new Map<string, Promise<unknown>>();
-  private readonly commandResults = new Map<string, unknown>();
+export class GameRoomActorDispatcher implements RoomActorDispatcher {
+  private readonly actors = new Map<string, GameRoomActor>();
 
   constructor(private readonly games: InMemoryGameService) {}
 
   dispatch(command: RoomCommand): Promise<unknown> {
-    const key = `${command.gameRoomId}\0${command.commandId}`;
-    if (this.commandResults.has(key)) {
-      return Promise.resolve(structuredClone(this.commandResults.get(key)));
+    return this.actorFor(command.gameRoomId).dispatch(command);
+  }
+
+  private actorFor(gameRoomId: string): GameRoomActor {
+    const existing = this.actors.get(gameRoomId);
+    if (existing) return existing;
+    const actor = new GameRoomActor(this.games, gameRoomId);
+    this.actors.set(gameRoomId, actor);
+    return actor;
+  }
+}
+
+class GameRoomActor {
+  private queue: Promise<unknown> = Promise.resolve();
+  private readonly commandResults = new Map<string, unknown>();
+
+  constructor(
+    private readonly games: InMemoryGameService,
+    private readonly gameRoomId: string
+  ) {}
+
+  dispatch(command: RoomCommand): Promise<unknown> {
+    if (command.gameRoomId !== this.gameRoomId) {
+      throw new Error("command gameRoomId does not match actor room");
     }
 
-    const previous = this.queues.get(command.gameRoomId) ?? Promise.resolve();
+    const previous = this.queue;
     const next = previous
       .catch(() => undefined)
       .then(async () => {
-        if (this.commandResults.has(key)) {
-          return structuredClone(this.commandResults.get(key));
-        }
+        const existing = this.commandResults.get(command.commandId);
+        if (existing !== undefined) return structuredClone(existing);
         const result = await this.execute(command);
-        this.commandResults.set(key, structuredClone(result));
+        this.commandResults.set(command.commandId, structuredClone(result));
         return result;
       });
 
-    this.queues.set(command.gameRoomId, next);
-    void next
-      .finally(() => {
-        if (this.queues.get(command.gameRoomId) === next) {
-          this.queues.delete(command.gameRoomId);
-        }
-      })
-      .catch(() => undefined);
+    this.queue = next;
     return next;
   }
 

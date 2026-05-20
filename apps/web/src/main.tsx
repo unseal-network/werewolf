@@ -7,6 +7,7 @@ import { GameRoomPage } from "./routes/game.$gameRoomId";
 import { AnimationDemoPage } from "./routes/animation-demo";
 import { UserSelectPage } from "./routes/user-select";
 import { LoadingPage } from "./components/LoadingPage";
+import { GameAssetPreloadGate } from "./components/GameAssetPreloadGate";
 import { I18nProvider } from "./i18n/I18nProvider";
 import { useIframeAuth } from "./hooks/useIframeAuth";
 import {
@@ -253,10 +254,16 @@ function App() {
   // Game room
   if (gameRoomId) {
     return (
-      <GameRoomPage
-        gameRoomId={gameRoomId}
+      <GameAssetPreloadGate
+        isAdmin={isAdmin}
         onLeave={() => iframeAuth.iframeMessage.hideApp()}
-      />
+      >
+        <GameRoomPage
+          key={gameRoomId}
+          gameRoomId={gameRoomId}
+          onLeave={() => iframeAuth.iframeMessage.hideApp()}
+        />
+      </GameAssetPreloadGate>
     );
   }
 

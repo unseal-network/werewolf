@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { GAME_BUTTON_ASSET_URLS, preloadGameAssetUrls } from "../game/preloadAssets";
 
 export type GameButtonVariant = "primary" | "confirm" | "secondary" | "danger";
 export type GameButtonSize = "sm" | "md" | "lg";
@@ -17,6 +18,16 @@ const BUTTON_STATE_IMAGE = {
   loading: `${assetBase}/loading-button.png`,
   pressed: `${assetBase}/pressed-button.png`,
 };
+
+let buttonArtPreloaded = false;
+
+export function preloadGameButtonArt() {
+  if (buttonArtPreloaded) return;
+  buttonArtPreloaded = true;
+  void preloadGameAssetUrls(GAME_BUTTON_ASSET_URLS);
+}
+
+preloadGameButtonArt();
 
 export interface GameButtonProps
   extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {

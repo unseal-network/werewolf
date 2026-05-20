@@ -13,8 +13,11 @@ import type {
   RuntimeAgentTurnOutput,
   StoredGameRoom,
 } from "../services/game-service";
-import type { RoomActorDispatcher } from "../services/game-service-room-actors";
-import { roomCommandSchema, type RoomCommand } from "../services/room-actor/types";
+import {
+  roomCommandSchema,
+  type RoomActorDispatcher,
+  type RoomCommand,
+} from "../services/room-actor/types";
 
 export interface GamesRouteDeps {
   matrix: MatrixAuthClient;

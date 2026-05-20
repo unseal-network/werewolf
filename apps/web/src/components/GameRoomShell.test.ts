@@ -561,6 +561,33 @@ describe("game room seat layout", () => {
     expect(modalCss.match(/\.game-layout-root \.modal-layer \{[\s\S]*?\n\}/)?.[0] ?? "").toContain("z-index: 150");
   });
 
+  it("renders the timeline trigger as a compact icon-only button", () => {
+    const timeline = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/TimelineCapsule.tsx"),
+      "utf8"
+    );
+    const utilityCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/utility-region.css"),
+      "utf8"
+    );
+
+    expect(timeline).toContain('className="log-peek-icon"');
+    expect(timeline).not.toContain("{t(\"timeline.title\")}</button>");
+
+    const logPeekRule = utilityCss.match(
+      /\.game-layout-root \.utility-region \.log-peek,[\s\S]*?\n\}/
+    )?.[0] ?? "";
+    expect(logPeekRule).toContain("width: 46px !important");
+    expect(logPeekRule).toContain("height: 46px !important");
+    expect(logPeekRule).toContain("place-items: center !important");
+    expect(logPeekRule).toContain("background: transparent !important");
+    expect(logPeekRule).toContain("border: 0 !important");
+    expect(utilityCss).toContain(".game-layout-root .utility-region .log-peek-icon");
+    expect(utilityCss).toContain("width: 100%");
+    expect(utilityCss).toContain("height: 100%");
+    expect(utilityCss).not.toContain(".game-layout-root .utility-region .log-peek::before");
+  });
+
   it("keeps the terminal game-over modal from inheriting legacy glass and uncentered button chrome", () => {
     const modalCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/modal-layer.css"),

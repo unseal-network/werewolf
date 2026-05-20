@@ -82,6 +82,41 @@ describe("timeline state derivation", () => {
     expect(compareGameEventIdStrings("event_10", "event_9")).toBeGreaterThan(0);
   });
 
+  it("ignores timeline events from another game room", () => {
+    const baseRoom = room();
+    const baseProjection = projection();
+    const display = deriveTimelineDisplayState(
+      baseRoom,
+      baseProjection,
+      [
+        event(
+          999,
+          "phase_started",
+          {
+            phase: "night_guard",
+            day: 9,
+            deadlineAt: "2026-05-12T14:00:00.000Z",
+          },
+          { gameRoomId: "game_other" }
+        ),
+        event(
+          1000,
+          "night_action_submitted",
+          {
+            day: 9,
+            phase: "night_guard",
+            action: { kind: "guardProtect", targetPlayerId: "player_other" },
+          },
+          { actorId: "player_other", gameRoomId: "game_other" }
+        ),
+      ],
+      ""
+    );
+
+    expect(display.projection).toEqual(baseProjection);
+    expect(display.facts.nightActionSubmittedByActorPhaseDay.size).toBe(0);
+  });
+
   it("does not replay historical turn events over the current subscribe snapshot", () => {
     const history = [
       event(154, "turn_started", {

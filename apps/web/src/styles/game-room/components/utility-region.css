@@ -46,40 +46,36 @@
   left: auto !important;
   right: auto !important;
   bottom: auto !important;
-  width: auto !important;
-  min-width: 92px !important;
-  height: 40px !important;
-  min-height: 40px !important;
-  padding: 0 16px 0 40px !important;
-  border: 1px solid rgba(226, 202, 139, 0.26) !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 46px !important;
+  min-width: 46px !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 0 !important;
+  border: 0 !important;
   border-radius: 0 !important;
-  background:
-    url("/assets/werewolf-ui/final/button/log-corner-tl.webp") left top / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-tr.webp") right top / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-bl.webp") left bottom / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-corner-br.webp") right bottom / 24px 24px no-repeat,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") top center / calc(100% - 36px) 12px repeat-x,
-    url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") bottom center / calc(100% - 36px) 12px repeat-x,
-    url("/assets/werewolf-ui/final/button/log-edge-vertical.webp") left center / 12px calc(100% - 36px) repeat-y,
-    url("/assets/werewolf-ui/final/button/log-edge-vertical.webp") right center / 12px calc(100% - 36px) repeat-y,
-    linear-gradient(180deg, rgba(7, 13, 15, 0.22), rgba(3, 8, 10, 0.12)) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  color: #fff7d8 !important;
-  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18) !important;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.82);
+  background: transparent !important;
+  box-shadow: none !important;
+  color: transparent !important;
 }
 
-.game-layout-root .utility-region .log-peek::before {
-  content: "";
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  width: 22px;
-  height: 22px;
+.game-layout-root .utility-region .log-peek-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
   background: url("/assets/werewolf-ui/final/icon/book.webp") center / contain no-repeat;
-  transform: translateY(-50%);
-  opacity: 0.88;
+  opacity: 0.98;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.82));
+}
+
+.game-layout-root .utility-region .log-peek:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+.game-layout-root .utility-region .log-peek.is-hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .game-layout-root .utility-region .log-sheet {

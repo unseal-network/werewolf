@@ -8,9 +8,9 @@ import { SseBroker } from "./services/sse-broker";
 import type { GameStore } from "./services/game-store";
 import type { MatrixProfileCache } from "./context/auth";
 import {
-  GameServiceRoomActors,
-  type RoomActorDispatcher,
-} from "./services/game-service-room-actors";
+  GameRoomActorDispatcher,
+} from "./services/room-actor/game-room-actor-dispatcher";
+import type { RoomActorDispatcher } from "./services/room-actor/types";
 import {
   createLivekitMeetingControllerFromEnv,
   type LivekitMeetingController,
@@ -36,7 +36,7 @@ export function createApp(deps: AppDeps): Hono {
   if (deps.runAgentTurn) {
     deps.games.setRunAgentTurn(deps.runAgentTurn);
   }
-  const roomActors = deps.roomActors ?? new GameServiceRoomActors(deps.games);
+  const roomActors = deps.roomActors ?? new GameRoomActorDispatcher(deps.games);
   app.use("*", cors());
   app.route("/games", createGamesRoutes({ ...deps, roomActors }));
   app.route("/", createWebhookRoutes());

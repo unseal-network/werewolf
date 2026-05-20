@@ -378,7 +378,7 @@ export class GameStore {
     if (roomRows.length === 0) return [];
     const roomIds = roomRows.map((r) => r.id);
 
-    const [playerRows, projRows, privateRows, eventWatermarkRows] = await Promise.all([
+    const [playerRows, projRows, privateRows, eventRows] = await Promise.all([
       this.db
         .select()
         .from(gameRoomPlayers)
@@ -395,6 +395,13 @@ export class GameStore {
         .select({
           gameRoomId: gameEvents.gameRoomId,
           id: gameEvents.id,
+          type: gameEvents.type,
+          visibility: gameEvents.visibility,
+          actorId: gameEvents.actorId,
+          subjectId: gameEvents.subjectId,
+          payload: gameEvents.payload,
+          rawEventJson: gameEvents.rawEventJson,
+          createdAt: gameEvents.createdAt,
         })
         .from(gameEvents)
         .where(inArray(gameEvents.gameRoomId, roomIds)),
@@ -403,7 +410,7 @@ export class GameStore {
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
     const projByRoom = new Map(projRows.map((p) => [p.gameRoomId, p]));
     const privateByRoom = groupBy(privateRows, (p) => p.gameRoomId);
-    const eventIdsByRoom = groupBy(eventWatermarkRows, (e) => e.gameRoomId);
+    const eventsByRoom = groupBy(eventRows, (e) => e.gameRoomId);
 
     return roomRows.map<StoredGameRoom>((r) => {
       const projRow = projByRoom.get(r.id);
@@ -429,6 +436,9 @@ export class GameStore {
       const privateStates = (privateByRoom.get(r.id) ?? []).map(
         (row) => row.privateState as PlayerPrivateState
       );
+      const events = (eventsByRoom.get(r.id) ?? [])
+        .map((row) => toGameEvent(row))
+        .sort((left, right) => compareEventIds(left.id, right.id));
       return {
         id: r.id,
         creatorUserId: r.creatorUserId,
@@ -442,10 +452,10 @@ export class GameStore {
         players,
         projection: payload?.projection ?? null,
         privateStates,
-        events: [],
+        events,
         nextEventIndex: nextLegacyEventIndex(
           r.id,
-          eventIdsByRoom.get(r.id)?.map((event) => event.id) ?? []
+          events.map((event) => event.id)
         ),
         pendingNightActions: (payload?.runtime?.pendingNightActions ??
           []) as StoredGameRoom["pendingNightActions"],
@@ -524,6 +534,63 @@ export class GameStore {
       await tx.delete(gameRooms).where(eq(gameRooms.id, roomId));
     });
   }
+}
+
+type PersistedGameEventRow = {
+  gameRoomId: string;
+  id: string;
+  type: string;
+  visibility: string;
+  actorId: string | null;
+  subjectId: string | null;
+  payload: unknown;
+  rawEventJson: string;
+  createdAt: Date;
+};
+
+function toGameEvent(row: PersistedGameEventRow): GameEvent {
+  const parsed = parseRawGameEvent(row.rawEventJson);
+  const event = {
+    id: parsed?.id ?? row.id,
+    gameRoomId: parsed?.gameRoomId ?? row.gameRoomId,
+    seq: typeof parsed?.seq === "number" ? parsed.seq : eventSeqFromId(row.id),
+    type: parsed?.type ?? row.type,
+    visibility: parsed?.visibility ?? row.visibility,
+    ...(parsed?.actorId !== undefined || row.actorId !== null
+      ? { actorId: parsed?.actorId ?? row.actorId ?? undefined }
+      : {}),
+    ...(parsed?.subjectId !== undefined || row.subjectId !== null
+      ? { subjectId: parsed?.subjectId ?? row.subjectId ?? undefined }
+      : {}),
+    payload:
+      parsed?.payload && typeof parsed.payload === "object"
+        ? parsed.payload
+        : row.payload && typeof row.payload === "object"
+          ? row.payload
+          : {},
+    createdAt:
+      typeof parsed?.createdAt === "string"
+        ? parsed.createdAt
+        : row.createdAt.toISOString(),
+  };
+  return event as GameEvent;
+}
+
+function parseRawGameEvent(raw: string): Partial<GameEvent> | null {
+  if (!raw.trim()) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Partial<GameEvent>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function eventSeqFromId(eventId: string): number {
+  const suffix = eventId.match(/_(\d+)$/)?.[1];
+  return suffix ? Number(suffix) : 1;
 }
 
 function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {

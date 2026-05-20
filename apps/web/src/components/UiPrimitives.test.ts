@@ -140,6 +140,18 @@ describe("new UI primitives", () => {
     expect(source).not.toContain('"/assets/werewolf-ui/final/button/art');
   });
 
+  it("preloads button art through the shared game asset cache", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/GameButton.tsx"),
+      "utf8"
+    );
+
+    expect(source).toContain("GAME_BUTTON_ASSET_URLS");
+    expect(source).toContain("preloadGameAssetUrls");
+    expect(source).toContain("let buttonArtPreloaded = false");
+    expect(source).toContain("preloadGameButtonArt();");
+  });
+
   it("renders reusable icon buttons with one shared icon style", () => {
     const html = renderToStaticMarkup(
       createElement(GameIconButton, {

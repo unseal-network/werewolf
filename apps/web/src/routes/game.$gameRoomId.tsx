@@ -280,9 +280,18 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
 
   const applyServerEvent = useCallback(
     (event: GameEventDto) => {
+      if (event.gameRoomId !== undefined && event.gameRoomId !== gameRoomId) return;
       setTimeline((current) => appendTimelineEvent(current, event));
     },
-    []
+    [gameRoomId]
+  );
+
+  const eventsForCurrentRoom = useCallback(
+    (events: GameEventDto[]) =>
+      events.filter(
+        (event) => event.gameRoomId === undefined || event.gameRoomId === gameRoomId
+      ),
+    [gameRoomId]
   );
 
   const refreshGameSnapshot = useCallback(async () => {
@@ -297,11 +306,15 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       limit: 100,
     });
     setTimeline((current) => {
-      const byId = new Map(current.map((event) => [event.id, event]));
-      for (const event of timelinePage.events) byId.set(event.id, event);
+      const byId = new Map(
+        eventsForCurrentRoom(current).map((event) => [event.id, event])
+      );
+      for (const event of eventsForCurrentRoom(timelinePage.events)) {
+        byId.set(event.id, event);
+      }
       return Array.from(byId.values()).slice(-260);
     });
-  }, [client, gameRoomId]);
+  }, [client, eventsForCurrentRoom, gameRoomId]);
 
   const handleActionError = useCallback(
     async (error: unknown) => {
@@ -325,6 +338,15 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
 
   useEffect(() => {
     autoTickPhaseRef.current = "";
+    setRoomSnapshot(null);
+    setProjectionSnapshot(null);
+    setPrivateStates([]);
+    setTimeline([]);
+    setTimelineBaseEventId("");
+    setSelectedTargetId(null);
+    setViewingSeatNo(null);
+    setSpeechDraft("");
+    setErrorMessage("");
   }, [gameRoomId]);
 
   useEffect(() => {
@@ -344,8 +366,12 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         });
         if (cancelled) return;
         setTimeline((current) => {
-          const byId = new Map(current.map((event) => [event.id, event]));
-          for (const event of timelinePage.events) byId.set(event.id, event);
+          const byId = new Map(
+            eventsForCurrentRoom(current).map((event) => [event.id, event])
+          );
+          for (const event of eventsForCurrentRoom(timelinePage.events)) {
+            byId.set(event.id, event);
+          }
           return Array.from(byId.values()).slice(-260);
         });
       })
@@ -357,7 +383,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     return () => {
       cancelled = true;
     };
-  }, [client, gameRoomId]);
+  }, [client, eventsForCurrentRoom, gameRoomId]);
 
   // Page-scoped live updates. New servers may send snapshot-first messages
   // without timeline history; older servers still include `events` here.
@@ -367,9 +393,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       setRoomSnapshot(snapshot.room);
       setProjectionSnapshot(snapshot.projection);
       setPrivateStates(snapshot.privateStates);
-      if (snapshot.events.length > 0) {
-        setTimeline(snapshot.events);
-      }
+      setTimeline(eventsForCurrentRoom(snapshot.events));
       setTimelineBaseEventId(
         snapshot.snapshotEventId ?? computeTimelineBaseEventId(snapshot.events)
       );
@@ -959,14 +983,18 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       setProjectionSnapshot(started.projection);
       setPrivateStates(started.privateStates);
       setTimeline((current) => {
-        const byId = new Map(current.map((event) => [event.id, event]));
-        for (const event of started.events) {
+        const byId = new Map(
+          eventsForCurrentRoom(current).map((event) => [event.id, event])
+        );
+        for (const event of eventsForCurrentRoom(started.events)) {
           byId.set(event.id, event);
         }
         return Array.from(byId.values()).slice(-260);
       });
       setTimelineBaseEventId((current) => {
-        const fromEvents = computeTimelineBaseEventId(started.events);
+        const fromEvents = computeTimelineBaseEventId(
+          eventsForCurrentRoom(started.events)
+        );
         return compareGameEventIdStrings(fromEvents, current) > 0 ? fromEvents : current;
       });
       setShowFillPrompt(false);

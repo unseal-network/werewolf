@@ -552,7 +552,10 @@ export function deriveTimelineDisplayState(
 ): TimelineDisplayState {
   const baseEventId =
     typeof baseCursor === "string" ? baseCursor : legacyBaseEventId(timeline, baseCursor);
-  const orderedTimeline = [...timeline].sort(compareGameEventIds);
+  const currentGameRoomId = roomSnapshot?.id ?? projectionSnapshot?.gameRoomId ?? "";
+  const orderedTimeline = timeline
+    .filter((event) => eventBelongsToRoom(event, currentGameRoomId))
+    .sort(compareGameEventIds);
   const liveEvents = orderedTimeline.filter((event) =>
     isEventIdAfter(event.id, baseEventId)
   );
@@ -581,6 +584,10 @@ export function deriveTimelineDisplayState(
       viewerUserId
     ),
   };
+}
+
+function eventBelongsToRoom(event: GameEventDto, gameRoomId: string): boolean {
+  return !gameRoomId || event.gameRoomId === undefined || event.gameRoomId === gameRoomId;
 }
 
 export function computeTimelineBaseSeq(events: GameEventDto[]): number {

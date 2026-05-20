@@ -148,6 +148,32 @@ describe("snapshot-first SSE state", () => {
     expect(next.timelineBaseSeq).toBe(3);
   });
 
+  it("ignores live events for a different room than the current snapshot", () => {
+    const next = applySubscribeMessage(
+      {
+        ...emptyState(),
+        roomSnapshot: room,
+        projectionSnapshot: projection,
+        timeline: [event],
+        timelineBaseSeq: 3,
+        timelineBaseEventId: event.id,
+      },
+      {
+        kind: "event",
+        event: {
+          ...event,
+          id: "evt_other_4",
+          gameRoomId: "game_other",
+          seq: 4,
+        },
+      }
+    );
+
+    expect(next.timeline).toEqual([event]);
+    expect(next.timelineBaseSeq).toBe(3);
+    expect(next.timelineBaseEventId).toBe(event.id);
+  });
+
   it("keeps only the latest live-caption event for one speech stream", () => {
     const first = transcriptEvent(56, "昨晚2号玩家出局，");
     const second = transcriptEvent(57, "昨晚2号玩家出局，目前场上局势不明朗，");

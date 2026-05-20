@@ -307,8 +307,9 @@ export function TimelineCapsule({
         className={`log-peek ${open ? "is-hidden" : ""}`}
         onClick={() => setOpen(true)}
         aria-label={t("timeline.capsule")}
+        title={t("timeline.title")}
       >
-        {t("timeline.title")}
+        <span className="log-peek-icon" aria-hidden="true" />
       </button>
 
       <div

@@ -142,7 +142,10 @@ export function applySubscribeMessage(
 ): SnapshotSseState {
   if (!message) return state;
   if (message.kind === "snapshot") {
-    const timeline = collapseStreamingTimelineEvents(message.snapshot.events);
+    const roomId = message.snapshot.room.id;
+    const timeline = collapseStreamingTimelineEvents(
+      message.snapshot.events.filter((event) => eventBelongsToRoom(event, roomId))
+    );
     const timelineBaseEventId =
       message.snapshot.snapshotEventId ?? computeTimelineBaseEventId(timeline);
     return {
@@ -154,6 +157,12 @@ export function applySubscribeMessage(
       timelineBaseEventId,
     };
   }
+  if (
+    state.roomSnapshot?.id &&
+    !eventBelongsToRoom(message.event, state.roomSnapshot.id)
+  ) {
+    return state;
+  }
   const timeline = appendTimelineEvent(state.timeline, message.event);
   return {
     ...state,
@@ -161,6 +170,10 @@ export function applySubscribeMessage(
     timelineBaseSeq: Math.max(state.timelineBaseSeq, message.event.seq ?? 0),
     timelineBaseEventId: computeTimelineBaseEventId(timeline),
   };
+}
+
+function eventBelongsToRoom(event: GameEventDto, gameRoomId: string): boolean {
+  return event.gameRoomId === undefined || event.gameRoomId === gameRoomId;
 }
 
 export { computeTimelineBaseEventId };

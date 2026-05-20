@@ -5,6 +5,8 @@ interface LoadingPageProps {
   isAdmin?: boolean;
   onAdminAction?: () => void;
   error?: string | null;
+  message?: string | undefined;
+  detail?: string | undefined;
   onRetry?: () => void;
   onLeave?: () => void;
 }
@@ -13,6 +15,8 @@ export function LoadingPage({
   isAdmin,
   onAdminAction,
   error,
+  message,
+  detail,
   onRetry,
   onLeave,
 }: LoadingPageProps) {
@@ -105,10 +109,10 @@ export function LoadingPage({
           ) : (
             <>
               <span className="text-[10px] font-black uppercase tracking-[0.6em] text-slate-500">
-                Retrieving Data{dots}
+                {message ? `${message}${dots}` : `Retrieving Data${dots}`}
               </span>
               <p className="text-[9px] font-bold tracking-[0.2em] text-slate-500/50 italic m-0">
-                Synchronizing with the oracle
+                {detail ?? "Synchronizing with the oracle"}
               </p>
             </>
           )}
