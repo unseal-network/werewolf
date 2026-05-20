@@ -557,7 +557,7 @@ export function PlayerRadialPicker({
         </div>
         {showActionButton && !wheelOpen ? <div className="player-picker-action-slot">
           <StageActionButton
-            className="stage-confirm player-picker-action"
+            className="player-picker-action"
             label={confirmLabel}
             variant="primary"
             onClick={onConfirm}
@@ -576,7 +576,7 @@ export function PlayerRadialPicker({
       {showActionButton && !wheelOpen && skipLabel && onSkip ? (
         <div className="player-picker-action-slot">
           <StageActionButton
-            className="stage-skip player-picker-action"
+            className="player-picker-action"
             label={skipLabel}
             variant="secondary"
             onClick={onSkip}

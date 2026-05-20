@@ -16,8 +16,8 @@ export function GameIconButton({
   ...rest
 }: GameIconButtonProps) {
   const classes = [
-    "ww-icon-button",
-    `ww-icon-button--${size}`,
+    "art-icon-button",
+    `art-icon-button--${size}`,
     className,
   ]
     .filter(Boolean)
@@ -30,7 +30,7 @@ export function GameIconButton({
       className={classes}
       disabled={disabled}
     >
-      {label}
+      <span className="art-icon-button__label">{label}</span>
     </button>
   );
 }

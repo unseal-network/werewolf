@@ -117,13 +117,12 @@ describe("center stage layout", () => {
     ).toBe(true);
   });
 
-  it("lets non-creators use the lobby primary action to add agents when seats remain", () => {
+  it("maps non-creator lobby primary to the join action", () => {
     expect(
       getLobbyPrimaryAction({
         isCreator: false,
-        canAddAgent: true,
       })
-    ).toBe("add-agent");
+    ).toBe("join");
   });
 
 });

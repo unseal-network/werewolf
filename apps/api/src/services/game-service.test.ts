@@ -60,6 +60,7 @@ function fakeLivekitMeeting() {
   return {
     ensureRoom: vi.fn(async () => undefined),
     setRoomSnapshotProvider: vi.fn(),
+    waitForPlayersConnected: vi.fn(async () => undefined),
     syncForRoom: vi.fn(async () => undefined),
     syncForLivekitEvent: vi.fn(async () => undefined),
     syncPublicSpeaker: vi.fn(async () => undefined),
@@ -114,6 +115,50 @@ describe("InMemoryGameService rules", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(calls[0]).toBe("sync");
+  });
+
+  it("waits for LiveKit players before opening narration at game start", async () => {
+    const games = new InMemoryGameService();
+    const livekitMeeting = fakeLivekitMeeting();
+    let releaseLivekitWait!: () => void;
+    livekitMeeting.waitForPlayersConnected.mockImplementation(
+      () => new Promise<undefined>((resolve) => {
+        releaseLivekitWait = () => resolve(undefined);
+      })
+    );
+    games.setLivekitMeetingController(livekitMeeting);
+    const playAudioFiles = vi.fn(async () => undefined);
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: () => undefined,
+        playAudioFiles,
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Rules",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 6)) games.join(room.id, userId, name);
+
+    games.start(room.id, players[0][0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(livekitMeeting.waitForPlayersConnected).toHaveBeenCalledWith(
+      expect.objectContaining({ id: room.id }),
+      5000
+    );
+    expect(playAudioFiles).not.toHaveBeenCalled();
+
+    releaseLivekitWait();
+    await vi.waitFor(() => expect(playAudioFiles).toHaveBeenCalled());
   });
 
   it("syncs wolf discussion with living wolves only", async () => {
@@ -2288,6 +2333,46 @@ describe("InMemoryGameService rules", () => {
 
     expect(room.projection.phase).toBe("day_speak");
     expect(room.projection.currentSpeakerPlayerId).toBe(firstSpeaker.id);
+  });
+
+  it("starts action phase deadlines after GM narration finishes", async () => {
+    vi.useFakeTimers();
+    try {
+      const { games, gameRoomId } = createStartedServiceGame();
+      const room = games.snapshot(gameRoomId);
+      const narrationStartedAt = new Date("2026-05-20T10:00:00.000Z");
+      const narrationEndedAt = new Date("2026-05-20T10:00:12.000Z");
+      vi.setSystemTime(narrationStartedAt);
+
+      games.setVoiceAgents({
+        getOrCreate: async () => ({
+          registerPlayerVoiceIdentity: () => undefined,
+          playAudioFiles: vi.fn(async () => {
+            vi.setSystemTime(narrationEndedAt);
+          }),
+        }),
+        get: () => null,
+        setTranscriptHandler: () => undefined,
+        destroy: async () => undefined,
+      } as unknown as VoiceAgentRegistry);
+      room.projection = {
+        ...room.projection!,
+        phase: "night_guard",
+        deadlineAt: new Date(narrationStartedAt.getTime() - 1000).toISOString(),
+      };
+      room.privateStates = room.privateStates.map((state) =>
+        state.role === "guard" ? { ...state, role: "villager" } : state
+      );
+
+      await games.advanceGame(gameRoomId, passAgentTurn);
+
+      expect(room.projection?.phase).toBe("night_wolf");
+      expect(room.projection?.deadlineAt).toBe(
+        new Date(narrationEndedAt.getTime() + 45_000).toISOString()
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("ends immediately during night resolution when witch poison kills the last wolf", async () => {

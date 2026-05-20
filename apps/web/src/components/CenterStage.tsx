@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { LOGO_IMG, normalizeDisplayRole, ROLE_COLOR, ROLE_IMG, ROLE_LABEL } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
+import { GameIconButton } from "./GameIconButton";
 import { GameSegmentedControl } from "./GameSegmentedControl";
 import { PlayerRadialPicker } from "./PlayerRadialPicker";
 import { StageActionButton } from "./StageActionButton";
@@ -46,6 +47,7 @@ export interface CenterStageProps {
   selectedTargetId: string | null;
   isCreator: boolean;
   canStart: boolean;
+  canJoinLobby?: boolean;
   canProgress: boolean;
   canCurrentUserAct: boolean;
   /** Can we still add an agent to this lobby? (active count < max). */
@@ -61,6 +63,7 @@ export interface CenterStageProps {
   speechInput?: string;
   actionLoading?: boolean;
   onStart: () => void;
+  onJoinLobby?: () => void;
   onExitGame?: () => void;
   /** Open the agent picker. Shown in lobby alongside the start button. */
   onAddAgent?: () => void;
@@ -133,13 +136,11 @@ export function shouldShowActionBubbleCopy({
 
 export function getLobbyPrimaryAction({
   isCreator,
-  canAddAgent,
 }: {
   isCreator: boolean;
-  canAddAgent: boolean | undefined;
-}): "start" | "add-agent" | "disabled" {
+}): "start" | "join" {
   if (isCreator) return "start";
-  return canAddAgent ? "add-agent" : "disabled";
+  return "join";
 }
 
 export function shouldPinActionBubbleOpen({
@@ -167,6 +168,7 @@ export function CenterStage({
   selectedTargetId,
   isCreator,
   canStart,
+  canJoinLobby,
   canProgress,
   canCurrentUserAct,
   canAddAgent,
@@ -181,6 +183,7 @@ export function CenterStage({
   speechInput,
   actionLoading,
   onStart,
+  onJoinLobby,
   onExitGame,
   onAddAgent,
   onRunRuntime,
@@ -265,37 +268,35 @@ export function CenterStage({
 
   // Lobby: only the start button + status copy
   if (actionMode === "lobby") {
-    const primaryAction = getLobbyPrimaryAction({ isCreator, canAddAgent });
+    const primaryAction = getLobbyPrimaryAction({ isCreator });
     const primaryLabel =
       primaryAction === "start"
         ? t("stage.startButton")
-        : primaryAction === "add-agent"
-          ? t("stage.addAgentButton")
-          : t("stage.readyButton");
+        : t("stage.joinButton");
     return (
       <article className="phase-card phase-card-lobby">
         {identity}
         <div className="phase-title">{title}</div>
         {statusText ? <div className="phase-copy">{statusText}</div> : null}
-        <div className="target-row">
+        <div className="target-row lobby-action-row">
           <StageActionButton
-            className="stage-start"
+            className="action-start"
             label={primaryLabel}
             variant="primary"
             onClick={
               primaryAction === "start"
                 ? onStart
-                : primaryAction === "add-agent"
-                  ? onAddAgent
+                : canJoinLobby
+                  ? onJoinLobby
                   : undefined
             }
-            disabled={primaryAction === "disabled"}
+            disabled={primaryAction === "start" ? !canStart : !canJoinLobby}
           />
-          {onAddAgent && canAddAgent && primaryAction !== "add-agent" ? (
-            <StageActionButton
-              className="stage-skip stage-add-player"
+          {onAddAgent && canAddAgent ? (
+            <GameIconButton
+              className="action-add-player"
               label="+"
-              variant="secondary"
+              size="sm"
               onClick={onAddAgent}
               aria-label={t("stage.addAgentButton")}
             />
@@ -424,7 +425,7 @@ export function CenterStage({
           <div className="binary-action">
             {witchSaveTarget ? (
               <StageActionButton
-                className="stage-confirm"
+                className="action-confirm"
                 label={t("stage.primary.witchSave")}
                 variant="primary"
                 onClick={() => onConfirmTarget(witchSaveTarget.playerId)}
@@ -432,7 +433,7 @@ export function CenterStage({
               />
             ) : null}
             <StageActionButton
-              className="stage-skip"
+              className="action-skip"
               label={witchSaveTarget ? t("stage.primary.witchPass") : t("stage.skipButton")}
               variant="secondary"
               onClick={onSkip}
@@ -462,7 +463,7 @@ export function CenterStage({
 
         {!showLockedDrawer && showPassOnlyAction ? (
           <StageActionButton
-            className="stage-confirm"
+            className="action-confirm"
             label={t("stage.skipButton")}
             variant="primary"
             onClick={onSkip}

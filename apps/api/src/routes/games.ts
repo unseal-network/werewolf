@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import { AppError, type GameEvent } from "@werewolf/shared";
 import {
   authenticateRequest,
@@ -12,6 +13,7 @@ import type {
   RuntimeAgentTurnOutput,
   StoredGameRoom,
 } from "../services/game-service";
+import type { RoomActorDispatcher } from "../services/game-service-room-actors";
 import { roomCommandSchema, type RoomCommand } from "../services/room-actor/types";
 
 export interface GamesRouteDeps {
@@ -19,14 +21,24 @@ export interface GamesRouteDeps {
   profileCache?: MatrixProfileCache | undefined;
   games: InMemoryGameService;
   matrixHomeserverUrl?: string;
+  fetchImpl?: typeof fetch;
   runAgentTurn?: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>;
-  roomActors?: { dispatch(command: RoomCommand): Promise<unknown> } | undefined;
+  roomActors: RoomActorDispatcher;
 }
 
 type DefaultAgentCandidate = {
   userId: string;
   displayName: string;
   avatarUrl?: string;
+};
+
+type AgentCandidateResponse = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+  userType: string;
+  membership: string;
+  alreadyJoined: boolean;
 };
 
 const DEFAULT_AGENT_CANDIDATES: readonly DefaultAgentCandidate[] = [
@@ -81,6 +93,108 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     )}/${encodeURIComponent(path.slice(slash + 1))}`;
   }
 
+  function matrixBearerToken(request: Request): string | undefined {
+    const header = request.headers.get("authorization") ?? "";
+    const match = header.match(/^Bearer\s+(.+)$/);
+    return match?.[1] ?? undefined;
+  }
+
+  function toAgentCandidate(
+    agent: DefaultAgentCandidate,
+    seenAgentIds: Set<string | undefined>
+  ): AgentCandidateResponse {
+    const avatarUrl = matrixMediaUrl(agent.avatarUrl);
+    return {
+      userId: agent.userId,
+      displayName: agent.displayName,
+      ...(avatarUrl ? { avatarUrl } : {}),
+      userType: "bot",
+      membership: "join",
+      alreadyJoined: seenAgentIds.has(agent.userId),
+    };
+  }
+
+  function stringField(value: unknown): string | undefined {
+    return typeof value === "string" && value.trim() ? value.trim() : undefined;
+  }
+
+  function normalizeExternalAgent(
+    raw: unknown,
+    seenAgentIds: Set<string | undefined>
+  ): AgentCandidateResponse | null {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const record = raw as Record<string, unknown>;
+    const userId =
+      stringField(record.user_id) ??
+      stringField(record.userId) ??
+      stringField(record.matrix_user_id) ??
+      stringField(record.matrixUserId) ??
+      stringField(record.agent_id) ??
+      stringField(record.agentId) ??
+      stringField(record.id);
+    if (!userId) return null;
+    const displayName =
+      stringField(record.display_name) ??
+      stringField(record.displayName) ??
+      stringField(record.name) ??
+      userId;
+    const avatarUrl =
+      stringField(record.avatar_url) ??
+      stringField(record.avatarUrl) ??
+      stringField(record.avatar);
+    const normalizedAvatarUrl = matrixMediaUrl(avatarUrl);
+    return {
+      userId,
+      displayName,
+      ...(normalizedAvatarUrl ? { avatarUrl: normalizedAvatarUrl } : {}),
+      userType:
+        stringField(record.user_type) ??
+        stringField(record.userType) ??
+        "agent",
+      membership: stringField(record.membership) ?? "join",
+      alreadyJoined: seenAgentIds.has(userId),
+    };
+  }
+
+  function agentListFromBody(body: unknown): unknown[] {
+    if (Array.isArray(body)) return body;
+    if (!body || typeof body !== "object") return [];
+    const record = body as Record<string, unknown>;
+    const agents = record.agents ?? record.data ?? record.items;
+    return Array.isArray(agents) ? agents : [];
+  }
+
+  async function listCurrentUserAgents(
+    request: Request,
+    seenAgentIds: Set<string | undefined>
+  ): Promise<AgentCandidateResponse[]> {
+    const token = matrixBearerToken(request);
+    if (!token) return [];
+    const homeserverUrl =
+      deps.matrixHomeserverUrl ??
+      process.env.MATRIX_BASE_URL ??
+      "https://keepsecret.io";
+    const url = `${homeserverUrl.replace(/\/+$/, "")}/chatbot/v1/agents`;
+    const fetcher = deps.fetchImpl ?? fetch;
+    try {
+      const response = await fetcher(url, {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return agentListFromBody(await response.json())
+        .map((agent) => normalizeExternalAgent(agent, seenAgentIds))
+        .filter((agent): agent is AgentCandidateResponse => Boolean(agent));
+    } catch (error) {
+      console.warn("[Agents] current user agents unavailable", {
+        url,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
   app.get("/me", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
@@ -122,27 +236,17 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = await readOptionalJson(c.req.raw);
       const seatNo = numberValue(body.seatNo);
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "join",
-            displayName: user.displayName,
-            ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
-            ...(seatNo ? { seatNo } : {}),
-          })
-        );
-      }
-      const player = deps.games.join(
-        c.req.param("gameRoomId"),
-        user.id,
-        user.displayName,
-        user.avatarUrl,
-        seatNo
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "join",
+          displayName: user.displayName,
+          ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+          ...(seatNo ? { seatNo } : {}),
+        })
       );
-      return c.json({ player });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -155,18 +259,14 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   app.post("/:gameRoomId/leave", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "leave",
-          })
-        );
-      }
-      const player = deps.games.leave(c.req.param("gameRoomId"), user.id);
-      return c.json({ player });
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "leave",
+        })
+      );
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -179,38 +279,14 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
   app.post("/:gameRoomId/start", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "start",
-          })
-        );
-      }
-      const started = deps.games.start(c.req.param("gameRoomId"), user.id);
-      // runAgentTurn is set globally at server startup (server.ts) so the
-      // tick worker can advance rooms even after a restart without waiting
-      // for a client API call. Just kick the advance loop.
-      void deps.games.scheduleAdvance(c.req.param("gameRoomId"));
-      const myPlayer = started.room.players.find(
-        (p) => p.userId === user.id && !p.leftAt
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "start",
+        })
       );
-      const myPrivateState = myPlayer
-        ? started.privateStates.find((s) => s.playerId === myPlayer.id)
-        : undefined;
-      return c.json({
-        status: started.room.status,
-        projection: started.projection,
-        privateStates: myPrivateState ? [myPrivateState] : [],
-        events: filterEventsForUser(
-          started.events,
-          myPlayer?.id,
-          myPrivateState?.team === "wolf" && myPrivateState.alive,
-          started.room.status === "ended"
-        ),
-      });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -232,7 +308,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         throw new AppError("invalid_action", "Invalid action kind", 400);
       }
       const room =
-        !deps.roomActors || kind === "vote" || kind === "nightAction"
+        kind === "vote" || kind === "nightAction"
           ? deps.games.snapshot(c.req.param("gameRoomId"))
           : null;
       const targetPlayerId =
@@ -249,29 +325,15 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
               : kind === "nightAction"
                 ? { kind: "nightAction", targetPlayerId }
                 : { kind: "pass" };
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "submitAction",
-            action,
-          })
-        );
-      }
-      const player = room!.players.find(
-        (p) => p.userId === user.id && !p.leftAt
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "submitAction",
+          action,
+        })
       );
-      if (!player) {
-        throw new AppError("not_found", "You are not in this room", 404);
-      }
-      const event = await deps.games.submitAction(
-        c.req.param("gameRoomId"),
-        player.id,
-        action
-      );
-      return c.json({ success: true, event });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -288,46 +350,14 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         throw new AppError("conflict", "Runtime agent turn runner is not configured", 409);
       }
       const gameRoomId = c.req.param("gameRoomId");
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId,
-            actorUserId: user.id,
-            kind: "runtimeTick",
-          })
-        );
-      }
-      const beforeRoom = deps.games.snapshot(gameRoomId);
-      const myPlayer = beforeRoom.players.find(
-        (p) => p.userId === user.id && !p.leftAt
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId,
+          actorUserId: user.id,
+          kind: "runtimeTick",
+        })
       );
-      const isCreator = beforeRoom.creatorUserId === user.id;
-      if (!myPlayer && !isCreator) {
-        throw new AppError("not_found", "You are not in this room", 404);
-      }
-      const myPrivateState = beforeRoom.privateStates.find(
-        (state) => state.playerId === myPlayer?.id
-      );
-      const beforeSeq = beforeRoom.events.length;
-
-      await deps.games.scheduleAdvance(gameRoomId);
-
-      const room = deps.games.snapshot(gameRoomId);
-      const revealAll = room.status === "ended" || room.projection?.status === "ended";
-      const isWolf = myPrivateState?.team === "wolf" && myPrivateState.alive;
-      const events = filterEventsForUser(
-        room.events.slice(beforeSeq),
-        myPlayer?.id,
-        Boolean(isWolf),
-        revealAll
-      );
-      return c.json({
-        status: room.status,
-        done: room.status === "ended",
-        projection: room.projection,
-        events,
-      });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -499,16 +529,21 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
           .filter((player) => !player.leftAt && player.kind === "agent")
           .map((player) => player.agentId)
       );
+      const fixedAgents = DEFAULT_AGENT_CANDIDATES.map((agent) =>
+        toAgentCandidate(agent, seenAgentIds)
+      );
+      const currentUserAgents = await listCurrentUserAgents(
+        c.req.raw,
+        seenAgentIds
+      );
+      const agentsById = new Map<string, AgentCandidateResponse>();
+      for (const agent of [...currentUserAgents, ...fixedAgents]) {
+        if (!agentsById.has(agent.userId)) agentsById.set(agent.userId, agent);
+      }
+      const agents = Array.from(agentsById.values());
       return c.json({
-        agents: DEFAULT_AGENT_CANDIDATES.map((agent) => ({
-          userId: agent.userId,
-          displayName: agent.displayName,
-          avatarUrl: matrixMediaUrl(agent.avatarUrl),
-          userType: "bot",
-          membership: "join",
-          alreadyJoined: seenAgentIds.has(agent.userId),
-        })),
-        total: DEFAULT_AGENT_CANDIDATES.length,
+        agents,
+        total: agents.length,
         roomId: room.agentSourceMatrixRoomId,
       });
     } catch (error) {
@@ -528,30 +563,20 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       if (!agentUserId) {
         throw new AppError("invalid_action", "agentUserId is required", 400);
       }
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "addAgent",
-            agentUserId,
-            displayName: stringValue(body.displayName) ?? agentUserId,
-            ...(stringValue(body.avatarUrl)
-              ? { avatarUrl: matrixMediaUrl(stringValue(body.avatarUrl)) }
-              : {}),
-          }),
-          201
-        );
-      }
-      const player = deps.games.addAgentPlayer(
-        c.req.param("gameRoomId"),
-        user.id,
-        agentUserId,
-        stringValue(body.displayName) ?? agentUserId,
-        matrixMediaUrl(stringValue(body.avatarUrl))
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "addAgent",
+          agentUserId,
+          displayName: stringValue(body.displayName) ?? agentUserId,
+          ...(stringValue(body.avatarUrl)
+            ? { avatarUrl: matrixMediaUrl(stringValue(body.avatarUrl)) }
+            : {}),
+        }),
+        201
       );
-      return c.json({ player }, 201);
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -569,23 +594,15 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       if (!seatNo) {
         throw new AppError("invalid_action", "seatNo is required", 400);
       }
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "swapSeat",
-            seatNo,
-          })
-        );
-      }
-      const result = deps.games.swapSeat(
-        c.req.param("gameRoomId"),
-        user.id,
-        seatNo
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "swapSeat",
+          seatNo,
+        })
       );
-      return c.json(result);
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -603,23 +620,15 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         room,
         c.req.param("matrixUserId")
       );
-      if (deps.roomActors) {
-        return c.json(
-          await dispatchActorCommand(deps, c.req.raw, {
-            commandId: commandId(c.req.raw),
-            gameRoomId: c.req.param("gameRoomId"),
-            actorUserId: user.id,
-            kind: "removePlayer",
-            playerId,
-          })
-        );
-      }
-      const player = deps.games.removePlayer(
-        c.req.param("gameRoomId"),
-        user.id,
-        playerId
+      return c.json(
+        await dispatchActorCommand(deps, c.req.raw, {
+          commandId: commandId(c.req.raw),
+          gameRoomId: c.req.param("gameRoomId"),
+          actorUserId: user.id,
+          kind: "removePlayer",
+          playerId,
+        })
       );
-      return c.json({ player });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(
@@ -634,14 +643,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
 function commandId(request: Request): string {
   const value = request.headers.get("x-command-id");
-  if (!value) {
-    throw new AppError(
-      "invalid_action",
-      "x-command-id is required for idempotent mutation routes",
-      400
-    );
-  }
-  return value;
+  return value && value.trim() ? value : `cmd_${randomUUID()}`;
 }
 
 async function dispatchActorCommand(
@@ -649,9 +651,6 @@ async function dispatchActorCommand(
   _request: Request,
   command: RoomCommand
 ): Promise<unknown> {
-  if (!deps.roomActors) {
-    throw new AppError("conflict", "Room actor dispatcher is not configured", 409);
-  }
   return deps.roomActors.dispatch(roomCommandSchema.parse(command));
 }
 

@@ -700,6 +700,13 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     () => seatView.find((seat) => seat.seatNo === viewingSeatNo) ?? null,
     [seatView, viewingSeatNo]
   );
+  const lastEmptyLobbySeatNo = useMemo(() => {
+    if (isGameStarted) return undefined;
+    return seatView
+      .filter((seat) => seat.isEmpty)
+      .at(-1)?.seatNo;
+  }, [isGameStarted, seatView]);
+  const canJoinLobbySeat = Boolean(!myPlayer && lastEmptyLobbySeatNo !== undefined);
   const canRemoveViewingSeat = useMemo(() => {
     if (!viewingSeat || viewingSeat.isEmpty || !room || !matrixUserId) return false;
     const isLobby =
@@ -1054,6 +1061,11 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     void refreshAgentCandidates();
   }
 
+  async function handleJoinLobbySeat() {
+    if (myPlayer || lastEmptyLobbySeatNo === undefined) return;
+    await joinGame(lastEmptyLobbySeatNo);
+  }
+
   // Game advancement is now handled server-side after each action.
 
   function onSeatClick(seatNo: number) {
@@ -1349,6 +1361,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
             selectedTargetId={selectedTargetId ?? null}
             isCreator={Boolean(isCreator)}
             canStart={canStart}
+            canJoinLobby={canJoinLobbySeat}
             canProgress={showRuntimeProgress}
             canCurrentUserAct={canCurrentUserAct}
             winnerText={winnerText}
@@ -1362,6 +1375,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
             speechInput={speechDraft}
             actionLoading={actionLoading}
             onStart={handleStartIntent}
+            onJoinLobby={handleJoinLobbySeat}
             onExitGame={goHome}
             onAddAgent={onFillAiStart}
             canAddAgent={
@@ -1424,7 +1438,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
               onAdd={addAgentToSeat}
               onRemove={removeAgentFromSeat}
               onRefresh={refreshAgentCandidates}
-              onStartNow={onAgentPickerStartNow}
+              {...(isCreator ? { onStartNow: onAgentPickerStartNow } : {})}
               onClose={onAgentPickerClose}
             />
             <SeerResultDialog

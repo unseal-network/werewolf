@@ -122,10 +122,12 @@
     background: transparent;
   }
 
-  .game-layout-root .action-region .stage-start,
-  .game-layout-root .action-region .stage-confirm,
-  .game-layout-root .action-region .stage-skip,
-  .game-layout-root .action-region .player-picker-action {
+  .game-layout-root .action-region .action-start,
+  .game-layout-root .action-region .action-add-player,
+  .game-layout-root .action-region .action-confirm,
+  .game-layout-root .action-region .action-skip,
+  .game-layout-root .action-region .player-picker-action,
+  .game-layout-root .action-region .voice-submit-action {
     max-width: 100%;
   }
 

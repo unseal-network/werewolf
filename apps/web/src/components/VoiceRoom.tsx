@@ -81,6 +81,18 @@ function mapConnectionState(state: ConnectionState): VoiceConnectionState {
  * a torn-down provider — important under React StrictMode double-invocation.
  */
 const VOICE_RECONNECT_DELAYS_MS = [2000, 4000, 8000, 15000, 30000];
+const VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS = [60000, 120000, 240000, 300000];
+
+function isLivekitRateLimitError(err: unknown): boolean {
+  if (!err) return false;
+  if (typeof err === "object") {
+    const status = (err as { status?: unknown; code?: unknown }).status;
+    const code = (err as { status?: unknown; code?: unknown }).code;
+    if (status === 429 || code === 429 || code === "429") return true;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return /\b429\b/.test(message) || /too many requests/i.test(message);
+}
 
 export function VoiceRoomProvider({
   serverUrl,
@@ -165,20 +177,29 @@ export function VoiceRoomProvider({
       });
     };
 
-    const scheduleRoomReconnect = (reason: string) => {
+    const scheduleRoomReconnect = (
+      reason: string,
+      options: { rateLimited?: boolean } = {}
+    ) => {
       if (cancelled || retryTimerRef.current !== null) return;
       const attempt = retryAttemptRef.current;
+      const delays = options.rateLimited
+        ? VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS
+        : VOICE_RECONNECT_DELAYS_MS;
       const delayMs =
-        VOICE_RECONNECT_DELAYS_MS[attempt] ??
-        VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
+        delays[attempt] ??
+        delays[delays.length - 1]!;
       retryAttemptRef.current = attempt + 1;
       console.warn("[VoiceRoom] scheduling reconnect", {
         reason,
         attempt,
+        rateLimited: Boolean(options.rateLimited),
         retryInMs: delayMs,
       });
       setState("reconnecting");
-      setErrorMessage(null);
+      setErrorMessage(
+        options.rateLimited ? "语音服务请求过快，稍后自动重连" : null
+      );
       retryTimerRef.current = window.setTimeout(() => {
         retryTimerRef.current = null;
         if (!cancelled) {
@@ -320,14 +341,19 @@ export function VoiceRoomProvider({
       .catch((err: unknown) => {
         if (cancelled) return;
         const attempt = retryAttemptRef.current;
-        const delayMs = VOICE_RECONNECT_DELAYS_MS[attempt] ?? VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
+        const rateLimited = isLivekitRateLimitError(err);
+        const delays = rateLimited
+          ? VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS
+          : VOICE_RECONNECT_DELAYS_MS;
+        const delayMs = delays[attempt] ?? delays[delays.length - 1]!;
         console.error("[VoiceRoom] connect failed", {
           err,
           attempt,
+          rateLimited,
           willRetry: true,
           retryInMs: delayMs,
         });
-        scheduleRoomReconnect("connect failed");
+        scheduleRoomReconnect("connect failed", { rateLimited });
       });
 
     return () => {

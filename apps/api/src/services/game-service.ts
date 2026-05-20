@@ -132,6 +132,7 @@ export type PlayerSubmittedAction =
   | { kind: "pass" };
 
 const absentNightActorAutoAdvanceMs = 15_000;
+const gameStartLivekitPlayerWaitMs = 5_000;
 function sleep(ms: number): Promise<void> {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -814,10 +815,7 @@ export class InMemoryGameService {
     // Once connected, bind each internal player to the Matrix identity used
     // by LiveKit and Unseal STT/TTS.
     if (this.voiceAgents) {
-      void this.playGmAnnouncement(room, {
-        kind: "phase",
-        phase: "night_guard",
-      })
+      void this.playGameStartGmAnnouncement(room)
         .then(() => this.scheduleAdvance(gameRoomId))
         .catch((err) => console.error("[VoiceAgent] getOrCreate failed:", err));
     }
@@ -1870,7 +1868,7 @@ export class InMemoryGameService {
       context.nightDeathPlayerIds = options.nightDeathPlayerIds;
     }
     await this.playGmAnnouncement(room, context);
-    this.startPhase(room, phase, now);
+    this.startPhase(room, phase, new Date());
   }
 
   private async playGmAnnouncement(
@@ -1896,6 +1894,25 @@ export class InMemoryGameService {
     } finally {
       this.announcingRooms.delete(room.id);
     }
+  }
+
+  private async playGameStartGmAnnouncement(room: StoredGameRoom): Promise<void> {
+    await this.waitForLivekitPlayersBeforeGameStart(room);
+    await this.playGmAnnouncement(room, {
+      kind: "phase",
+      phase: "night_guard",
+    });
+  }
+
+  private async waitForLivekitPlayersBeforeGameStart(
+    room: StoredGameRoom
+  ): Promise<void> {
+    const livekitRoom = toLivekitMeetingRoomState(room);
+    if (!this.livekitMeeting || !livekitRoom) return;
+    await this.livekitMeeting.waitForPlayersConnected(
+      livekitRoom,
+      gameStartLivekitPlayerWaitMs
+    );
   }
 
   private async syncLivekitMeetingBeforeNarration(

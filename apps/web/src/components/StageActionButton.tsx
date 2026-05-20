@@ -1,11 +1,10 @@
 import {
-  useMemo,
   useState,
   type ButtonHTMLAttributes,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { GameButton, type GameButtonVariant } from "./GameButton";
+import { GameButton } from "./GameButton";
 
 export type StageActionButtonVariant = "primary" | "secondary";
 
@@ -31,20 +30,6 @@ export function StageActionButton({
   ...rest
 }: StageActionButtonProps) {
   const [pressed, setPressed] = useState(false);
-  const resolvedClassName = useMemo(
-    () =>
-      [
-        className,
-        "stage-action-button",
-        `stage-action-button--${variant}`,
-        pressed ? "is-pressed" : "",
-        loading ? "is-loading" : "",
-      ]
-        .filter(Boolean)
-        .join(" "),
-    [className, loading, pressed, variant]
-  );
-  const buttonVariant: GameButtonVariant = variant === "secondary" ? "secondary" : "primary";
 
   function resetPressState() {
     setPressed(false);
@@ -75,10 +60,9 @@ export function StageActionButton({
   return (
     <GameButton
       {...rest}
-      className={resolvedClassName}
-      variant={buttonVariant}
-      data-variant={variant}
-      data-loading={loading ? "true" : "false"}
+      className={className}
+      variant={variant === "secondary" ? "secondary" : "primary"}
+      aria-pressed={pressed || undefined}
       disabled={disabled || loading}
       label={label}
       loading={loading}
