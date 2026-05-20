@@ -64,6 +64,7 @@ export function createUnsealClient(
     init: RequestInit = {},
     retryOnUnauthorized = true
   ): Promise<T> {
+    un.log('[request]', path, init)
     const headers = headersWithRefreshedJwt(init);
     const requestInit: RequestInit = { ...init };
     if (headers) requestInit.headers = headers;

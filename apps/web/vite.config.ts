@@ -4,6 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 
 function normalizeBasePath(value: string | undefined): string {
   const raw = value?.trim() || "/";
+  // Relative base (e.g. "./" or ".") — pass through as-is for Vite
+  if (raw === "." || raw.startsWith("./")) return "./";
   const leading = raw.startsWith("/") ? raw : `/${raw}`;
   return leading.endsWith("/") ? leading : `${leading}/`;
 }
