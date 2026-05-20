@@ -518,21 +518,21 @@ describe("game room seat layout", () => {
     expect(voiceRoom).toContain("scheduleRoomReconnect");
     expect(voiceRoom).toContain("setReconnectNonce((value) => value + 1)");
     expect(voiceRoom).toContain("}, [serverUrl, token, reconnectNonce])");
-    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\", { rateLimited })");
+    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\")");
     expect(disconnectedHandler).toContain("clearRemoteAudioElements()");
     expect(disconnectedHandler).toContain("scheduleRoomReconnect(\"room disconnected\")");
   });
 
-  it("backs off LiveKit Cloud 429 reconnects without refreshing credentials", () => {
+  it("pauses LiveKit Cloud 429 reconnects without refreshing credentials", () => {
     const voiceRoom = readFileSync(
       resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
       "utf8"
     );
 
-    expect(voiceRoom).toContain("VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS");
     expect(voiceRoom).toContain("isLivekitRateLimitError");
-    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\", { rateLimited })");
-    expect(voiceRoom).toContain("语音服务请求过快，稍后自动重连");
+    expect(voiceRoom).toContain("willRetry: !rateLimited");
+    expect(voiceRoom).toContain("语音服务请求过快，已暂停自动重连");
+    expect(voiceRoom).not.toContain("VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS");
     expect(voiceRoom).not.toContain("client.getLivekitToken");
   });
 

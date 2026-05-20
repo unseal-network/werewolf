@@ -81,8 +81,6 @@ function mapConnectionState(state: ConnectionState): VoiceConnectionState {
  * a torn-down provider — important under React StrictMode double-invocation.
  */
 const VOICE_RECONNECT_DELAYS_MS = [2000, 4000, 8000, 15000, 30000];
-const VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS = [60000, 120000, 240000, 300000];
-
 function isLivekitRateLimitError(err: unknown): boolean {
   if (!err) return false;
   if (typeof err === "object") {
@@ -178,14 +176,11 @@ export function VoiceRoomProvider({
     };
 
     const scheduleRoomReconnect = (
-      reason: string,
-      options: { rateLimited?: boolean } = {}
+      reason: string
     ) => {
       if (cancelled || retryTimerRef.current !== null) return;
       const attempt = retryAttemptRef.current;
-      const delays = options.rateLimited
-        ? VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS
-        : VOICE_RECONNECT_DELAYS_MS;
+      const delays = VOICE_RECONNECT_DELAYS_MS;
       const delayMs =
         delays[attempt] ??
         delays[delays.length - 1]!;
@@ -193,13 +188,10 @@ export function VoiceRoomProvider({
       console.warn("[VoiceRoom] scheduling reconnect", {
         reason,
         attempt,
-        rateLimited: Boolean(options.rateLimited),
         retryInMs: delayMs,
       });
       setState("reconnecting");
-      setErrorMessage(
-        options.rateLimited ? "语音服务请求过快，稍后自动重连" : null
-      );
+      setErrorMessage(null);
       retryTimerRef.current = window.setTimeout(() => {
         retryTimerRef.current = null;
         if (!cancelled) {
@@ -342,18 +334,18 @@ export function VoiceRoomProvider({
         if (cancelled) return;
         const attempt = retryAttemptRef.current;
         const rateLimited = isLivekitRateLimitError(err);
-        const delays = rateLimited
-          ? VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS
-          : VOICE_RECONNECT_DELAYS_MS;
-        const delayMs = delays[attempt] ?? delays[delays.length - 1]!;
         console.error("[VoiceRoom] connect failed", {
           err,
           attempt,
           rateLimited,
-          willRetry: true,
-          retryInMs: delayMs,
+          willRetry: !rateLimited,
         });
-        scheduleRoomReconnect("connect failed", { rateLimited });
+        if (rateLimited) {
+          setState("error");
+          setErrorMessage("语音服务请求过快，已暂停自动重连");
+          return;
+        }
+        scheduleRoomReconnect("connect failed");
       });
 
     return () => {
