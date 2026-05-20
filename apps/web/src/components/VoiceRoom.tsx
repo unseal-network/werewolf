@@ -140,6 +140,7 @@ export function VoiceRoomProvider({
     }
 
     let cancelled = false;
+    let rateLimitPaused = false;
     const lkRoom = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -292,6 +293,7 @@ export function VoiceRoomProvider({
         setIsMicrophoneEnabled(false);
         clearUnlockListener();
         clearRemoteAudioElements();
+        if (rateLimitPaused) return;
         scheduleRoomReconnect("room disconnected");
       })
       .on(RoomEvent.LocalTrackPublished, updateMicState)
@@ -341,6 +343,8 @@ export function VoiceRoomProvider({
           willRetry: !rateLimited,
         });
         if (rateLimited) {
+          rateLimitPaused = true;
+          clearRetryTimer();
           setState("error");
           setErrorMessage("语音服务请求过快，已暂停自动重连");
           return;

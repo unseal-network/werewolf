@@ -531,6 +531,10 @@ describe("game room seat layout", () => {
 
     expect(voiceRoom).toContain("isLivekitRateLimitError");
     expect(voiceRoom).toContain("willRetry: !rateLimited");
+    expect(voiceRoom).toContain("let rateLimitPaused = false");
+    expect(voiceRoom).toContain("if (rateLimitPaused) return");
+    expect(voiceRoom).toContain("rateLimitPaused = true");
+    expect(voiceRoom).toContain("clearRetryTimer()");
     expect(voiceRoom).toContain("语音服务请求过快，已暂停自动重连");
     expect(voiceRoom).not.toContain("VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS");
     expect(voiceRoom).not.toContain("client.getLivekitToken");
