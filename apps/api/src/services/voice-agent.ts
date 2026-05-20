@@ -70,7 +70,15 @@ export interface VoiceTranscriptUpdate {
   final: boolean;
 }
 
+export interface VoicePlayerTrackUpdate {
+  gameRoomId: string;
+  playerId: string;
+  matrixUserId: string;
+  trackSid: string | null;
+}
+
 export type VoiceTranscriptHandler = (update: VoiceTranscriptUpdate) => void;
+export type VoicePlayerTrackHandler = (update: VoicePlayerTrackUpdate) => void;
 export type AgentSpeechProgressHandler = (text: string) => void;
 
 export interface VoiceSpeakOptions {
@@ -118,6 +126,7 @@ export class VoiceAgentService {
   private reconnectAttempt = 0;
   private intentionalDisconnect = false;
   private transcriptHandler: VoiceTranscriptHandler | null = null;
+  private playerTrackHandler: VoicePlayerTrackHandler | null = null;
   private activePlayerAudioTrackKeys = new Set<string>();
   /** Serializes speak() so two simultaneous utterances don't interleave
    *  PCM into the shared audio track. */
@@ -131,6 +140,10 @@ export class VoiceAgentService {
 
   setTranscriptHandler(handler: VoiceTranscriptHandler | null): void {
     this.transcriptHandler = handler;
+  }
+
+  setPlayerTrackHandler(handler: VoicePlayerTrackHandler | null): void {
+    this.playerTrackHandler = handler;
   }
 
   /**
@@ -780,6 +793,12 @@ export class VoiceAgentService {
       return;
     }
     const { playerId, matrixUserId, trackKey } = claim;
+    this.playerTrackHandler?.({
+      gameRoomId: this.gameRoomId,
+      playerId,
+      matrixUserId,
+      trackSid: track.sid ?? null,
+    });
     console.info("[VoiceAgent] starting STT for player audio", {
       gameRoomId: this.gameRoomId,
       playerId,
@@ -1402,6 +1421,7 @@ function objectValue(value: unknown): Record<string, unknown> | null {
 export class VoiceAgentRegistry {
   private agents = new Map<string, VoiceAgentService>();
   private transcriptHandler: VoiceTranscriptHandler | null = null;
+  private playerTrackHandler: VoicePlayerTrackHandler | null = null;
 
   constructor(private config: VoiceAgentConfig) {}
 
@@ -1412,11 +1432,19 @@ export class VoiceAgentRegistry {
     }
   }
 
+  setPlayerTrackHandler(handler: VoicePlayerTrackHandler | null): void {
+    this.playerTrackHandler = handler;
+    for (const agent of this.agents.values()) {
+      agent.setPlayerTrackHandler(handler);
+    }
+  }
+
   async getOrCreate(gameRoomId: string): Promise<VoiceAgentService> {
     let agent = this.agents.get(gameRoomId);
     if (!agent) {
       agent = new VoiceAgentService(gameRoomId, this.config);
       agent.setTranscriptHandler(this.transcriptHandler);
+      agent.setPlayerTrackHandler(this.playerTrackHandler);
       this.agents.set(gameRoomId, agent);
       try {
         await agent.connect();

@@ -206,6 +206,11 @@ export class InMemoryGameService {
         final: update.final,
       });
     });
+    registry.setPlayerTrackHandler?.((update) => {
+      const room = this.rooms.get(update.gameRoomId);
+      if (!room) return;
+      this.syncLivekitMeeting(room, "voiceAgentPlayerTrack");
+    });
   }
 
   setLivekitMeetingController(controller: LivekitMeetingController): void {
