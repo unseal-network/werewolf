@@ -1,5 +1,5 @@
 {
-  "voiceId": "4VZIsMPtgggwNg7OXbPY",
+  "voiceId": "Chinese (Mandarin)_Reliable_Executive",
   "count": 72,
   "files": [
     {
@@ -7,252 +7,252 @@
       "lang": "zh",
       "file": "01_zh.mp3",
       "text": "天黑请闭眼",
-      "bytes": 25539
+      "bytes": 21300
     },
     {
       "index": 2,
       "lang": "zh",
       "file": "02_zh.mp3",
       "text": "守卫请睁眼，请选择你要保护的人",
-      "bytes": 60648
+      "bytes": 52980
     },
     {
       "index": 3,
       "lang": "zh",
       "file": "03_zh.mp3",
       "text": "狼人请睁眼，请选择今晚的目标",
-      "bytes": 56050
+      "bytes": 50100
     },
     {
       "index": 4,
       "lang": "zh",
       "file": "04_zh.mp3",
-      "text": "女巫请睁眼，今晚阵亡的是 ta，你要使用解药吗？",
-      "bytes": 78202
+      "text": "女巫请睁眼，今晚阵亡的是他，你要使用解药吗？",
+      "bytes": 67380
     },
     {
       "index": 5,
       "lang": "zh",
       "file": "05_zh.mp3",
       "text": "今晚，你要使用毒药吗？",
-      "bytes": 40586
+      "bytes": 38004
     },
     {
       "index": 6,
       "lang": "zh",
       "file": "06_zh.mp3",
       "text": "预言家请睁眼，你要洞悉谁的身份？",
-      "bytes": 60648
+      "bytes": 48372
     },
     {
       "index": 7,
       "lang": "zh",
       "file": "07_zh.mp3",
       "text": "天亮请睁眼，今晚是平安夜",
-      "bytes": 48527
+      "bytes": 44916
     },
     {
       "index": 8,
       "lang": "zh",
       "file": "08_zh.mp3",
       "text": "天亮请睁眼，今晚死亡的是",
-      "bytes": 52288
+      "bytes": 42612
     },
     {
       "index": 9,
       "lang": "zh",
       "file": "09_zh.mp3",
       "text": "1 号玩家",
-      "bytes": 21777
+      "bytes": 18996
     },
     {
       "index": 10,
       "lang": "zh",
       "file": "10_zh.mp3",
       "text": "2 号玩家",
-      "bytes": 21777
+      "bytes": 19572
     },
     {
       "index": 11,
       "lang": "zh",
       "file": "11_zh.mp3",
       "text": "3 号玩家",
-      "bytes": 20524
+      "bytes": 18996
     },
     {
       "index": 12,
       "lang": "zh",
       "file": "12_zh.mp3",
       "text": "4 号玩家",
-      "bytes": 21777
+      "bytes": 18996
     },
     {
       "index": 13,
       "lang": "zh",
       "file": "13_zh.mp3",
       "text": "5 号玩家",
-      "bytes": 22613
+      "bytes": 18996
     },
     {
       "index": 14,
       "lang": "zh",
       "file": "14_zh.mp3",
       "text": "6 号玩家",
-      "bytes": 23449
+      "bytes": 18996
     },
     {
       "index": 15,
       "lang": "zh",
       "file": "15_zh.mp3",
       "text": "7 号玩家",
-      "bytes": 20524
+      "bytes": 18996
     },
     {
       "index": 16,
       "lang": "zh",
       "file": "16_zh.mp3",
       "text": "8 号玩家",
-      "bytes": 24285
+      "bytes": 18996
     },
     {
       "index": 17,
       "lang": "zh",
       "file": "17_zh.mp3",
       "text": "9 号玩家",
-      "bytes": 20942
+      "bytes": 18996
     },
     {
       "index": 18,
       "lang": "zh",
       "file": "18_zh.mp3",
       "text": "10 号玩家",
-      "bytes": 20942
+      "bytes": 18420
     },
     {
       "index": 19,
       "lang": "zh",
       "file": "19_zh.mp3",
       "text": "11 号玩家",
-      "bytes": 21777
+      "bytes": 20724
     },
     {
       "index": 20,
       "lang": "zh",
       "file": "20_zh.mp3",
       "text": "12 号玩家",
-      "bytes": 25539
+      "bytes": 20148
     },
     {
       "index": 21,
       "lang": "zh",
       "file": "21_zh.mp3",
       "text": "1 号玩家和",
-      "bytes": 23449
+      "bytes": 23028
     },
     {
       "index": 22,
       "lang": "zh",
       "file": "22_zh.mp3",
       "text": "2 号玩家和",
-      "bytes": 23449
+      "bytes": 23604
     },
     {
       "index": 23,
       "lang": "zh",
       "file": "23_zh.mp3",
       "text": "3 号玩家和",
-      "bytes": 23449
+      "bytes": 23604
     },
     {
       "index": 24,
       "lang": "zh",
       "file": "24_zh.mp3",
       "text": "4 号玩家和",
-      "bytes": 24703
+      "bytes": 22452
     },
     {
       "index": 25,
       "lang": "zh",
       "file": "25_zh.mp3",
       "text": "5 号玩家和",
-      "bytes": 23449
+      "bytes": 23028
     },
     {
       "index": 26,
       "lang": "zh",
       "file": "26_zh.mp3",
       "text": "6 号玩家和",
-      "bytes": 22613
+      "bytes": 24180
     },
     {
       "index": 27,
       "lang": "zh",
       "file": "27_zh.mp3",
       "text": "7 号玩家和",
-      "bytes": 24703
+      "bytes": 24180
     },
     {
       "index": 28,
       "lang": "zh",
       "file": "28_zh.mp3",
       "text": "8 号玩家和",
-      "bytes": 21777
+      "bytes": 25332
     },
     {
       "index": 29,
       "lang": "zh",
       "file": "29_zh.mp3",
       "text": "9 号玩家和",
-      "bytes": 23449
+      "bytes": 21300
     },
     {
       "index": 30,
       "lang": "zh",
       "file": "30_zh.mp3",
       "text": "10 号玩家和",
-      "bytes": 25539
+      "bytes": 23604
     },
     {
       "index": 31,
       "lang": "zh",
       "file": "31_zh.mp3",
       "text": "11 号玩家和",
-      "bytes": 26375
+      "bytes": 26484
     },
     {
       "index": 32,
       "lang": "zh",
       "file": "32_zh.mp3",
       "text": "12 号玩家和",
-      "bytes": 24703
+      "bytes": 32244
     },
     {
       "index": 33,
       "lang": "zh",
       "file": "33_zh.mp3",
       "text": "发言结束，进入投票。现在，请做出你的判断。",
-      "bytes": 90323
+      "bytes": 79476
     },
     {
       "index": 34,
       "lang": "zh",
       "file": "34_zh.mp3",
       "text": "投票结束，今天被放逐的对象是",
-      "bytes": 54378
+      "bytes": 54708
     },
     {
       "index": 35,
       "lang": "zh",
       "file": "35_zh.mp3",
       "text": "游戏结束，村民获胜，村庄迎来了胜利。",
-      "bytes": 79874
+      "bytes": 62772
     },
     {
       "index": 36,
       "lang": "zh",
       "file": "36_zh.mp3",
       "text": "游戏结束，狼人获胜，夜色占据了村庄。",
-      "bytes": 78202
+      "bytes": 65652
     },
     {
       "index": 1,
