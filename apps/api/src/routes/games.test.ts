@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createApp } from "../app";
@@ -576,7 +576,10 @@ describe("games API", () => {
 
   it("returns the fixed agent candidate list with joined state", async () => {
     const deps = createTestDeps();
-    const app = createApp(deps);
+    const app = createApp({
+      ...deps,
+      fetchImpl: vi.fn(async () => new Response("{}", { status: 503 })),
+    });
     const { room } = deps.games.createGame(
       {
         sourceMatrixRoomId: "!source:example.com",
@@ -632,6 +635,76 @@ describe("games API", () => {
       displayName: "kimi game 1",
       avatarUrl: "https://api.dicebear.com/9.x/bottts/svg?seed=Felix",
       alreadyJoined: false,
+    });
+  });
+
+  it("prepends current user's chatbot agents before the fixed list", async () => {
+    const deps = createTestDeps();
+    const fetchImpl = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          agents: [
+            {
+              user_id: "@custom-agent:example.com",
+              display_name: "Custom Agent",
+              avatar_url: "mxc://example.com/custom-avatar",
+              user_type: "agent",
+              membership: "join",
+            },
+            {
+              user_id: "@game-10:keepsecret.io",
+              display_name: "Duplicate Fixed Agent",
+              user_type: "agent",
+              membership: "join",
+            },
+          ],
+          total: 2,
+        }),
+        { status: 200 }
+      )
+    );
+    const app = createApp({
+      ...deps,
+      matrixHomeserverUrl: "https://matrix.example",
+      fetchImpl,
+    });
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+
+    const response = await app.request(`/games/${room.id}/agent-candidates`, {
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://matrix.example/chatbot/v1/agents",
+      expect.objectContaining({
+        headers: { authorization: "Bearer matrix-token-alice" },
+      })
+    );
+    expect(body.total).toBe(18);
+    expect(body.agents.slice(0, 3).map((agent: { userId: string }) => agent.userId)).toEqual([
+      "@custom-agent:example.com",
+      "@game-10:keepsecret.io",
+      "@game-12:keepsecret.io",
+    ]);
+    expect(body.agents[0]).toMatchObject({
+      displayName: "Custom Agent",
+      avatarUrl:
+        "https://matrix.example/_matrix/media/v3/download/example.com/custom-avatar",
+      userType: "agent",
+      alreadyJoined: false,
+    });
+    expect(body.agents[1]).toMatchObject({
+      displayName: "Duplicate Fixed Agent",
     });
   });
 });

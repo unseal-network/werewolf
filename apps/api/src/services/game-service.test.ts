@@ -2335,6 +2335,46 @@ describe("InMemoryGameService rules", () => {
     expect(room.projection.currentSpeakerPlayerId).toBe(firstSpeaker.id);
   });
 
+  it("starts action phase deadlines after GM narration finishes", async () => {
+    vi.useFakeTimers();
+    try {
+      const { games, gameRoomId } = createStartedServiceGame();
+      const room = games.snapshot(gameRoomId);
+      const narrationStartedAt = new Date("2026-05-20T10:00:00.000Z");
+      const narrationEndedAt = new Date("2026-05-20T10:00:12.000Z");
+      vi.setSystemTime(narrationStartedAt);
+
+      games.setVoiceAgents({
+        getOrCreate: async () => ({
+          registerPlayerVoiceIdentity: () => undefined,
+          playAudioFiles: vi.fn(async () => {
+            vi.setSystemTime(narrationEndedAt);
+          }),
+        }),
+        get: () => null,
+        setTranscriptHandler: () => undefined,
+        destroy: async () => undefined,
+      } as unknown as VoiceAgentRegistry);
+      room.projection = {
+        ...room.projection!,
+        phase: "night_guard",
+        deadlineAt: new Date(narrationStartedAt.getTime() - 1000).toISOString(),
+      };
+      room.privateStates = room.privateStates.map((state) =>
+        state.role === "guard" ? { ...state, role: "villager" } : state
+      );
+
+      await games.advanceGame(gameRoomId, passAgentTurn);
+
+      expect(room.projection?.phase).toBe("night_wolf");
+      expect(room.projection?.deadlineAt).toBe(
+        new Date(narrationEndedAt.getTime() + 45_000).toISOString()
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("ends immediately during night resolution when witch poison kills the last wolf", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

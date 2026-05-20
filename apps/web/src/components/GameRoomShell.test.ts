@@ -572,14 +572,19 @@ describe("game room seat layout", () => {
     const exitButtonCss = modalCss.slice(
       modalCss.indexOf(".game-layout-root[data-scene=\"end\"] .modal-layer .endgame-exit-button")
     );
+    const endFillRule = modalCss.match(
+      /\.game-layout-root\[data-scene="end"\] \.modal-layer \.endgame-phase-card \.ww-ui-panel__fill \{[\s\S]*?\n\}/
+    )?.[0] ?? "";
 
     expect(endCardRule).toContain("backdrop-filter: none !important");
     expect(endCardRule).toContain("-webkit-backdrop-filter: none !important");
     expect(endCardRule).toContain("top: 50dvh");
     expect(endCardRule).toContain("max-height: calc(100dvh - 24px)");
     expect(endCardRule).toContain("overflow: visible");
-    expect(modalCss).toContain(".endgame-phase-card .ww-ui-panel__fill");
-    expect(modalCss).toContain("background: transparent !important");
+    expect(endFillRule).toContain(".endgame-phase-card .ww-ui-panel__fill");
+    expect(endFillRule).toContain("linear-gradient(180deg, rgba(7, 13, 15, 0.94), rgba(3, 8, 10, 0.90)) !important");
+    expect(endFillRule).toContain("inset 0 -18px 42px rgba(0, 0, 0, 0.34)");
+    expect(endFillRule).not.toContain("background: transparent !important");
     expect(modalCss).toContain(".endgame-phase-card-content");
     expect(modalCss).toContain("overflow: visible !important");
     expect(exitButtonCss).toContain("max-width: 300px");

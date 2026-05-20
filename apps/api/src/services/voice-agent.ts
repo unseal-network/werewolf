@@ -680,27 +680,6 @@ export class VoiceAgentService {
           })
           .catch(() => undefined);
       },
-      onAlignment: (event) => {
-        const alignment = parseTtsSpeechAlignment(event);
-        if (!alignment) return;
-        mergedAlignment = mergeTtsSpeechAlignment(mergedAlignment, alignment);
-        speechProgressCheckpoints = buildSpeechProgressCheckpoints(
-          mergedAlignment,
-          trimmed,
-          normalizedPlaybackRate
-        );
-        console.debug("[VoiceAgent] TTS alignment progress checkpoints", {
-          gameRoomId: this.gameRoomId,
-          playerId: playerId ?? null,
-          matrixUserId: this.resolveMatrixUserIdForPlayer(playerId),
-          alignmentChars: mergedAlignment.chars.length,
-          checkpointCount: speechProgressCheckpoints.length,
-          lastAudioMs:
-            speechProgressCheckpoints[speechProgressCheckpoints.length - 1]
-              ?.audioMs ?? null,
-        });
-        scheduleSpeechProgress();
-      },
       onError: (err) => console.error("[VoiceAgent] TTS error:", err),
     };
 

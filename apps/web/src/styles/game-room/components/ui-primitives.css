@@ -436,15 +436,15 @@
 }
 
 .game-layout-root .agent-picker.ww-ui-panel {
-  width: min(640px, calc(100vw - 28px));
-  height: min(78dvh, 680px);
+  width: min(680px, calc(100vw - 28px));
+  height: min(82dvh, 720px);
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .ww-ui-panel__content {
   height: 100%;
   position: relative;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: clamp(14px, 2.1dvh, 22px);
   overflow: hidden;
 }
 
@@ -492,14 +492,16 @@
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-row {
+  --agent-row-avatar-size: clamp(48px, 6.4dvh, 62px);
+  --agent-row-icon-size: clamp(46px, 6dvh, 58px);
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: 72px;
-  grid-template-columns: 48px minmax(0, 1fr) auto;
-  column-gap: 14px;
+  min-height: clamp(82px, 10.8dvh, 106px);
+  grid-template-columns: var(--agent-row-avatar-size) minmax(0, 1fr) auto;
+  column-gap: clamp(14px, 2.2dvh, 22px);
   overflow: hidden;
-  padding: 10px 12px;
+  padding: clamp(12px, 1.8dvh, 18px) clamp(12px, 2.2dvh, 18px);
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-avatar,
@@ -510,21 +512,22 @@
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-avatar {
-  width: 44px;
-  height: 44px;
+  width: var(--agent-row-avatar-size);
+  height: var(--agent-row-avatar-size);
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-name {
-  font-size: 17px;
+  font-size: clamp(18px, 2.7dvh, 22px);
   line-height: 1.2;
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-id {
-  font-size: 13px;
+  font-size: clamp(13px, 2dvh, 16px);
   line-height: 1.25;
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-add-button {
+  --art-icon-button-size: var(--agent-row-icon-size);
   justify-self: end;
   margin-left: auto;
 }
@@ -532,19 +535,21 @@
 .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
   width: 100%;
   max-width: 100%;
-  min-height: 64px;
-  grid-template-columns: repeat(2, minmax(0, 96px));
+  min-height: 128px;
+  grid-template-columns: repeat(2, minmax(0, 150px));
   justify-content: center;
   justify-items: center;
-  align-items: center;
+  align-items: end;
   align-self: end;
-  padding-bottom: 8px;
+  margin-top: auto;
+  gap: 14px;
+  padding-bottom: 10px;
   overflow: visible;
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .art-button {
-  --art-button-width: 96px;
-  --art-button-font-size: 13px;
+  --art-button-width: 150px;
+  --art-button-font-size: 15px;
 }
 
 @media (max-width: 560px) {
@@ -557,20 +562,25 @@
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-row {
-    grid-template-columns: 42px minmax(0, 1fr) auto;
+    --agent-row-avatar-size: clamp(46px, 6.2dvh, 56px);
+    --agent-row-icon-size: clamp(44px, 5.8dvh, 52px);
+    min-height: clamp(78px, 10.2dvh, 96px);
+    grid-template-columns: var(--agent-row-avatar-size) minmax(0, 1fr) auto;
     gap: 10px;
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
-    min-height: 84px;
-    grid-template-columns: repeat(2, minmax(0, 92px));
+    min-height: 116px;
+    grid-template-columns: repeat(2, minmax(0, 136px));
     justify-content: center;
-    gap: 8px;
-    padding-bottom: 6px;
+    align-items: end;
+    margin-top: auto;
+    gap: 10px;
+    padding-bottom: 8px;
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .art-button {
-    --art-button-width: 92px;
-    --art-button-font-size: 12px;
+    --art-button-width: 136px;
+    --art-button-font-size: 14px;
   }
 }

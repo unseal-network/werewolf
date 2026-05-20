@@ -1868,7 +1868,7 @@ export class InMemoryGameService {
       context.nightDeathPlayerIds = options.nightDeathPlayerIds;
     }
     await this.playGmAnnouncement(room, context);
-    this.startPhase(room, phase, now);
+    this.startPhase(room, phase, new Date());
   }
 
   private async playGmAnnouncement(
