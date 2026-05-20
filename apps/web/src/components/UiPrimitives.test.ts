@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GameButton } from "./GameButton";
+import { GameIconButton } from "./GameIconButton";
+import { GameSegmentedControl } from "./GameSegmentedControl";
 import { StageActionButton } from "./StageActionButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
@@ -56,29 +58,33 @@ describe("new UI primitives", () => {
     expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-row");
     expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) 128px");
     expect(css).toContain("overflow-x: hidden");
-    expect(css).toContain(".agent-add-button.ww-game-button");
-    expect(css).toContain("--ww-agent-add-size: 44px");
+    expect(css).not.toContain(".agent-add-button.ww-icon-button");
+    expect(css).not.toContain("--ww-agent-add-size");
   });
 
-  it("keeps compact agent add/remove glyphs visible inside the circular button", () => {
+  it("keeps compact agent add/remove glyphs as direct button text", () => {
+    const html = renderToStaticMarkup(
+      createElement(GameIconButton, {
+        label: "+",
+        "aria-label": "add",
+        className: "agent-add-button",
+        size: "lg",
+      })
+    );
     const css = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
       "utf8"
     );
-    const agentButtonCss = css.slice(
-      css.indexOf(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button"),
-      css.indexOf("@media (max-width: 560px)")
-    );
 
-    expect(agentButtonCss).toContain("--ww-button-content-inset-x: 0px");
-    expect(agentButtonCss).toContain("width: 100%");
-    expect(agentButtonCss).toContain("height: 100%");
-    expect(agentButtonCss).toContain("display: grid");
-    expect(agentButtonCss).toContain("place-items: center");
-    expect(agentButtonCss).toContain("transform: none");
+    expect(html).toContain("ww-icon-button");
+    expect(html).toContain("ww-icon-button--lg");
+    expect(html).toContain(">+</button>");
+    expect(html).not.toContain("ww-icon-button__content");
+    expect(css).not.toContain(".game-layout-root .ww-icon-button");
+    expect(css).not.toContain(".game-layout-root .ww-icon-button__content");
   });
 
-  it("renders decision buttons with live text and verified 9-slice variants", () => {
+  it("renders decision buttons as unstyled semantic buttons with live text", () => {
     const html = renderToStaticMarkup(
       createElement(
         "div",
@@ -96,27 +102,66 @@ describe("new UI primitives", () => {
     expect(html).toContain("ww-game-button--primary");
     expect(html).toContain("ww-game-button--confirm");
     expect(html).toContain("ww-game-button--secondary");
-    expect(html).toContain("ww-game-button__chrome");
-    expect(html).toContain("ww-game-button__label");
+    expect(html).toContain('data-game-button-variant="primary"');
+    expect(html).toContain('data-game-button-variant="confirm"');
+    expect(html).toContain('data-game-button-variant="secondary"');
     expect(html).toContain(">Start<");
-    expect(css).toContain("submit-button-9slice.webp");
-    expect(css).toContain("confirm-button-9slice.webp");
-    expect(css).toContain("cancel-button-9slice.webp");
-    expect(css).toContain(".game-layout-root .ww-game-button--primary");
-    expect(css).toContain("color: #fff7d8");
-    expect(css).toContain("background: transparent");
-    expect(css).toContain("box-sizing: border-box");
-    expect(css).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp\")");
-    expect(css).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp\")");
-    expect(css).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/cancel-button-9slice.webp\")");
-    expect(css).toContain("--ww-button-chrome-slice: 76 168");
-    expect(css).toContain("--ww-button-chrome-slice: 40 64");
-    expect(css).toContain("border-image-source: var(--ww-button-chrome-image)");
-    expect(css).toContain("border-image-slice: var(--ww-button-chrome-slice)");
-    expect(css).toContain("background-image: none");
-    expect(css).toContain("--ww-button-label-optical-y");
-    expect(css).not.toContain("border-image-slice: 76 168 fill");
-    expect(css).not.toContain("border-image-slice: 40 64 fill");
+    expect(html).not.toContain("ww-game-button__chrome");
+    expect(html).not.toContain("ww-game-button__content");
+    expect(html).not.toContain("ww-game-button__label");
+    expect(css).not.toContain("submit-button-9slice.webp");
+    expect(css).not.toContain("confirm-button-9slice.webp");
+    expect(css).not.toContain("cancel-button-9slice.webp");
+    expect(css).not.toContain(".game-layout-root .ww-game-button");
+    expect(css).not.toContain("--ww-button-chrome");
+    expect(css).not.toContain("border-image-source");
+  });
+
+  it("renders reusable icon buttons without shared visual chrome", () => {
+    const html = renderToStaticMarkup(
+      createElement(GameIconButton, {
+        label: "+",
+        "aria-label": "add",
+        className: "agent-add-button",
+        size: "lg",
+      })
+    );
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
+      "utf8"
+    );
+
+    expect(html).toContain("ww-icon-button");
+    expect(html).toContain("ww-icon-button--lg");
+    expect(html).toContain(">+<");
+    expect(html).not.toContain("ww-icon-button__content");
+    expect(css).not.toContain(".game-layout-root .ww-icon-button");
+    expect(css).not.toContain("--ww-icon-button-size");
+  });
+
+  it("renders segmented controls from unstyled button primitives", () => {
+    const html = renderToStaticMarkup(
+      createElement(GameSegmentedControl, {
+        "aria-label": "wolf-actions",
+        value: "target",
+        options: [
+          { value: "target", label: "选择玩家" },
+          { value: "speech", label: "发言" },
+        ],
+        onChange: () => undefined,
+      })
+    );
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
+      "utf8"
+    );
+
+    expect(html).toContain("ww-segmented-control");
+    expect(html).toContain("ww-game-button--primary");
+    expect(html).toContain("ww-game-button--secondary");
+    expect(css).not.toContain(".game-layout-root .ww-segmented-control");
+    expect(css).not.toContain(".ww-segmented-control__option");
+    expect(css).not.toContain(".ww-segmented-control button.active");
   });
 
   it("maps the room start action to the primary button skin", () => {
@@ -129,6 +174,70 @@ describe("new UI primitives", () => {
 
     expect(html).toContain("ww-game-button--primary");
     expect(html).not.toContain("ww-game-button--confirm");
+  });
+
+  it("maps primary stage actions to the shared primary button skin", () => {
+    const html = renderToStaticMarkup(
+      createElement(StageActionButton, {
+        className: "stage-confirm player-picker-action",
+        label: "确认查验",
+        variant: "primary",
+      })
+    );
+
+    expect(html).toContain("ww-game-button--primary");
+    expect(html).not.toContain("ww-game-button--confirm");
+  });
+
+  it("removes legacy action container and picker button backgrounds", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
+
+    expect(css).toContain(".game-layout-root .action-region .binary-action {");
+    expect(css).toContain("background: transparent !important");
+    expect(css).toContain("box-shadow: none !important");
+    expect(css).toContain("backdrop-filter: none !important");
+    expect(css).toContain(".game-layout-root .action-region .stage-start");
+    expect(css).toContain(".game-layout-root .action-region .player-picker-action");
+    expect(css).toContain("padding: 0 !important");
+    expect(css).toContain("border: 0 !important");
+    expect(css).toContain("background: none !important");
+    expect(css).toContain("background-image: none !important");
+  });
+
+  it("keeps action buttons positioned by the scene while clearing visual styles", () => {
+    const primitiveCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
+      "utf8"
+    );
+    const actionCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
+    const actionButtonCss = actionCss.slice(
+      actionCss.indexOf(".game-layout-root .action-region .stage-start")
+    );
+    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).not.toContain(".game-layout-root .ww-icon-button");
+    expect(actionButtonCss).toContain("width: var(--action-button-width) !important");
+    expect(actionButtonCss).toContain("max-width: var(--action-button-width) !important");
+    expect(actionButtonCss).toContain("background: none !important");
+    expect(actionButtonCss).toContain("background-image: none !important");
+    expect(actionButtonCss).toContain("box-shadow: none !important");
+    const nonResetBackgroundLines = actionButtonCss
+      .split("\n")
+      .filter((line) => /\bbackground\s*:/.test(line))
+      .filter((line) => !line.includes("background: none"))
+      .filter((line) => !line.includes("background: transparent"));
+
+    expect(nonResetBackgroundLines).toEqual([]);
+    expect(actionButtonCss).not.toContain("rgba(255, 255, 255");
+    expect(actionButtonCss).not.toContain("backdrop-filter");
+    expect(actionButtonCss).not.toContain("linear-gradient");
+    expect(actionCss).toContain("--voice-fill-layer: transparent");
+    expect(actionCss).toContain("--voice-active-fill-layer: transparent");
   });
 
   it("centers the lobby add-agent glyph inside its short stage button", () => {
@@ -145,37 +254,40 @@ describe("new UI primitives", () => {
     );
 
     expect(html).toContain("stage-add-player");
-    expect(html).toContain('<span class="ww-game-button__label">+</span>');
-    expect(css).toContain(".game-layout-root .action-region .stage-add-player .ww-game-button__label");
-    expect(css).toContain("--ww-button-label-optical-y: 0px");
-    expect(css).toContain("width: 100%");
-    expect(css).toContain("height: 100%");
-    expect(css).toContain("display: grid");
-    expect(css).toContain("place-items: center");
-    expect(css).toContain("transform: none");
+    expect(html).toContain(">+</button>");
+    expect(html).not.toContain("ww-game-button__label");
+    expect(css).not.toContain(".stage-add-player .ww-game-button__label");
+    expect(css).toContain(".game-layout-root .action-region .stage-skip");
+    expect(css).toContain("width: var(--action-secondary-button-width) !important");
+    expect(css).toContain("transform: none !important");
   });
 
-  it("keeps native one-glyph buttons centered across responsive layouts", () => {
-    const hudCss = readFileSync(
-      resolve(process.cwd(), "apps/web/src/styles/game-room/components/hud.css"),
-      "utf8"
-    );
-    const legacyCss = readFileSync(
-      resolve(process.cwd(), "apps/web/src/styles/game-room/legacy.css"),
+  it("routes one-glyph chrome buttons through GameIconButton", () => {
+    const files = [
+      "apps/web/src/components/AgentPicker.tsx",
+      "apps/web/src/components/GameRoomShell.tsx",
+      "apps/web/src/components/SeerResultDialog.tsx",
+      "apps/web/src/components/TimelineCapsule.tsx",
+      "apps/web/src/components/UserInfoPanel.tsx",
+    ].map((file) => readFileSync(resolve(process.cwd(), file), "utf8"));
+
+    for (const source of files) {
+      expect(source).toContain("GameIconButton");
+    }
+    expect(files.join("\n")).not.toMatch(/<button[\s\S]{0,160}className="profile-close"/);
+    expect(files.join("\n")).not.toMatch(/<button[\s\S]{0,160}className="seer-result-close"/);
+    expect(files.join("\n")).not.toMatch(/<button[\s\S]{0,160}className="sheet-close"/);
+    expect(files.join("\n")).not.toMatch(/<button[\s\S]{0,160}className="hud-back-button"/);
+  });
+
+  it("routes wolf mode switching through GameSegmentedControl", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/CenterStage.tsx"),
       "utf8"
     );
 
-    expect(hudCss).toContain(".game-layout-root .hud-back-button");
-    expect(hudCss).toContain("display: grid");
-    expect(hudCss).toContain("place-items: center");
-    expect(hudCss).toContain("padding: 0");
-    expect(legacyCss).toContain(".sheet-close,");
-    expect(legacyCss).toContain(".profile-close,");
-    expect(legacyCss).toContain(".seer-result-close");
-    expect(legacyCss).toContain("display: grid");
-    expect(legacyCss).toContain("place-items: center");
-    expect(legacyCss).toContain("padding: 0");
-    expect(legacyCss).toContain("line-height: 1");
+    expect(source).toContain("GameSegmentedControl");
+    expect(source).not.toContain('className="action-mode-switch"');
   });
 
   it("removes legacy action button press overlays from the new button skins", () => {

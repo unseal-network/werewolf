@@ -4,7 +4,7 @@ import { useIframeAuth } from "../hooks/useIframeAuth";
 import { isHostRuntime } from "../runtime/hostBridge";
 import type { MemberInfo } from "@unseal-network/game-sdk";
 import { GameRoomShell } from "../components/GameRoomShell";
-import { CenterStage, type ActionMode, type ConfirmMode } from "../components/CenterStage";
+import { CenterStage } from "../components/CenterStage";
 import { CenterInfoPanel } from "../components/CenterInfoPanel";
 import { TimelineCapsule } from "../components/TimelineCapsule";
 import { RoleCardLayer } from "../components/RoleCardLayer";
@@ -13,9 +13,7 @@ import { StartDialog } from "../components/StartDialog";
 import { AgentPicker } from "../components/AgentPicker";
 import { SeerResultDialog } from "../components/SeerResultDialog";
 import { VoiceRoomProvider } from "../components/VoiceRoom";
-import { getPhaseAnimationCue } from "../animation/phaseCatalog";
 import { useT } from "../i18n/I18nProvider";
-import type { SceneId } from "../components/GameRoomShell";
 import type { EngineGameState } from "../engine/GameEngine";
 import {
   actorDayKey,
@@ -29,6 +27,11 @@ import {
 import { canUseActionPanel } from "../game/actionAvailability";
 import { isActionStateConflictError } from "../game/actionConflict";
 import { getStableLivekitCredentials } from "../game/livekitCredentials";
+import {
+  PHASE_DRESSING,
+  mapServerPhaseToUi,
+  type PhaseDressing,
+} from "../game/phaseUi";
 import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
   DEMO_DISPLAY_NAME,
@@ -39,30 +42,6 @@ import {
   writeMatrixIdentity,
 } from "../matrix/session";
 import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
-
-interface PhaseDressing {
-  scene: SceneId;
-  accent: string;
-  kickerKey: string;
-  copyKey: string;
-  confirmMode: ConfirmMode;
-}
-
-const PHASE_DRESSING: Record<string, PhaseDressing> = {
-  lobby: { scene: "lobby", accent: "#435cff", kickerKey: "stage.kicker.lobby", copyKey: "", confirmMode: "vote" },
-  deal: { scene: "deal", accent: "#7357d9", kickerKey: "stage.kicker.deal", copyKey: "", confirmMode: "vote" },
-  guard: { scene: "night", accent: "#2c8cff", kickerKey: "stage.kicker.guard", copyKey: "", confirmMode: "guard" },
-  wolf: { scene: "night", accent: "#c43d4d", kickerKey: "stage.kicker.wolf", copyKey: "", confirmMode: "wolf" },
-  "witch-save": { scene: "night", accent: "#28a86d", kickerKey: "stage.kicker.witchHeal", copyKey: "", confirmMode: "witch-save" },
-  "witch-poison": { scene: "night", accent: "#7751d9", kickerKey: "stage.kicker.witchPoison", copyKey: "", confirmMode: "witch-poison" },
-  seer: { scene: "night", accent: "#1d95b8", kickerKey: "stage.kicker.seer", copyKey: "", confirmMode: "seer" },
-  night: { scene: "night", accent: "#2c8cff", kickerKey: "stage.kicker.nightResolution", copyKey: "", confirmMode: "vote" },
-  day: { scene: "day", accent: "#d58b21", kickerKey: "stage.kicker.daySpeak", copyKey: "", confirmMode: "vote" },
-  dayResolution: { scene: "day", accent: "#d58b21", kickerKey: "stage.kicker.dayResolution", copyKey: "", confirmMode: "vote" },
-  vote: { scene: "vote", accent: "#d84848", kickerKey: "stage.kicker.dayVote", copyKey: "", confirmMode: "vote" },
-  tie: { scene: "tie", accent: "#b554d9", kickerKey: "stage.kicker.tieVote", copyKey: "", confirmMode: "vote" },
-  end: { scene: "end", accent: "#13a36c", kickerKey: "stage.kicker.end", copyKey: "", confirmMode: "vote" },
-};
 
 interface UserSeatState {
   seatNo: number;
@@ -107,176 +86,6 @@ function roleCardFrontUrl(roleId: string | undefined): string {
 
 function roleCardBackUrl(): string {
   return `${roleAssetBase}/card-back.avif`;
-}
-
-interface PhaseUiSpec {
-  phaseId: ReturnType<typeof getPhaseAnimationCue>["phaseId"];
-  labelKey: string;
-  rawLabel?: string;
-  actionMode: ActionMode;
-  canRunRuntime: boolean;
-  canProgress: boolean;
-  showTimeline: boolean;
-  showRoleCard: boolean;
-}
-
-function mapServerPhaseToUi(phase: string | null): PhaseUiSpec {
-  if (!phase) {
-    const cue = getPhaseAnimationCue("lobby");
-    return {
-      phaseId: cue.phaseId,
-      labelKey: "phase.lobby",
-      actionMode: "lobby",
-      canRunRuntime: false,
-      canProgress: false,
-      showTimeline: cue.allowTimeline,
-      showRoleCard: cue.showRoleCard,
-    };
-  }
-
-  switch (phase) {
-    case "role_assignment":
-      return {
-        phaseId: "deal",
-        labelKey: "phase.deal",
-        actionMode: "deal",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("deal").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("deal").showRoleCard,
-      };
-    case "night_guard":
-      return {
-        phaseId: "guard",
-        labelKey: "phase.guard",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("guard").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("guard").showRoleCard,
-      };
-    case "night_wolf":
-      return {
-        phaseId: "wolf",
-        labelKey: "phase.wolf",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("wolf").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("wolf").showRoleCard,
-      };
-    case "night_witch_heal":
-      return {
-        phaseId: "witch-save",
-        labelKey: "phase.witchHeal",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("witch-save").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("witch-save").showRoleCard,
-      };
-    case "night_witch_poison":
-      return {
-        phaseId: "witch-poison",
-        labelKey: "phase.witchPoison",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("witch-poison").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("witch-poison").showRoleCard,
-      };
-    case "night_seer":
-      return {
-        phaseId: "seer",
-        labelKey: "phase.seer",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("seer").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("seer").showRoleCard,
-      };
-    case "night_resolution":
-      return {
-        phaseId: "night",
-        labelKey: "phase.nightResolution",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("night").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("night").showRoleCard,
-      };
-    case "day_speak":
-      return {
-        phaseId: "day",
-        labelKey: "phase.daySpeak",
-        actionMode: "day",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("day").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("day").showRoleCard,
-      };
-    case "day_vote":
-      return {
-        phaseId: "vote",
-        labelKey: "phase.dayVote",
-        actionMode: "vote",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("vote").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("vote").showRoleCard,
-      };
-    case "tie_speech":
-      return {
-        phaseId: "day",
-        labelKey: "phase.tieSpeech",
-        actionMode: "day",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("day").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("day").showRoleCard,
-      };
-    case "tie_vote":
-      return {
-        phaseId: "tie",
-        labelKey: "phase.tieVote",
-        actionMode: "tie",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("tie").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("tie").showRoleCard,
-      };
-    case "day_resolution":
-      return {
-        phaseId: "dayResolution",
-        labelKey: "phase.dayResolution",
-        actionMode: "waiting",
-        canRunRuntime: true,
-        canProgress: false,
-        showTimeline: getPhaseAnimationCue("dayResolution").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("dayResolution").showRoleCard,
-      };
-    case "post_game":
-      return {
-        phaseId: "end",
-        labelKey: "phase.end",
-        actionMode: "end",
-        canRunRuntime: false,
-        canProgress: false,
-        showTimeline: getPhaseAnimationCue("end").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("end").showRoleCard,
-      };
-    default:
-      return {
-        phaseId: "lobby",
-        labelKey: "phase.lobby",
-        rawLabel: phase,
-        actionMode: "waiting",
-        canRunRuntime: false,
-        canProgress: false,
-        showTimeline: getPhaseAnimationCue("lobby").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("lobby").showRoleCard,
-      };
-  }
 }
 
 function memberToAgentCandidate(
@@ -640,7 +449,10 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   );
   const isCreator = room?.creatorUserId === matrixUserId;
 
-  const myPlayerId = myPlayer?.id;
+  // Fetch LiveKit credentials independently from the SSE room snapshot and
+  // game runtime. Once a credential exists for this user+game, websocket
+  // reconnects must reuse it inside VoiceRoomProvider instead of minting a new
+  // token and hitting the LiveKit server again.
   useEffect(() => {
     if (!matrixUserId) {
       livekitCredentialKeyRef.current = "";
@@ -1550,6 +1362,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
             speechInput={speechDraft}
             actionLoading={actionLoading}
             onStart={handleStartIntent}
+            onExitGame={goHome}
             onAddAgent={onFillAiStart}
             canAddAgent={
               !!room &&

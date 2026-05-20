@@ -311,4 +311,120 @@ describe("VoiceAgentService TTS LiveKit framing", () => {
     expect(attempts[0]!.close).toHaveBeenCalled();
     expect(attempts[1]!.close).toHaveBeenCalled();
   });
+
+  it("does not retry TTS after audio has already been captured", async () => {
+    const agent = new VoiceAgentService("game_1", config);
+    const attempts: Array<{ connect: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> }> = [];
+    const captureFrame = vi.fn(async () => undefined);
+    const waitForPlayout = vi.fn(async () => undefined);
+    (agent as any).connect = vi.fn(async () => {
+      (agent as any).connected = true;
+    });
+    (agent as any).audioSource = {
+      captureFrame,
+      waitForPlayout,
+      queuedDuration: 0,
+    };
+    (agent as any).createTtsClient = vi.fn((opts) => {
+      const attempt = {
+        connect: vi.fn(async () => undefined),
+        synthesize: vi.fn(async () => {
+          opts.onAudioChunk(Buffer.alloc(640), 16000);
+          throw new Error("TTS synthesize timed out");
+        }),
+        close: vi.fn(),
+      };
+      attempts.push(attempt);
+      return attempt;
+    });
+
+    await expect((agent as any).speakImplInner("不要重复播放")).resolves.toBe(true);
+
+    expect(attempts).toHaveLength(1);
+    expect(captureFrame).toHaveBeenCalled();
+    expect(waitForPlayout).toHaveBeenCalledTimes(1);
+    expect(attempts[0]!.close).toHaveBeenCalled();
+  });
+
+  it("waits for generated audio duration when LiveKit playout resolves early", async () => {
+    vi.useFakeTimers();
+    try {
+      const agent = new VoiceAgentService("game_1", config);
+      const waitForPlayout = vi.fn(async () => undefined);
+      (agent as any).connect = vi.fn(async () => {
+        (agent as any).connected = true;
+      });
+      (agent as any).audioSource = {
+        captureFrame: vi.fn(async () => undefined),
+        waitForPlayout,
+        queuedDuration: 0,
+      };
+      (agent as any).createTtsClient = vi.fn((opts) => ({
+        connect: vi.fn(async () => undefined),
+        synthesize: vi.fn(async () => {
+          opts.onAudioChunk(Buffer.alloc(32_000), 16000);
+        }),
+        close: vi.fn(),
+      }));
+      const completed = vi.fn();
+
+      void (agent as any).speakImplInner("要等音频播完").then(completed);
+      await vi.advanceTimersByTimeAsync(999);
+      expect(completed).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(completed).toHaveBeenCalledWith(true);
+      expect(waitForPlayout).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("emits cumulative speech progress from raw TTS alignment", async () => {
+    vi.useFakeTimers();
+    try {
+      const agent = new VoiceAgentService("game_1", config);
+      const onProgress = vi.fn();
+      const completed = vi.fn();
+      (agent as any).connect = vi.fn(async () => {
+        (agent as any).connected = true;
+      });
+      (agent as any).audioSource = {
+        captureFrame: vi.fn(async () => undefined),
+        waitForPlayout: vi.fn(async () => undefined),
+        queuedDuration: 0,
+      };
+      (agent as any).createTtsClient = vi.fn((opts) => ({
+        connect: vi.fn(async () => undefined),
+        synthesize: vi.fn(async () => {
+          opts.onAlignment({
+            alignment: {
+              chars: ["你", "好", "，", "世", "界", "。"],
+              charStartTimesMs: [0, 100, 200, 400, 500, 600],
+              charDurationsMs: [50, 50, 50, 50, 50, 50],
+            },
+          });
+          opts.onAudioChunk(Buffer.alloc(32_000), 16000);
+        }),
+        close: vi.fn(),
+      }));
+
+      void (agent as any)
+        .speakImplInner("你好，世界。", "player_1", 1, onProgress)
+        .then(completed);
+      await vi.advanceTimersByTimeAsync(249);
+      expect(onProgress).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(onProgress).toHaveBeenLastCalledWith("你好，");
+
+      await vi.advanceTimersByTimeAsync(400);
+      expect(onProgress).toHaveBeenLastCalledWith("你好，世界。");
+
+      await vi.advanceTimersByTimeAsync(350);
+      expect(completed).toHaveBeenCalledWith(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

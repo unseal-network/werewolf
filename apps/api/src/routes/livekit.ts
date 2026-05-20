@@ -70,7 +70,6 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         canPublish: false,
       });
 
-      // Ensure the LiveKit room exists before the client tries to connect.
       try {
         await livekitMeeting.ensureRoom(gameRoomId);
       } catch (err) {

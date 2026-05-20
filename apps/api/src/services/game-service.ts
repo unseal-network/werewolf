@@ -25,6 +25,7 @@ import type {
   LivekitMeetingController,
   LivekitMeetingRoomState,
 } from "./livekit-meeting-controller";
+import { runGamePhaseFlow } from "./game-phase-flow";
 
 export interface StoredPlayer {
   id: string;
@@ -1276,288 +1277,347 @@ export class InMemoryGameService {
       return this.tickResult(room, before);
     }
 
-    if (room.projection.phase === "night_guard") {
-      const guard = this.findRolePlayer(room, "guard");
-      if (guard) {
-        const player = this.requirePlayer(room, guard.playerId);
-        if (player.kind === "user") {
-          const pending = this.findNightActionForCurrentPhase(room, guard.playerId);
-          if (!pending) {
-            if (!this.deadlinePassed(room, now)) {
-              return this.tickResult(room, before);
-            }
-            this.recordNightAction(room, {
-              actorPlayerId: guard.playerId,
-              kind: "passAction",
-            });
-          }
-        } else {
-          await this.runNightAgentAction(
-            room,
-            guard.playerId,
-            runAgentTurn,
-            now,
-            ""
-          );
-        }
-      } else if (!this.advanceAfterAbsentNightActor(room, "night_wolf", now)) {
-        return this.tickResult(room, before);
-      }
-      await this.startPhaseAfterAnnouncement(room, "night_wolf", now);
-    } else if (room.projection.phase === "night_wolf") {
-      const wolves = room.privateStates
-        .filter((state) => state.role === "werewolf" && state.alive)
-        .map((state) => state.playerId);
+    const phaseResult = await this.advanceCurrentPhase(
+      room,
+      runAgentTurn,
+      now,
+      before
+    );
+    return phaseResult ?? this.tickResult(room, before);
+  }
 
-      // Check if any human wolf hasn't acted yet; if so, wait like other night phases
-      const pendingHumanWolves = wolves.filter((id) => {
-        const player = room.players.find((p) => p.id === id);
-        if (player?.kind !== "user") return false;
-        const acted = this.hasNightActionForCurrentPhase(room, id, [
-          "wolfKill",
-          "passAction",
-        ]);
-        return !acted;
-      });
-      if (pendingHumanWolves.length > 0) {
-        if (!this.deadlinePassed(room, now)) {
-          // Publish discussion window event once
-          const hasWindowEvent = room.events.some(
-            (e) =>
-              e.type === "speech_submitted" &&
-              e.visibility === "private:team:wolf" &&
-              e.actorId === "runtime" &&
-              String(e.payload?.speech) === "Wolf team discussion window opened." &&
-              Number(e.payload?.day) === room.projection?.day
-          );
-          if (!hasWindowEvent) {
-            const window = {
-              gameRoomId: room.id,
-              day: room.projection.day,
-              phase: "night_wolf",
-              visibility: "private:team:wolf",
-              allowedSpeakerPlayerIds: wolves,
-              openedAt: now.toISOString(),
-            };
-            this.assignAndAppendEvents(room, [
-              {
-                id: "pending",
-                gameRoomId: room.id,
-                seq: 1,
-                type: "speech_submitted",
-                visibility: "private:team:wolf",
-                actorId: "runtime",
-                payload: {
-                  day: room.projection.day,
-                  speech: "Wolf team discussion window opened.",
-                  window,
-                },
-                createdAt: now.toISOString(),
-              },
-            ]);
-            this.syncLivekitWolfDiscussion(
-              room,
-              wolves,
-              "nightWolfDiscussionWindow"
-            );
+  private advanceCurrentPhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    if (!room.projection) {
+      return Promise.resolve(undefined);
+    }
+    return runGamePhaseFlow(room.projection.phase, {
+      night_guard: () => this.advanceNightGuardPhase(room, runAgentTurn, now, before),
+      night_wolf: () => this.advanceNightWolfPhase(room, runAgentTurn, now, before),
+      night_witch_heal: () =>
+        this.advanceWitchPhase(
+          room,
+          runAgentTurn,
+          now,
+          before,
+          "night_witch_poison",
+          "Use passAction unless you are certain healing changes the outcome. You must respond by calling one tool."
+        ),
+      night_witch_poison: () =>
+        this.advanceWitchPhase(
+          room,
+          runAgentTurn,
+          now,
+          before,
+          "night_seer",
+          "Use passAction for poison tonight. You must respond by calling one tool."
+        ),
+      night_seer: () => this.advanceSeerPhase(room, runAgentTurn, now, before),
+      night_resolution: () => this.advanceNightResolutionPhase(room, now, before),
+      day_speak: () => this.advanceSpeechPhase(room, runAgentTurn, now),
+      tie_speech: () => this.advanceSpeechPhase(room, runAgentTurn, now),
+      day_vote: () => this.advanceVotePhase(room, runAgentTurn, now, before),
+      tie_vote: () => this.advanceVotePhase(room, runAgentTurn, now, before),
+      day_resolution: () => this.advanceDayResolutionPhase(room, now, before),
+    });
+  }
+
+  private async advanceNightGuardPhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    const guard = this.findRolePlayer(room, "guard");
+    if (guard) {
+      const player = this.requirePlayer(room, guard.playerId);
+      if (player.kind === "user") {
+        const pending = this.findNightActionForCurrentPhase(room, guard.playerId);
+        if (!pending) {
+          if (!this.deadlinePassed(room, now)) {
+            return this.tickResult(room, before);
           }
-          return this.tickResult(room, before);
-        }
-        // Deadline passed — auto-pass pending human wolves
-        for (const id of pendingHumanWolves) {
           this.recordNightAction(room, {
-            actorPlayerId: id,
+            actorPlayerId: guard.playerId,
             kind: "passAction",
           });
         }
+      } else {
+        await this.runNightAgentAction(room, guard.playerId, runAgentTurn, now, "");
       }
+    } else if (!this.advanceAfterAbsentNightActor(room, "night_wolf", now)) {
+      return this.tickResult(room, before);
+    }
+    await this.startPhaseAfterAnnouncement(room, "night_wolf", now);
+    return undefined;
+  }
 
-      await this.runWolfDiscussion(room, wolves, runAgentTurn, now);
-      await this.runWolfKillVote(room, wolves, runAgentTurn, now);
-      this.revealWolfKillToWitch(room, now);
-      await this.startPhaseAfterAnnouncement(room, "night_witch_heal", now);
-    } else if (room.projection.phase === "night_witch_heal") {
-      const witch = this.findRolePlayer(room, "witch");
-      if (witch) {
-        const player = this.requirePlayer(room, witch.playerId);
-        if (player.kind === "user") {
-          const pending = this.findNightActionForCurrentPhase(room, witch.playerId);
-          if (!pending) {
-            if (!this.deadlinePassed(room, now)) {
-              return this.tickResult(room, before);
-            }
-            this.recordNightAction(room, {
-              actorPlayerId: witch.playerId,
-              kind: "passAction",
-            });
-          }
-        } else {
-          await this.runNightAgentAction(
-            room,
-            witch.playerId,
-            runAgentTurn,
-            now,
-            "Use passAction unless you are certain healing changes the outcome. You must respond by calling one tool."
-          );
-        }
-      } else if (
-        !this.advanceAfterAbsentNightActor(room, "night_witch_poison", now)
-      ) {
-        return this.tickResult(room, before);
-      }
-      await this.startPhaseAfterAnnouncement(room, "night_witch_poison", now);
-    } else if (room.projection.phase === "night_witch_poison") {
-      const witch = this.findRolePlayer(room, "witch");
-      if (witch) {
-        const player = this.requirePlayer(room, witch.playerId);
-        if (player.kind === "user") {
-          const pending = this.findNightActionForCurrentPhase(room, witch.playerId);
-          if (!pending) {
-            if (!this.deadlinePassed(room, now)) {
-              return this.tickResult(room, before);
-            }
-            this.recordNightAction(room, {
-              actorPlayerId: witch.playerId,
-              kind: "passAction",
-            });
-          }
-        } else {
-          await this.runNightAgentAction(
-            room,
-            witch.playerId,
-            runAgentTurn,
-            now,
-            "Use passAction for poison tonight. You must respond by calling one tool."
-          );
-        }
-      } else if (!this.advanceAfterAbsentNightActor(room, "night_seer", now)) {
-        return this.tickResult(room, before);
-      }
-      await this.startPhaseAfterAnnouncement(room, "night_seer", now);
-    } else if (room.projection.phase === "night_seer") {
-      const seer = this.findRolePlayer(room, "seer");
-      if (seer) {
-        const player = this.requirePlayer(room, seer.playerId);
-        if (player.kind === "user") {
-          const pending = this.findNightActionForCurrentPhase(room, seer.playerId);
-          if (!pending) {
-            if (!this.deadlinePassed(room, now)) {
-              return this.tickResult(room, before);
-            }
-            this.recordNightAction(room, {
-              actorPlayerId: seer.playerId,
-              kind: "passAction",
-            });
-          }
-        } else {
-          await this.runNightAgentAction(
-            room,
-            seer.playerId,
-            runAgentTurn,
-            now,
-            ""
-          );
-        }
-      } else if (
-        !this.advanceAfterAbsentNightActor(room, "night_resolution", now)
-      ) {
-        return this.tickResult(room, before);
-      }
-      await this.startPhaseAfterAnnouncement(room, "night_resolution", now);
-    } else if (room.projection.phase === "night_resolution") {
-      const resolved = resolveNight({
-        gameRoomId: room.id,
-        day: room.projection.day,
-        alivePlayerIds: room.projection.alivePlayerIds,
-        privateStates: room.privateStates,
-        actions: room.pendingNightActions,
-        now,
-      });
-      this.assignAndAppendEvents(room, resolved.events);
-      this.markEliminated(room, resolved.eliminatedPlayerIds);
+  private async advanceNightWolfPhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    const wolves = room.privateStates
+      .filter((state) => state.role === "werewolf" && state.alive)
+      .map((state) => state.playerId);
 
-      room.pendingNightActions = [];
-      const winner = determineWinner(room.privateStates);
-      if (winner) {
-        await this.playGmAnnouncement(room, { kind: "game_over", winner });
-        this.endGame(room, gameRoomId, winner, room.projection.day, now);
+    const pendingHumanWolves = wolves.filter((id) => {
+      const player = room.players.find((p) => p.id === id);
+      if (player?.kind !== "user") return false;
+      const acted = this.hasNightActionForCurrentPhase(room, id, [
+        "wolfKill",
+        "passAction",
+      ]);
+      return !acted;
+    });
+    if (pendingHumanWolves.length > 0) {
+      if (!this.deadlinePassed(room, now)) {
+        this.emitWolfDiscussionWindow(room, wolves, now);
         return this.tickResult(room, before);
       }
-      await this.startPhaseAfterAnnouncement(room, "day_speak", now, {
-        nightDeathPlayerIds: resolved.eliminatedPlayerIds,
-      });
-      this.beginSpeechQueue(
-        room,
-        room.players
-          .filter((player) => room.projection?.alivePlayerIds.includes(player.id))
-          .sort((left, right) => left.seatNo - right.seatNo)
-          .map((player) => player.id),
-        "runtime",
-        new Date()
-      );
-    } else if (
-      room.projection.phase === "day_speak" ||
-      room.projection.phase === "tie_speech"
-    ) {
-      await this.runCurrentSpeaker(room, runAgentTurn, now);
-      if (!room.projection.currentSpeakerPlayerId) {
-        await this.startPhaseAfterAnnouncement(
-          room,
-          room.projection.phase === "tie_speech" ? "tie_vote" : "day_vote",
-          now
-        );
-      }
-    } else if (
-      room.projection.phase === "day_vote" ||
-      room.projection.phase === "tie_vote"
-    ) {
-      const tiedOnly =
-        room.projection.phase === "tie_vote" ? room.tiePlayerIds : undefined;
-      const voteResult = await this.runAgentVotes(
-        room,
-        runAgentTurn,
-        now,
-        tiedOnly
-      );
-      if (voteResult === null) {
-        return this.tickResult(room, before);
-      }
-      const resolved = resolveDayVote({
-        gameRoomId: room.id,
-        day: room.projection.day,
-        alivePlayerIds: room.projection.alivePlayerIds,
-        ...(tiedOnly ? { allowedTargetPlayerIds: tiedOnly } : {}),
-        votes: voteResult,
-        now,
-      });
-      this.assignAndAppendEvents(room, resolved.events);
-      room.pendingVotes = [];
-      if (resolved.exiledPlayerId) {
-        this.markEliminated(room, [resolved.exiledPlayerId]);
-        await this.playGmAnnouncement(room, {
-          kind: "vote_result",
-          exiledPlayerId: resolved.exiledPlayerId,
+      for (const id of pendingHumanWolves) {
+        this.recordNightAction(room, {
+          actorPlayerId: id,
+          kind: "passAction",
         });
-        this.startPhase(room, "day_resolution", now);
-      } else if (resolved.tiedPlayerIds.length > 0) {
-        room.tiePlayerIds = resolved.tiedPlayerIds;
-        await this.startPhaseAfterAnnouncement(room, "tie_speech", now);
-        this.beginSpeechQueue(room, resolved.speechQueue, "runtime", new Date());
-      } else {
-        this.startPhase(room, "day_resolution", now);
-      }
-    } else if (room.projection.phase === "day_resolution") {
-      const winner = determineWinner(room.privateStates);
-      if (winner) {
-        await this.playGmAnnouncement(room, { kind: "game_over", winner });
-        this.endGame(room, gameRoomId, winner, room.projection.day, now);
-      } else {
-        room.projection.day += 1;
-        await this.startPhaseAfterAnnouncement(room, "night_guard", now);
       }
     }
 
-    return this.tickResult(room, before);
+    await this.runWolfDiscussion(room, wolves, runAgentTurn, now);
+    await this.runWolfKillVote(room, wolves, runAgentTurn, now);
+    this.revealWolfKillToWitch(room, now);
+    await this.startPhaseAfterAnnouncement(room, "night_witch_heal", now);
+    return undefined;
+  }
+
+  private emitWolfDiscussionWindow(
+    room: StoredGameRoom,
+    wolves: string[],
+    now: Date
+  ): void {
+    if (!room.projection) return;
+    const hasWindowEvent = room.events.some(
+      (event) =>
+        event.type === "speech_submitted" &&
+        event.visibility === "private:team:wolf" &&
+        event.actorId === "runtime" &&
+        String(event.payload?.speech) === "Wolf team discussion window opened." &&
+        Number(event.payload?.day) === room.projection?.day
+    );
+    if (hasWindowEvent) return;
+    const window = {
+      gameRoomId: room.id,
+      day: room.projection.day,
+      phase: "night_wolf",
+      visibility: "private:team:wolf",
+      allowedSpeakerPlayerIds: wolves,
+      openedAt: now.toISOString(),
+    };
+    this.assignAndAppendEvents(room, [
+      {
+        id: "pending",
+        gameRoomId: room.id,
+        seq: 1,
+        type: "speech_submitted",
+        visibility: "private:team:wolf",
+        actorId: "runtime",
+        payload: {
+          day: room.projection.day,
+          speech: "Wolf team discussion window opened.",
+          window,
+        },
+        createdAt: now.toISOString(),
+      },
+    ]);
+    this.syncLivekitWolfDiscussion(
+      room,
+      wolves,
+      "nightWolfDiscussionWindow"
+    );
+  }
+
+  private async advanceWitchPhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date,
+    before: number,
+    nextPhase: GamePhase,
+    agentInstruction: string
+  ): Promise<RuntimeTickResult | undefined> {
+    const witch = this.findRolePlayer(room, "witch");
+    if (witch) {
+      const player = this.requirePlayer(room, witch.playerId);
+      if (player.kind === "user") {
+        const pending = this.findNightActionForCurrentPhase(room, witch.playerId);
+        if (!pending) {
+          if (!this.deadlinePassed(room, now)) {
+            return this.tickResult(room, before);
+          }
+          this.recordNightAction(room, {
+            actorPlayerId: witch.playerId,
+            kind: "passAction",
+          });
+        }
+      } else {
+        await this.runNightAgentAction(
+          room,
+          witch.playerId,
+          runAgentTurn,
+          now,
+          agentInstruction
+        );
+      }
+    } else if (!this.advanceAfterAbsentNightActor(room, nextPhase, now)) {
+      return this.tickResult(room, before);
+    }
+    await this.startPhaseAfterAnnouncement(room, nextPhase, now);
+    return undefined;
+  }
+
+  private async advanceSeerPhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    const seer = this.findRolePlayer(room, "seer");
+    if (seer) {
+      const player = this.requirePlayer(room, seer.playerId);
+      if (player.kind === "user") {
+        const pending = this.findNightActionForCurrentPhase(room, seer.playerId);
+        if (!pending) {
+          if (!this.deadlinePassed(room, now)) {
+            return this.tickResult(room, before);
+          }
+          this.recordNightAction(room, {
+            actorPlayerId: seer.playerId,
+            kind: "passAction",
+          });
+        }
+      } else {
+        await this.runNightAgentAction(room, seer.playerId, runAgentTurn, now, "");
+      }
+    } else if (!this.advanceAfterAbsentNightActor(room, "night_resolution", now)) {
+      return this.tickResult(room, before);
+    }
+    await this.startPhaseAfterAnnouncement(room, "night_resolution", now);
+    return undefined;
+  }
+
+  private async advanceNightResolutionPhase(
+    room: StoredGameRoom,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    if (!room.projection) return undefined;
+    const resolved = resolveNight({
+      gameRoomId: room.id,
+      day: room.projection.day,
+      alivePlayerIds: room.projection.alivePlayerIds,
+      privateStates: room.privateStates,
+      actions: room.pendingNightActions,
+      now,
+    });
+    this.assignAndAppendEvents(room, resolved.events);
+    this.markEliminated(room, resolved.eliminatedPlayerIds);
+
+    room.pendingNightActions = [];
+    const winner = determineWinner(room.privateStates);
+    if (winner) {
+      await this.playGmAnnouncement(room, { kind: "game_over", winner });
+      this.endGame(room, room.id, winner, room.projection.day, now);
+      return this.tickResult(room, before);
+    }
+    await this.startPhaseAfterAnnouncement(room, "day_speak", now, {
+      nightDeathPlayerIds: resolved.eliminatedPlayerIds,
+    });
+    this.beginSpeechQueue(
+      room,
+      room.players
+        .filter((player) => room.projection?.alivePlayerIds.includes(player.id))
+        .sort((left, right) => left.seatNo - right.seatNo)
+        .map((player) => player.id),
+      "runtime",
+      new Date()
+    );
+    return undefined;
+  }
+
+  private async advanceSpeechPhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date
+  ): Promise<RuntimeTickResult | undefined> {
+    await this.runCurrentSpeaker(room, runAgentTurn, now);
+    if (!room.projection?.currentSpeakerPlayerId) {
+      await this.startPhaseAfterAnnouncement(
+        room,
+        room.projection?.phase === "tie_speech" ? "tie_vote" : "day_vote",
+        now
+      );
+    }
+    return undefined;
+  }
+
+  private async advanceVotePhase(
+    room: StoredGameRoom,
+    runAgentTurn: (input: RuntimeAgentTurnInput) => Promise<RuntimeAgentTurnOutput>,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    if (!room.projection) return undefined;
+    const tiedOnly = room.projection.phase === "tie_vote" ? room.tiePlayerIds : undefined;
+    const voteResult = await this.runAgentVotes(room, runAgentTurn, now, tiedOnly);
+    if (voteResult === null) {
+      return this.tickResult(room, before);
+    }
+    const resolved = resolveDayVote({
+      gameRoomId: room.id,
+      day: room.projection.day,
+      alivePlayerIds: room.projection.alivePlayerIds,
+      ...(tiedOnly ? { allowedTargetPlayerIds: tiedOnly } : {}),
+      votes: voteResult,
+      now,
+    });
+    this.assignAndAppendEvents(room, resolved.events);
+    room.pendingVotes = [];
+    if (resolved.exiledPlayerId) {
+      this.markEliminated(room, [resolved.exiledPlayerId]);
+      await this.playGmAnnouncement(room, {
+        kind: "vote_result",
+        exiledPlayerId: resolved.exiledPlayerId,
+      });
+      this.startPhase(room, "day_resolution", now);
+    } else if (resolved.tiedPlayerIds.length > 0) {
+      room.tiePlayerIds = resolved.tiedPlayerIds;
+      await this.startPhaseAfterAnnouncement(room, "tie_speech", now);
+      this.beginSpeechQueue(room, resolved.speechQueue, "runtime", new Date());
+    } else {
+      this.startPhase(room, "day_resolution", now);
+    }
+    return undefined;
+  }
+
+  private async advanceDayResolutionPhase(
+    room: StoredGameRoom,
+    now: Date,
+    before: number
+  ): Promise<RuntimeTickResult | undefined> {
+    if (!room.projection) return undefined;
+    const winner = determineWinner(room.privateStates);
+    if (winner) {
+      await this.playGmAnnouncement(room, { kind: "game_over", winner });
+      this.endGame(room, room.id, winner, room.projection.day, now);
+      return this.tickResult(room, before);
+    }
+    room.projection.day += 1;
+    await this.startPhaseAfterAnnouncement(room, "night_guard", now);
+    return undefined;
   }
 
   recordSpeechTranscript(
@@ -2253,10 +2313,18 @@ export class InMemoryGameService {
   ): void {
     if (!room.projection) throw new Error("projection is required");
     const tally: Record<string, number> = {};
-    for (const vote of votes) {
+    const firstVoteOrder = new Map<string, number>();
+    for (const [index, vote] of votes.entries()) {
       tally[vote.targetPlayerId] = (tally[vote.targetPlayerId] ?? 0) + 1;
+      if (!firstVoteOrder.has(vote.targetPlayerId)) {
+        firstVoteOrder.set(vote.targetPlayerId, index);
+      }
     }
-    const sorted = Object.entries(tally).sort((left, right) => right[1] - left[1]);
+    const sorted = Object.entries(tally).sort(
+      (left, right) =>
+        right[1] - left[1] ||
+        (firstVoteOrder.get(left[0]) ?? 0) - (firstVoteOrder.get(right[0]) ?? 0)
+    );
     const top = sorted[0];
     const second = sorted[1];
     const tiedPlayerIds =
@@ -2264,9 +2332,8 @@ export class InMemoryGameService {
         ? sorted
             .filter((entry) => entry[1] === top[1])
             .map(([playerId]) => playerId)
-            .sort()
         : [];
-    const targetPlayerId = top && tiedPlayerIds.length === 0 ? top[0] : null;
+    const targetPlayerId = top ? top[0] : null;
     this.assignAndAppendEvents(room, [
       {
         id: "pending",

@@ -327,6 +327,19 @@ describe("games API", () => {
     expect(source).not.toContain("const ensuredLivekitRooms = new Set<string>()");
   });
 
+  it("keeps LiveKit room creation cached instead of creating the room for every token", () => {
+    const livekitRoute = readFileSync(
+      resolve(process.cwd(), "apps/api/src/routes/livekit.ts"),
+      "utf8"
+    );
+
+    expect(livekitRoute).toContain("const ensuredLivekitRooms = new Set<string>()");
+    expect(livekitRoute).toContain("const ensuringLivekitRooms = new Map<string, Promise<void>>()");
+    expect(livekitRoute).toContain("async function ensureLivekitRoom");
+    expect(livekitRoute).toContain("if (ensuredLivekitRooms.has(gameRoomId)) return");
+    expect(livekitRoute).toContain("await ensureLivekitRoom(gameRoomId)");
+  });
+
   it("downloads a visible transcript event by id", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);

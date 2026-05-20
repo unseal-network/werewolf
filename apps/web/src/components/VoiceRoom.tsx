@@ -91,19 +91,31 @@ export function VoiceRoomProvider({
   const [state, setState] = useState<VoiceConnectionState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isMicrophoneEnabled, setIsMicrophoneEnabled] = useState(false);
+  const [reconnectNonce, setReconnectNonce] = useState(0);
   const audioContainerRef = useRef<HTMLDivElement | null>(null);
   const audioUnlockCleanupRef = useRef<(() => void) | null>(null);
   const retryAttemptRef = useRef(0);
   const retryTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!serverUrl || !token) {
-      audioUnlockCleanupRef.current?.();
-      audioUnlockCleanupRef.current = null;
+    const clearRetryTimer = () => {
       if (retryTimerRef.current !== null) {
         window.clearTimeout(retryTimerRef.current);
         retryTimerRef.current = null;
       }
+    };
+
+    const clearRemoteAudioElements = () => {
+      const host = audioContainerRef.current;
+      if (!host) return;
+      while (host.firstChild) host.removeChild(host.firstChild);
+    };
+
+    if (!serverUrl || !token) {
+      audioUnlockCleanupRef.current?.();
+      audioUnlockCleanupRef.current = null;
+      clearRetryTimer();
+      clearRemoteAudioElements();
       retryAttemptRef.current = 0;
       setRoom((current) => {
         if (current) {
@@ -151,6 +163,28 @@ export function VoiceRoomProvider({
         console.warn("[VoiceRoom] startAudio blocked; waiting for user gesture");
         ensureAudioUnlocked();
       });
+    };
+
+    const scheduleRoomReconnect = (reason: string) => {
+      if (cancelled || retryTimerRef.current !== null) return;
+      const attempt = retryAttemptRef.current;
+      const delayMs =
+        VOICE_RECONNECT_DELAYS_MS[attempt] ??
+        VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
+      retryAttemptRef.current = attempt + 1;
+      console.warn("[VoiceRoom] scheduling reconnect", {
+        reason,
+        attempt,
+        retryInMs: delayMs,
+      });
+      setState("reconnecting");
+      setErrorMessage(null);
+      retryTimerRef.current = window.setTimeout(() => {
+        retryTimerRef.current = null;
+        if (!cancelled) {
+          setReconnectNonce((value) => value + 1);
+        }
+      }, delayMs);
     };
 
     const attachAudio = (
@@ -242,9 +276,10 @@ export function VoiceRoomProvider({
       .on(RoomEvent.Disconnected, () => {
         if (cancelled) return;
         console.warn("[VoiceRoom] disconnected");
-        setState("disconnected");
         setIsMicrophoneEnabled(false);
         clearUnlockListener();
+        clearRemoteAudioElements();
+        scheduleRoomReconnect("room disconnected");
       })
       .on(RoomEvent.LocalTrackPublished, updateMicState)
       .on(RoomEvent.LocalTrackUnpublished, updateMicState)
@@ -269,6 +304,7 @@ export function VoiceRoomProvider({
         console.info("[VoiceRoom] connected", {
           remoteParticipantCount: lkRoom.remoteParticipants.size,
         });
+        retryAttemptRef.current = 0;
         await lkRoom.localParticipant.setMicrophoneEnabled(false);
         setRoom(lkRoom);
         for (const participant of lkRoom.remoteParticipants.values()) {
@@ -285,85 +321,24 @@ export function VoiceRoomProvider({
         if (cancelled) return;
         const attempt = retryAttemptRef.current;
         const delayMs = VOICE_RECONNECT_DELAYS_MS[attempt] ?? VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
-        const hasMoreRetries = attempt < VOICE_RECONNECT_DELAYS_MS.length;
         console.error("[VoiceRoom] connect failed", {
           err,
           attempt,
-          willRetry: hasMoreRetries,
-          retryInMs: hasMoreRetries ? delayMs : null,
+          willRetry: true,
+          retryInMs: delayMs,
         });
-        if (hasMoreRetries) {
-          setState("reconnecting");
-          setErrorMessage(null);
-          retryAttemptRef.current += 1;
-          retryTimerRef.current = window.setTimeout(() => {
-            retryTimerRef.current = null;
-            if (!cancelled) {
-              // Trigger re-run of this effect by bumping a counter isn't
-              // possible without state; instead we re-invoke connect directly
-              // on a fresh room — effect deps (serverUrl/token) haven't changed.
-              setState("connecting");
-              void lkRoom
-                .connect(serverUrl, token, { autoSubscribe: false })
-                .then(async () => {
-                  if (cancelled) {
-                    void lkRoom.disconnect().catch(() => {});
-                    return;
-                  }
-                  retryAttemptRef.current = 0;
-                  console.info("[VoiceRoom] reconnect succeeded", { attempt: retryAttemptRef.current });
-                  await lkRoom.localParticipant.setMicrophoneEnabled(false);
-                  setRoom(lkRoom);
-                  for (const participant of lkRoom.remoteParticipants.values()) {
-                    for (const publication of participant.trackPublications.values()) {
-                      if (publication.track && publication.isSubscribed) {
-                        attachAudio(publication.track, publication, participant);
-                      }
-                    }
-                  }
-                  updateMicState();
-                  eagerStartAudio();
-                })
-                .catch((retryErr: unknown) => {
-                  if (cancelled) return;
-                  const nextAttempt = retryAttemptRef.current;
-                  const nextDelay = VOICE_RECONNECT_DELAYS_MS[nextAttempt] ?? VOICE_RECONNECT_DELAYS_MS[VOICE_RECONNECT_DELAYS_MS.length - 1]!;
-                  const hasNext = nextAttempt < VOICE_RECONNECT_DELAYS_MS.length;
-                  console.error("[VoiceRoom] retry failed", { retryErr, nextAttempt, hasNext });
-                  if (hasNext) {
-                    setState("reconnecting");
-                    retryAttemptRef.current += 1;
-                    // Keep retries bounded; the join token is intentionally
-                    // stable for this game/user and is not refreshed here.
-                  }
-                  setState("error");
-                  setErrorMessage(retryErr instanceof Error ? retryErr.message : String(retryErr));
-                });
-            }
-          }, delayMs);
-        } else {
-          setState("error");
-          setErrorMessage(err instanceof Error ? err.message : String(err));
-        }
+        scheduleRoomReconnect("connect failed");
       });
 
     return () => {
       cancelled = true;
-      if (retryTimerRef.current !== null) {
-        window.clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = null;
-      }
-      retryAttemptRef.current = 0;
-      // Detach lingering audio elements before tearing down the room.
-      const host = audioContainerRef.current;
-      if (host) {
-        while (host.firstChild) host.removeChild(host.firstChild);
-      }
+      clearRetryTimer();
+      clearRemoteAudioElements();
       clearUnlockListener();
       void lkRoom.disconnect().catch(() => {});
       setRoom((current) => (current === lkRoom ? null : current));
     };
-  }, [serverUrl, token]);
+  }, [serverUrl, token, reconnectNonce]);
 
   const enableMicrophone = useCallback(async () => {
     if (!room) {

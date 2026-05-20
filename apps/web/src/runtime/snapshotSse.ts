@@ -196,6 +196,20 @@ export interface UseSnapshotSseOptions {
   reconnectDelayMs?: number;
 }
 
+const maxSseReconnectDelayMs = 30000;
+
+export function computeSseReconnectDelayMs(
+  attempt: number,
+  initialDelayMs: number
+): number {
+  const normalizedAttempt = Math.max(0, attempt);
+  const normalizedInitialDelay = Math.max(250, initialDelayMs);
+  return Math.min(
+    maxSseReconnectDelayMs,
+    normalizedInitialDelay * 2 ** normalizedAttempt
+  );
+}
+
 export function useSnapshotSse({
   subscribeUrl,
   onSnapshot,
@@ -205,6 +219,7 @@ export function useSnapshotSse({
 }: UseSnapshotSseOptions) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
   const onSnapshotRef = useRef(onSnapshot);
   const onEventRef = useRef(onEvent);
   const onMessageRef = useRef(onMessage);
@@ -226,7 +241,11 @@ export function useSnapshotSse({
   const connect = useCallback(() => {
     close();
     const source = new EventSource(subscribeUrl);
+    source.onopen = () => {
+      reconnectAttemptRef.current = 0;
+    };
     source.onmessage = (event) => {
+      reconnectAttemptRef.current = 0;
       // un.log('[onmessage]', event.data)
       const parsed = parseSubscribeMessage(event.data);
       if (!parsed) return;
@@ -240,12 +259,18 @@ export function useSnapshotSse({
     source.onerror = () => {
       source.close();
       eventSourceRef.current = null;
-      reconnectTimerRef.current = window.setTimeout(connect, reconnectDelayMs);
+      const delayMs = computeSseReconnectDelayMs(
+        reconnectAttemptRef.current,
+        reconnectDelayMs
+      );
+      reconnectAttemptRef.current += 1;
+      reconnectTimerRef.current = window.setTimeout(connect, delayMs);
     };
     eventSourceRef.current = source;
   }, [close, reconnectDelayMs, subscribeUrl]);
 
   useEffect(() => {
+    reconnectAttemptRef.current = 0;
     connect();
     return close;
   }, [close, connect]);
