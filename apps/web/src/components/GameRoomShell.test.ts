@@ -462,7 +462,7 @@ describe("game room seat layout", () => {
     );
 
     expect(route).toContain(
-      "const credentialKey = `${gameRoomId}:${matrixUserId}`"
+      "const credentialKey = `${gameRoomId}:${matrixUserId}:publish-token-v2`"
     );
     expect(route).toContain(
       "if (livekitCredentialKeyRef.current === credentialKey)"

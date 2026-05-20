@@ -47,6 +47,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       const player = room.players.find(
         (p) => p.userId === user.id && !p.leftAt
       );
+      const isPlayer = Boolean(player);
       const identity = user.id;
 
       const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
@@ -57,9 +58,9 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
       at.addGrant({
         room: gameRoomId,
         roomJoin: true,
-        canPublish: false,
+        canPublish: isPlayer,
         canSubscribe: true,
-        canPublishData: false,
+        canPublishData: isPlayer,
       });
 
       const token = await at.toJwt();
@@ -67,7 +68,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         gameRoomId,
         userId: user.id,
         identity,
-        canPublish: false,
+        canPublish: isPlayer,
       });
 
       try {
@@ -81,7 +82,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
         serverUrl: LIVEKIT_URL,
         room: gameRoomId,
         identity,
-        canPublish: false,
+        canPublish: isPlayer,
         canSubscribe: true,
       });
     } catch (error) {

@@ -312,7 +312,7 @@ describe("games API", () => {
     const body = await response.json();
     expect(body.identity).toBe("@alice:example.com");
     expect(body.identity).not.toBe(player.id);
-    expect(body.canPublish).toBe(false);
+    expect(body.canPublish).toBe(true);
     expect(body.canSubscribe).toBe(true);
   });
 

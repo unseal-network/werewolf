@@ -460,7 +460,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       setLivekitServerUrl(null);
       return;
     }
-    const credentialKey = `${gameRoomId}:${matrixUserId}`;
+    const credentialKey = `${gameRoomId}:${matrixUserId}:publish-token-v2`;
     if (livekitCredentialKeyRef.current === credentialKey) {
       return;
     }
