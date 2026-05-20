@@ -254,7 +254,7 @@ export class SttWebSocketClient {
       case "committed_transcript":
       case "committed_transcript_with_timestamps": {
         if (text) {
-          this.committedSegments.push(text);
+          this.recordCommittedTranscript(text);
           this.latestPartial = "";
           if (this.opts.onCommittedTranscript) {
             this.opts.onCommittedTranscript(text);
@@ -270,6 +270,24 @@ export class SttWebSocketClient {
       default:
         break;
     }
+  }
+
+  private recordCommittedTranscript(text: string): void {
+    const incoming = text.trim();
+    if (!incoming) return;
+    const existing = this.transcriptText.trim();
+    if (!existing) {
+      this.committedSegments = [incoming];
+      return;
+    }
+    if (incoming === existing || existing.endsWith(incoming)) {
+      return;
+    }
+    if (incoming.startsWith(existing)) {
+      this.committedSegments = [incoming];
+      return;
+    }
+    this.committedSegments.push(incoming);
   }
 
   private handleClose(): void {

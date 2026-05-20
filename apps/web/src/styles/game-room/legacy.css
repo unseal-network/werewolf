@@ -774,6 +774,9 @@ body.logs-open .log-peek {
 .sheet-close {
   width: 38px;
   height: 38px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 1px solid #3a4357;
   border-radius: 999px;
   color: #fff;
@@ -781,6 +784,7 @@ body.logs-open .log-peek {
   cursor: pointer;
   font-size: 18px;
   font-weight: 700;
+  line-height: 1;
 }
 
 .log-grid {
@@ -950,11 +954,15 @@ body.logs-open .log-peek {
 .profile-close {
   width: 34px;
   height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
   cursor: pointer;
   font-size: 16px;
+  line-height: 1;
 }
 
 .game-room-root[data-scene="night"] .profile-close {
@@ -1164,11 +1172,15 @@ body.logs-open .log-peek {
   right: 12px;
   width: 34px;
   height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   border-radius: 999px;
   border: 1px solid rgba(149, 172, 218, 0.18);
   background: rgba(255, 255, 255, 0.04);
   color: #eff6ff;
   font-size: 18px;
+  line-height: 1;
   cursor: pointer;
 }
 

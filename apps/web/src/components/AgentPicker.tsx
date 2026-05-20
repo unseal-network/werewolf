@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useT } from "../i18n/I18nProvider";
 import type { AgentCandidate } from "../api/client";
 import { GameButton } from "./GameButton";
+import { GameIconButton } from "./GameIconButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 interface AgentPickerProps {
@@ -24,7 +25,6 @@ export function AgentPicker({
   loading,
   agents,
   errorMessage,
-  sourceRoomId,
   remainingSeats,
   canStartNow,
   onAdd,
@@ -86,20 +86,14 @@ export function AgentPicker({
         <div className="agent-picker-head">
           <div>
             <div className="agent-picker-title">{t("agentPicker.title")}</div>
-            <div className="agent-picker-sub">
-              {sourceRoomId
-                ? t("agentPicker.empty.help", { room: sourceRoomId })
-                : ""}
-            </div>
           </div>
-          <button
-            type="button"
+          <GameIconButton
             className="profile-close"
             onClick={onClose}
             aria-label={t("user.close")}
-          >
-            ×
-          </button>
+            label="×"
+            size="sm"
+          />
         </div>
 
         {errorMessage ? (
@@ -127,9 +121,7 @@ export function AgentPicker({
                   <div className="agent-name">{agent.displayName}</div>
                   <div className="agent-id">{agent.userId}</div>
                 </div>
-                <GameButton
-                  variant="secondary"
-                  size="sm"
+                <GameIconButton
                   className={`agent-add-button ${agent.alreadyJoined ? "added" : ""}`}
                   disabled={
                     pendingId === agent.userId ||
@@ -145,6 +137,7 @@ export function AgentPicker({
                     : pendingId === agent.userId
                       ? "..."
                       : "+"}
+                  size="lg"
                 />
               </div>
             ))

@@ -40,7 +40,7 @@ export const dictionaries: Record<Locale, Dict> = {
     "create.logout": "切换账号",
 
     "autoCreate.creating": "正在为你创建房间...",
-    "agentPicker.title": "从源 Matrix 房间挑选 AI",
+    "agentPicker.title": "选择 Agent 进入",
     "agentPicker.empty": "源房间里暂无可用 agent。",
     "agentPicker.add": "加入座位",
     "agentPicker.added": "已入座",
@@ -75,6 +75,7 @@ export const dictionaries: Record<Locale, Dict> = {
     "stage.prompt.waiting": "等待阶段推进",
     "stage.startButton": "开始",
     "stage.readyButton": "准备",
+    "stage.exitGame": "退出本局",
     "stage.addAgentButton": "+ 添加 AI",
     "stage.runtimeButton": "推进本回合",
     "stage.fillAi": "补 AI 后开始",
@@ -250,7 +251,7 @@ export const dictionaries: Record<Locale, Dict> = {
     "create.logout": "Switch User",
 
     "autoCreate.creating": "Creating a room for you...",
-    "agentPicker.title": "Pick AI agents from the source Matrix room",
+    "agentPicker.title": "Select an agent to enter",
     "agentPicker.empty": "No agents available in the source room.",
     "agentPicker.add": "Seat",
     "agentPicker.added": "Seated",
@@ -285,6 +286,7 @@ export const dictionaries: Record<Locale, Dict> = {
     "stage.prompt.waiting": "Waiting for next phase",
     "stage.startButton": "Start",
     "stage.readyButton": "Ready",
+    "stage.exitGame": "Exit Game",
     "stage.addAgentButton": "+ Add AI",
     "stage.runtimeButton": "Advance Round",
     "stage.fillAi": "Fill with AI & Start",

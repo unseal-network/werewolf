@@ -96,6 +96,19 @@ describe("game room seat layout", () => {
     expect(responsive).not.toContain("scale(var(--mobile-layout-scale");
   });
 
+  it("reserves vertical space for actions before sizing player rails", () => {
+    const shell = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/GameRoomShell.tsx"),
+      "utf8"
+    );
+
+    expect(shell).toContain("actionReservedHeight");
+    expect(shell).toContain("utilityReservedHeight");
+    expect(shell).toContain("availableRailHeight");
+    expect(shell).toContain("height - hudSafeHeight - actionReservedHeight - utilityReservedHeight");
+    expect(shell).toContain("--layout-rail-action-gap");
+  });
+
   it("keeps rail seat containers from adding glass panels over the scene", () => {
     const css = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/seat-avatar.css"),
@@ -277,12 +290,8 @@ describe("game room seat layout", () => {
       resolve(process.cwd(), "apps/web/src/components/SeerResultDialog.tsx"),
       "utf8"
     );
-    const manifest = readFileSync(
-      resolve(process.cwd(), "apps/web/public/assets/werewolf-ui/final/asset-manifest.json"),
-      "utf8"
-    );
-    const componentMap = readFileSync(
-      resolve(process.cwd(), "apps/web/public/assets/werewolf-ui/final/component-map.json"),
+    const gameButton = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/GameButton.tsx"),
       "utf8"
     );
 
@@ -322,6 +331,13 @@ describe("game room seat layout", () => {
     expect(primitiveCss).toContain("no-repeat");
     expect(primitiveCss).not.toContain("inset: var(--ww-panel-fill-inset)");
     expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).toContain("button/decision/submit-button-9slice.webp");
+    expect(primitiveCss).toContain("button/decision/confirm-button-9slice.webp");
+    expect(primitiveCss).toContain("button/decision/cancel-button-9slice.webp");
+    expect(gameButton).toContain('"ww-game-button"');
+    expect(gameButton).toContain("data-game-button-variant");
+    expect(gameButton).not.toContain("ww-game-button__chrome");
+    expect(gameButton).not.toContain("ww-game-button__content");
     expect(seatAvatar).toContain("seatBadgeId");
     expect(seatAvatar).toContain("seat-hooded-portrait");
     expect(seatAvatar).toContain("hasHoodedAvatar");
@@ -333,11 +349,9 @@ describe("game room seat layout", () => {
     expect(userInfoPanel).toContain("profile-dialog open");
     expect(seerResultDialog).toContain("UiPanelFrame");
     expect(seerResultDialog).toContain("seer-result-dialog open");
-    expect(manifest).toContain('"id": "button/decision/confirm-button-9slice"');
-    expect(componentMap).toContain('"button/decision/confirm-button-9slice"');
   });
 
-  it("keeps mobile action buttons wide and filled instead of hollow", () => {
+  it("keeps action buttons positioned by the room while clearing button visuals", () => {
     const shell = readFileSync(
       resolve(process.cwd(), "apps/web/src/components/GameRoomShell.tsx"),
       "utf8"
@@ -350,30 +364,18 @@ describe("game room seat layout", () => {
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
       "utf8"
     );
-    const buttonCss = primitiveCss.slice(
-      primitiveCss.indexOf(".game-layout-root .ww-game-button {")
-    );
 
     expect(shell).toContain("compact ? 340");
     expect(shell).toContain("compact ? 380");
-    expect(buttonCss).toContain("--ww-button-aspect-ratio");
-    expect(buttonCss).toContain("aspect-ratio: var(--ww-button-aspect-ratio)");
-    expect(buttonCss).toContain("background-image: none");
-    expect(buttonCss).toContain("button/decision/cancel-button-9slice.webp");
-    expect(buttonCss).toContain("button/decision/submit-button-9slice.webp");
-    expect(buttonCss).not.toContain("log-fill.webp");
-    expect(buttonCss).not.toContain("--ww-button-fill");
-    expect(buttonCss).not.toContain("background-size: 100% 100%");
-    expect(buttonCss).not.toContain(".game-layout-root .ww-game-button::before");
-    expect(buttonCss).not.toContain("--ww-button-label-plate-cover");
-    expect(buttonCss).toContain(".game-layout-root .ww-game-button__chrome");
-    expect(buttonCss).toContain("--ww-button-chrome-image: url(\"/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp\")");
-    expect(buttonCss).toContain("border-image-source: var(--ww-button-chrome-image)");
-    expect(buttonCss).not.toContain("border-image-slice: 76 168 fill");
-    expect(buttonCss).not.toContain("border-image-slice: 40 64 fill");
-    expect(buttonCss).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button");
-    expect(buttonCss).toContain("--ww-agent-add-size");
-    expect(buttonCss).toContain("background-image: none");
+    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).not.toContain(".game-layout-root .ww-icon-button");
+    expect(primitiveCss).toContain("button/decision");
+    expect(primitiveCss).toContain("border-image-source: var(--ww-button-skin-image)");
+    expect(actionCss).toContain(".game-layout-root .action-region .stage-start");
+    expect(actionCss).toContain("width: var(--action-primary-button-width) !important");
+    expect(actionCss).toContain("background: none !important");
+    expect(actionCss).toContain("background-image: none !important");
+    expect(actionCss).toContain("box-shadow: none !important");
     expect(actionCss).toContain("calc(100vw - 24px)");
   });
 
@@ -396,7 +398,7 @@ describe("game room seat layout", () => {
     expect(actionCss).toContain("box-shadow: none !important");
     expect(actionCss).toContain("grid-area: action");
     expect(actionCss).not.toContain(".stage-confirm.use-confirm-asset");
-    expect(actionCss).toContain("--ww-button-scale: var(--layout-action-scale, 1)");
+    expect(actionCss).not.toContain("--ww-button-scale");
     expect(actionCss).not.toContain("background-size: 100% 100%");
     expect(voicePanel).not.toContain("autoFocus");
   });
@@ -429,13 +431,99 @@ describe("game room seat layout", () => {
     expect(leaveBody).not.toContain("void stopMicrophone()");
   });
 
-  it("only fetches a LiveKit token after the viewer is seated as a player", () => {
-    const gameRoute = readFileSync(
+  it("does not fetch a new LiveKit token when voice recording starts", () => {
+    const route = readFileSync(
       resolve(process.cwd(), "apps/web/src/routes/game.$gameRoomId.tsx"),
       "utf8"
     );
+    const centerStage = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/CenterStage.tsx"),
+      "utf8"
+    );
+    const voicePanel = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoicePanel.tsx"),
+      "utf8"
+    );
 
-    expect(gameRoute).toContain("if (!room || !matrixUserId || !myPlayerId)");
+    expect(route).not.toContain("requestPublishVoiceToken");
+    expect(route).not.toContain("livekitCanPublish");
+    expect(route).not.toContain("livekitPublishTokenInFlightRef");
+    expect(centerStage).not.toContain("onRequestPublishVoice");
+    expect(centerStage).not.toContain("canPublishVoice");
+    expect(voicePanel).not.toContain("onRequestPublishVoice");
+    expect(voicePanel).not.toContain("canPublishVoice");
+  });
+
+  it("keeps LiveKit credentials stable for the current game and user", () => {
+    const route = readFileSync(
+      resolve(process.cwd(), "apps/web/src/routes/game.$gameRoomId.tsx"),
+      "utf8"
+    );
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(route).toContain(
+      "const credentialKey = `${gameRoomId}:${matrixUserId}:publish-token-v2`"
+    );
+    expect(route).toContain(
+      "if (livekitCredentialKeyRef.current === credentialKey)"
+    );
+    expect(route).toContain("}, [matrixUserId, client, gameRoomId]);");
+    expect(route).not.toContain(
+      "}, [matrixUserId, client, gameRoomId, livekitToken, livekitServerUrl]);"
+    );
+    expect(voiceRoom).not.toContain("token refresh");
+  });
+
+  it("does not auto-subscribe to LiveKit tracks in the browser", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+    expect(voiceRoom).toContain("autoSubscribe: false");
+    expect(voiceRoom).not.toContain("publication.setSubscribed(true)");
+  });
+
+  it("keeps the LiveKit microphone muted by default", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(voiceRoom).toContain(
+      "await lkRoom.localParticipant.setMicrophoneEnabled(false)"
+    );
+  });
+
+  it("does not preflight LiveKit immediately before connecting", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(voiceRoom).not.toContain("prepareConnection(serverUrl, token)");
+    expect(voiceRoom).toContain(".connect(serverUrl, token");
+  });
+
+  it("recreates the LiveKit room after an unexpected client disconnect", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+    const disconnectedHandler = voiceRoom.slice(
+      voiceRoom.indexOf(".on(RoomEvent.Disconnected"),
+      voiceRoom.indexOf(".on(RoomEvent.LocalTrackPublished")
+    );
+
+    expect(voiceRoom).toContain("const [reconnectNonce, setReconnectNonce]");
+    expect(voiceRoom).toContain("scheduleRoomReconnect");
+    expect(voiceRoom).toContain("setReconnectNonce((value) => value + 1)");
+    expect(voiceRoom).toContain("}, [serverUrl, token, reconnectNonce])");
+    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\")");
+    expect(disconnectedHandler).toContain("clearRemoteAudioElements()");
+    expect(disconnectedHandler).toContain("scheduleRoomReconnect(\"room disconnected\")");
   });
 
   it("keeps the closed timeline sheet from blocking action controls", () => {
@@ -461,6 +549,36 @@ describe("game room seat layout", () => {
     expect(openSheetRule).toContain("visibility: visible !important");
     expect(openSheetRule).toContain("pointer-events: auto !important");
     expect(modalCss.match(/\.game-layout-root \.modal-layer \{[\s\S]*?\n\}/)?.[0] ?? "").toContain("z-index: 150");
+  });
+
+  it("keeps the terminal game-over modal from inheriting legacy glass and uncentered button chrome", () => {
+    const modalCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/modal-layer.css"),
+      "utf8"
+    );
+    const endCardRule = modalCss.match(
+      /\.game-layout-root\[data-scene="end"\] \.modal-layer \.endgame-phase-card \{[\s\S]*?\n\}/
+    )?.[0] ?? "";
+    const exitButtonCss = modalCss.slice(
+      modalCss.indexOf(".game-layout-root[data-scene=\"end\"] .modal-layer .endgame-exit-button")
+    );
+
+    expect(endCardRule).toContain("backdrop-filter: none !important");
+    expect(endCardRule).toContain("-webkit-backdrop-filter: none !important");
+    expect(endCardRule).toContain("top: 50dvh");
+    expect(endCardRule).toContain("max-height: calc(100dvh - 24px)");
+    expect(endCardRule).toContain("overflow: visible");
+    expect(modalCss).toContain(".endgame-phase-card .ww-ui-panel__fill");
+    expect(modalCss).toContain("background: transparent !important");
+    expect(modalCss).toContain(".endgame-phase-card-content");
+    expect(modalCss).toContain("overflow: visible !important");
+    expect(exitButtonCss).toContain("max-width: 300px");
+    expect(exitButtonCss).toContain("justify-self: center");
+    expect(exitButtonCss).toContain("width: min(300px, 100%)");
+    expect(exitButtonCss).not.toContain("--ww-button-content-inset-x");
+    expect(exitButtonCss).not.toContain("--ww-button-width");
+    expect(exitButtonCss).not.toContain("--ww-button-font-size");
+    expect(exitButtonCss).not.toContain(".endgame-exit-button .ww-game-button__content");
   });
 
   it("keeps mobile center voting readable without bleeding over the scene", () => {

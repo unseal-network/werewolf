@@ -44,13 +44,7 @@ export function StageActionButton({
         .join(" "),
     [className, loading, pressed, variant]
   );
-  const buttonVariant: GameButtonVariant = className
-    ?.split(/\s+/)
-    .includes("stage-start")
-    ? "primary"
-    : variant === "secondary"
-      ? "secondary"
-      : "confirm";
+  const buttonVariant: GameButtonVariant = variant === "secondary" ? "secondary" : "primary";
 
   function resetPressState() {
     setPressed(false);

@@ -4,7 +4,7 @@ import { useIframeAuth } from "../hooks/useIframeAuth";
 import { isHostRuntime } from "../runtime/hostBridge";
 import type { MemberInfo } from "@unseal-network/game-sdk";
 import { GameRoomShell } from "../components/GameRoomShell";
-import { CenterStage, type ActionMode, type ConfirmMode } from "../components/CenterStage";
+import { CenterStage } from "../components/CenterStage";
 import { CenterInfoPanel } from "../components/CenterInfoPanel";
 import { TimelineCapsule } from "../components/TimelineCapsule";
 import { RoleCardLayer } from "../components/RoleCardLayer";
@@ -13,20 +13,25 @@ import { StartDialog } from "../components/StartDialog";
 import { AgentPicker } from "../components/AgentPicker";
 import { SeerResultDialog } from "../components/SeerResultDialog";
 import { VoiceRoomProvider } from "../components/VoiceRoom";
-import { getPhaseAnimationCue } from "../animation/phaseCatalog";
 import { useT } from "../i18n/I18nProvider";
-import type { SceneId } from "../components/GameRoomShell";
 import type { EngineGameState } from "../engine/GameEngine";
 import {
   actorDayKey,
   actorPhaseDayKey,
+  compareGameEventIdStrings,
   deriveTimelineDisplayState,
-  computeTimelineBaseSeq,
+  computeTimelineBaseEventId,
   seerDayKey,
   upsertRoomPlayers,
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
-import { buildActionExpectation } from "../game/actionExpectation";
+import { isActionStateConflictError } from "../game/actionConflict";
+import { getStableLivekitCredentials } from "../game/livekitCredentials";
+import {
+  PHASE_DRESSING,
+  mapServerPhaseToUi,
+  type PhaseDressing,
+} from "../game/phaseUi";
 import { computeVisibleSeatCount, visibleSeatNumbersForRoom } from "../game/seatLayout";
 import {
   DEMO_DISPLAY_NAME,
@@ -37,30 +42,6 @@ import {
   writeMatrixIdentity,
 } from "../matrix/session";
 import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
-
-interface PhaseDressing {
-  scene: SceneId;
-  accent: string;
-  kickerKey: string;
-  copyKey: string;
-  confirmMode: ConfirmMode;
-}
-
-const PHASE_DRESSING: Record<string, PhaseDressing> = {
-  lobby: { scene: "lobby", accent: "#435cff", kickerKey: "stage.kicker.lobby", copyKey: "", confirmMode: "vote" },
-  deal: { scene: "deal", accent: "#7357d9", kickerKey: "stage.kicker.deal", copyKey: "", confirmMode: "vote" },
-  guard: { scene: "night", accent: "#2c8cff", kickerKey: "stage.kicker.guard", copyKey: "", confirmMode: "guard" },
-  wolf: { scene: "night", accent: "#c43d4d", kickerKey: "stage.kicker.wolf", copyKey: "", confirmMode: "wolf" },
-  "witch-save": { scene: "night", accent: "#28a86d", kickerKey: "stage.kicker.witchHeal", copyKey: "", confirmMode: "witch-save" },
-  "witch-poison": { scene: "night", accent: "#7751d9", kickerKey: "stage.kicker.witchPoison", copyKey: "", confirmMode: "witch-poison" },
-  seer: { scene: "night", accent: "#1d95b8", kickerKey: "stage.kicker.seer", copyKey: "", confirmMode: "seer" },
-  night: { scene: "night", accent: "#2c8cff", kickerKey: "stage.kicker.nightResolution", copyKey: "", confirmMode: "vote" },
-  day: { scene: "day", accent: "#d58b21", kickerKey: "stage.kicker.daySpeak", copyKey: "", confirmMode: "vote" },
-  dayResolution: { scene: "day", accent: "#d58b21", kickerKey: "stage.kicker.dayResolution", copyKey: "", confirmMode: "vote" },
-  vote: { scene: "vote", accent: "#d84848", kickerKey: "stage.kicker.dayVote", copyKey: "", confirmMode: "vote" },
-  tie: { scene: "tie", accent: "#b554d9", kickerKey: "stage.kicker.tieVote", copyKey: "", confirmMode: "vote" },
-  end: { scene: "end", accent: "#13a36c", kickerKey: "stage.kicker.end", copyKey: "", confirmMode: "vote" },
-};
 
 interface UserSeatState {
   seatNo: number;
@@ -107,259 +88,6 @@ function roleCardBackUrl(): string {
   return `${roleAssetBase}/card-back.avif`;
 }
 
-function stripPayloadFromEvent(raw: string): string {
-  if (raw.startsWith("data:")) {
-    return raw.slice(5).trim();
-  }
-  return raw;
-}
-
-function parseSseEvent(raw: string): GameEventDto | undefined {
-  if (!raw.trim()) return undefined;
-  try {
-    const candidate = JSON.parse(raw) as unknown;
-    if (!candidate || typeof candidate !== "object") {
-      return undefined;
-    }
-    if ("event" in candidate) {
-      const wrapped = (candidate as { event?: unknown }).event;
-      if (
-        wrapped &&
-        typeof wrapped === "object" &&
-        "id" in wrapped &&
-        "type" in wrapped
-      ) {
-        return wrapped as GameEventDto;
-      }
-    }
-    if ("id" in candidate && "type" in candidate) {
-      return candidate as GameEventDto;
-    }
-  } catch {
-    return undefined;
-  }
-  return undefined;
-}
-
-interface SubscribeSnapshot {
-  room: GameRoom;
-  projection: RoomProjection | null;
-  privateStates: PlayerPrivateState[];
-  events: GameEventDto[];
-}
-
-type SubscribeMessage =
-  | { kind: "snapshot"; snapshot: SubscribeSnapshot }
-  | { kind: "event"; event: GameEventDto };
-
-function parseSubscribeMessage(raw: string): SubscribeMessage | undefined {
-  if (!raw.trim()) return undefined;
-  try {
-    const candidate = JSON.parse(raw) as unknown;
-    if (!candidate || typeof candidate !== "object") return undefined;
-    if ("snapshot" in candidate) {
-      return {
-        kind: "snapshot",
-        snapshot: (candidate as { snapshot: SubscribeSnapshot }).snapshot,
-      };
-    }
-    const event = parseSseEvent(raw);
-    return event ? { kind: "event", event } : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * Defensive mirror of server-side filterEventsForUser. The SSE route already
- * filters events, but the client keeps this guard for optimistic action
- * responses and future transport changes.
- */
-function sseEventVisibleToMe(
-  event: GameEventDto,
-  myPrivateState: PlayerPrivateState | undefined
-): boolean {
-  if (event.visibility === "public") return true;
-  if (event.visibility === "runtime") return false;
-  if (event.visibility === "private:team:wolf") {
-    return myPrivateState?.team === "wolf";
-  }
-  if (event.visibility.startsWith("private:user:")) {
-    return event.visibility === `private:user:${myPrivateState?.playerId}`;
-  }
-  return false;
-}
-
-interface PhaseUiSpec {
-  phaseId: ReturnType<typeof getPhaseAnimationCue>["phaseId"];
-  labelKey: string;
-  rawLabel?: string;
-  actionMode: ActionMode;
-  canRunRuntime: boolean;
-  canProgress: boolean;
-  showTimeline: boolean;
-  showRoleCard: boolean;
-}
-
-function mapServerPhaseToUi(phase: string | null): PhaseUiSpec {
-  if (!phase) {
-    const cue = getPhaseAnimationCue("lobby");
-    return {
-      phaseId: cue.phaseId,
-      labelKey: "phase.lobby",
-      actionMode: "lobby",
-      canRunRuntime: false,
-      canProgress: false,
-      showTimeline: cue.allowTimeline,
-      showRoleCard: cue.showRoleCard,
-    };
-  }
-
-  switch (phase) {
-    case "role_assignment":
-      return {
-        phaseId: "deal",
-        labelKey: "phase.deal",
-        actionMode: "deal",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("deal").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("deal").showRoleCard,
-      };
-    case "night_guard":
-      return {
-        phaseId: "guard",
-        labelKey: "phase.guard",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("guard").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("guard").showRoleCard,
-      };
-    case "night_wolf":
-      return {
-        phaseId: "wolf",
-        labelKey: "phase.wolf",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("wolf").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("wolf").showRoleCard,
-      };
-    case "night_witch_heal":
-      return {
-        phaseId: "witch-save",
-        labelKey: "phase.witchHeal",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("witch-save").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("witch-save").showRoleCard,
-      };
-    case "night_witch_poison":
-      return {
-        phaseId: "witch-poison",
-        labelKey: "phase.witchPoison",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("witch-poison").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("witch-poison").showRoleCard,
-      };
-    case "night_seer":
-      return {
-        phaseId: "seer",
-        labelKey: "phase.seer",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("seer").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("seer").showRoleCard,
-      };
-    case "night_resolution":
-      return {
-        phaseId: "night",
-        labelKey: "phase.nightResolution",
-        actionMode: "night",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("night").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("night").showRoleCard,
-      };
-    case "day_speak":
-      return {
-        phaseId: "day",
-        labelKey: "phase.daySpeak",
-        actionMode: "day",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("day").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("day").showRoleCard,
-      };
-    case "day_vote":
-      return {
-        phaseId: "vote",
-        labelKey: "phase.dayVote",
-        actionMode: "vote",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("vote").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("vote").showRoleCard,
-      };
-    case "tie_speech":
-      return {
-        phaseId: "day",
-        labelKey: "phase.tieSpeech",
-        actionMode: "day",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("day").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("day").showRoleCard,
-      };
-    case "tie_vote":
-      return {
-        phaseId: "tie",
-        labelKey: "phase.tieVote",
-        actionMode: "tie",
-        canRunRuntime: true,
-        canProgress: true,
-        showTimeline: getPhaseAnimationCue("tie").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("tie").showRoleCard,
-      };
-    case "day_resolution":
-      return {
-        phaseId: "dayResolution",
-        labelKey: "phase.dayResolution",
-        actionMode: "waiting",
-        canRunRuntime: true,
-        canProgress: false,
-        showTimeline: getPhaseAnimationCue("dayResolution").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("dayResolution").showRoleCard,
-      };
-    case "post_game":
-      return {
-        phaseId: "end",
-        labelKey: "phase.end",
-        actionMode: "end",
-        canRunRuntime: false,
-        canProgress: false,
-        showTimeline: getPhaseAnimationCue("end").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("end").showRoleCard,
-      };
-    default:
-      return {
-        phaseId: "lobby",
-        labelKey: "phase.lobby",
-        rawLabel: phase,
-        actionMode: "waiting",
-        canRunRuntime: false,
-        canProgress: false,
-        showTimeline: getPhaseAnimationCue("lobby").allowTimeline,
-        showRoleCard: getPhaseAnimationCue("lobby").showRoleCard,
-      };
-  }
-}
-
 function memberToAgentCandidate(
   member: MemberInfo,
   roomPlayers: RoomPlayer[]
@@ -373,10 +101,10 @@ function memberToAgentCandidate(
   return {
     userId: member.userId,
     displayName: member.displayName,
-    avatarUrl: member.avatarUrl,
     userType: member.isAgent ? "agent" : "user",
     membership: "join",
     alreadyJoined,
+    ...(member.avatarUrl !== undefined ? { avatarUrl: member.avatarUrl } : {}),
   };
 }
 
@@ -490,7 +218,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     useState<RoomProjection | null>(null);
   const [privateStates, setPrivateStates] = useState<PlayerPrivateState[]>([]);
   const [timeline, setTimeline] = useState<GameEventDto[]>([]);
-  const [timelineBaseSeq, setTimelineBaseSeq] = useState(0);
+  const [timelineBaseEventId, setTimelineBaseEventId] = useState("");
   const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [runtimeInProgress, setRuntimeInProgress] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -506,6 +234,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   const [actionLoading, setActionLoading] = useState(false);
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitServerUrl, setLivekitServerUrl] = useState<string | null>(null);
+  const livekitCredentialKeyRef = useRef<string>("");
   const [roleRevealNonce, setRoleRevealNonce] = useState(0);
   const [roleRevealOpen, setRoleRevealOpen] = useState(false);
   // Tick once per second so countdown text re-renders smoothly between SSE
@@ -521,10 +250,10 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         roomSnapshot,
         projectionSnapshot,
         timeline,
-        timelineBaseSeq,
+        timelineBaseEventId,
         matrixUserId
       ),
-    [roomSnapshot, projectionSnapshot, timeline, timelineBaseSeq, matrixUserId]
+    [roomSnapshot, projectionSnapshot, timeline, timelineBaseEventId, matrixUserId]
   );
   const room = timelineDisplayState.room;
   const projection = timelineDisplayState.projection;
@@ -581,26 +310,97 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     []
   );
 
+  const refreshGameSnapshot = useCallback(async () => {
+    const readModel = await client.getGame(gameRoomId);
+    const display = readModel.snapshot.displayState;
+    setRoomSnapshot(display.room);
+    setProjectionSnapshot(display.projection ?? display.room.projection);
+    setPrivateStates(display.privateStates);
+    setTimelineBaseEventId(readModel.snapshot.snapshotEventId);
+    const timelinePage = await client.getTimeline(gameRoomId, {
+      after: readModel.timelineCursor.after,
+      limit: 100,
+    });
+    setTimeline((current) => {
+      const byId = new Map(current.map((event) => [event.id, event]));
+      for (const event of timelinePage.events) byId.set(event.id, event);
+      return Array.from(byId.values()).slice(-260);
+    });
+  }, [client, gameRoomId]);
+
+  const handleActionError = useCallback(
+    async (error: unknown) => {
+      if (isActionStateConflictError(error)) {
+        try {
+          await refreshGameSnapshot();
+          setErrorMessage("行动阶段已变化，已同步最新状态");
+        } catch (refreshError) {
+          setErrorMessage(
+            refreshError instanceof Error
+              ? refreshError.message
+              : String(refreshError)
+          );
+        }
+        return;
+      }
+      setErrorMessage(error instanceof Error ? error.message : String(error));
+    },
+    [refreshGameSnapshot]
+  );
+
   useEffect(() => {
     autoTickPhaseRef.current = "";
   }, [gameRoomId]);
 
-  // Page-scoped read model: /subscribe is the only game-room read source.
-  // On refresh, the SSE route sends a snapshot first; that snapshot rebuilds
-  // room/projection/private state and the timeline without a separate GET.
+  useEffect(() => {
+    let cancelled = false;
+    void client
+      .getGame(gameRoomId)
+      .then(async (readModel) => {
+        if (cancelled) return;
+        const display = readModel.snapshot.displayState;
+        setRoomSnapshot(display.room);
+        setProjectionSnapshot(display.projection ?? display.room.projection);
+        setPrivateStates(display.privateStates);
+        setTimelineBaseEventId(readModel.snapshot.snapshotEventId);
+        const timelinePage = await client.getTimeline(gameRoomId, {
+          after: readModel.timelineCursor.after,
+          limit: 100,
+        });
+        if (cancelled) return;
+        setTimeline((current) => {
+          const byId = new Map(current.map((event) => [event.id, event]));
+          for (const event of timelinePage.events) byId.set(event.id, event);
+          return Array.from(byId.values()).slice(-260);
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setErrorMessage(err instanceof Error ? err.message : String(err));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [client, gameRoomId]);
+
+  // Page-scoped live updates. New servers may send snapshot-first messages
+  // without timeline history; older servers still include `events` here.
   useSnapshotSse({
     subscribeUrl: client.subscribeUrl(gameRoomId),
     onSnapshot(snapshot) {
       setRoomSnapshot(snapshot.room);
       setProjectionSnapshot(snapshot.projection);
       setPrivateStates(snapshot.privateStates);
-      setTimeline(snapshot.events);
-      setTimelineBaseSeq(computeTimelineBaseSeq(snapshot.events));
+      if (snapshot.events.length > 0) {
+        setTimeline(snapshot.events);
+      }
+      setTimelineBaseEventId(
+        snapshot.snapshotEventId ?? computeTimelineBaseEventId(snapshot.events)
+      );
     },
     onEvent(event) {
-      if (sseEventVisibleToMe(event, myPrivateStateRef.current)) {
-        applyServerEvent(event);
-      }
+      applyServerEvent(event);
     },
   });
 
@@ -647,59 +447,49 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       myPrivateState?.alive !== false &&
       (projection?.alivePlayerIds.includes(myPlayer.id) ?? true)
   );
-  // Mirror myPrivateState into a ref so the long-lived SSE handler (created
-  // once per gameRoomId) can read it without forcing a reconnect every time
-  // the value changes.
-  const myPrivateStateRef = useRef<PlayerPrivateState | undefined>(undefined);
-  useEffect(() => {
-    myPrivateStateRef.current = myPrivateState;
-  }, [myPrivateState]);
   const isCreator = room?.creatorUserId === matrixUserId;
 
-  // Fetch LiveKit token once the player is in the room. Token is reused for
-  // the whole session; the VoiceRoomProvider handles connect/disconnect.
-  //
-  // Keying the effect on `myPlayer?.id` (a stable string) rather than the
-  // whole `myPlayer` object is critical — `myPlayer` is recomputed via
-  // useMemo whenever `room` changes (which happens on every SSE-triggered
-  // refresh), and re-fetching would create a new JWT every time, which in
-  // turn would cause VoiceRoomProvider to tear down and re-establish the
-  // LiveKit connection. With the stable id, we fetch once per game session.
-  const myPlayerId = myPlayer?.id;
-  const roomIdForVoice = room?.id;
-  const voiceIdentityMode = roomIdForVoice
-    ? `${roomIdForVoice}:${myPlayerId ?? "spectator"}`
-    : "";
+  // Fetch LiveKit credentials independently from the SSE room snapshot and
+  // game runtime. Once a credential exists for this user+game, websocket
+  // reconnects must reuse it inside VoiceRoomProvider instead of minting a new
+  // token and hitting the LiveKit server again.
   useEffect(() => {
-    if (!room || !matrixUserId || !myPlayerId) {
+    if (!matrixUserId) {
+      livekitCredentialKeyRef.current = "";
       setLivekitToken(null);
       setLivekitServerUrl(null);
       return;
     }
+    const credentialKey = `${gameRoomId}:${matrixUserId}:publish-token-v2`;
+    if (livekitCredentialKeyRef.current === credentialKey) {
+      return;
+    }
     let cancelled = false;
-    void client
-      .getLivekitToken(gameRoomId)
+    void getStableLivekitCredentials(credentialKey, () =>
+      client.getLivekitToken(gameRoomId)
+    )
       .then((res) => {
         if (cancelled) return;
         console.info("[VoiceRoom] livekit token ready", {
           gameRoomId,
           identity: res.identity,
-          canPublish: Boolean(res.canPublish),
           hasServerUrl: Boolean(res.serverUrl),
         });
+        livekitCredentialKeyRef.current = credentialKey;
         setLivekitToken(res.token);
         setLivekitServerUrl(res.serverUrl);
       })
       .catch((err) => {
         if (cancelled) return;
         console.warn("[LiveKit] token fetch failed:", err);
+        livekitCredentialKeyRef.current = "";
         setLivekitToken(null);
         setLivekitServerUrl(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [voiceIdentityMode, matrixUserId, client, gameRoomId, roomIdForVoice]);
+  }, [matrixUserId, client, gameRoomId]);
 
   useEffect(() => {
     return () => {
@@ -1193,15 +983,10 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         }
         return Array.from(byId.values()).slice(-260);
       });
-      setTimelineBaseSeq((current) =>
-        Math.max(
-          current,
-          started.events.reduce(
-            (maxSeq, event) => Math.max(maxSeq, event.seq),
-            started.projection.version
-          )
-        )
-      );
+      setTimelineBaseEventId((current) => {
+        const fromEvents = computeTimelineBaseEventId(started.events);
+        return compareGameEventIdStrings(fromEvents, current) > 0 ? fromEvents : current;
+      });
       setShowFillPrompt(false);
       setShowAgentPicker(false);
       return started;
@@ -1330,10 +1115,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setSelectedTargetId(null);
   }
 
-  function actionExpectation() {
-    return buildActionExpectation(projection);
-  }
-
   async function onConfirmTarget(explicitTargetId?: string) {
     const targetPlayerId = explicitTargetId ?? selectedTargetId;
     if (!targetPlayerId || !myPlayer) return;
@@ -1354,15 +1135,14 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       const result = await client.submitAction(gameRoomId, {
         kind,
         targetMatrixUserId,
-        ...actionExpectation(),
       });
-      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+      if (result.event) {
         applyServerEvent(result.event);
       }
       setSelectedTargetId(null);
       // Server auto-advances after action
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
+      await handleActionError(error);
     } finally {
       setActionLoading(false);
     }
@@ -1377,25 +1157,23 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       if (!text) {
         const result = await client.submitAction(gameRoomId, {
           kind: "pass",
-          ...actionExpectation(),
         });
-        if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        if (result.event) {
           applyServerEvent(result.event);
         }
       } else {
         const result = await client.submitAction(gameRoomId, {
           kind: "speech",
           speech: text,
-          ...actionExpectation(),
         });
-        if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+        if (result.event) {
           applyServerEvent(result.event);
         }
       }
       setSpeechDraft("");
       // Server auto-advances after action
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : String(error));
+      await handleActionError(error);
     } finally {
       setActionLoading(false);
     }
@@ -1408,9 +1186,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     try {
       const result = await client.submitAction(gameRoomId, {
         kind: "pass",
-        ...actionExpectation(),
       });
-      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+      if (result.event) {
         applyServerEvent(result.event);
       }
       setSelectedTargetId(null);
@@ -1430,9 +1207,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     try {
       const result = await client.submitAction(gameRoomId, {
         kind: "speechComplete",
-        ...actionExpectation(),
       });
-      if (result.event && sseEventVisibleToMe(result.event, myPrivateStateRef.current)) {
+      if (result.event) {
         applyServerEvent(result.event);
       }
       setSpeechDraft("");
@@ -1586,6 +1362,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
             speechInput={speechDraft}
             actionLoading={actionLoading}
             onStart={handleStartIntent}
+            onExitGame={goHome}
             onAddAgent={onFillAiStart}
             canAddAgent={
               !!room &&

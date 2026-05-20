@@ -8,6 +8,7 @@ import {
 import type { SseBroker } from "../services/sse-broker";
 import type { GameStore } from "../services/game-store";
 import type { InMemoryGameService } from "../services/game-service";
+import { compareEventIds, isEventIdAfter } from "../services/event-id-cursor";
 import { filterEventsForUser } from "./games";
 
 export interface EventsRouteDeps {
@@ -39,24 +40,25 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
       const user = await authenticateRequest(c.req.raw, matrix, deps.profileCache);
       const gameRoomId = c.req.param("gameRoomId");
       games.snapshot(gameRoomId);
-      const lastEventId = c.req.header("last-event-id");
-      const lastSeq = lastEventId ? Number(lastEventId) : 0;
+      const lastEventId = c.req.header("last-event-id") ?? "";
 
       const stream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
           const perspective = () => buildPerspective(games, gameRoomId, user.id);
-          const serializeSnapshot = (seq?: number) => {
+          const serializeSnapshot = (eventId?: string) => {
             const view = perspective();
+            const snapshotEventId = eventId ?? view.snapshotEventId;
             const data = `data: ${JSON.stringify({
               snapshot: {
                 room: view.room,
                 projection: view.room.projection,
                 privateStates: view.privateStates,
                 events: view.events,
+                snapshotEventId,
               },
             })}\n\n`;
-            return seq ? `id: ${seq}\n${data}` : data;
+            return eventId ? `id: ${snapshotEventId}\n${data}` : data;
           };
           const pushVisible = (payload: string) => {
             const event = eventFromSsePayload(payload);
@@ -71,7 +73,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
               ).length
             );
             if (eventRefreshesPerspectiveSnapshot(event, visible)) {
-              controller.enqueue(encoder.encode(serializeSnapshot(event.seq)));
+              controller.enqueue(encoder.encode(serializeSnapshot(event.id)));
               return;
             }
             if (!visible) return;
@@ -80,38 +82,37 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
           controller.enqueue(encoder.encode(serializeSnapshot()));
 
+          const liveBuffer: Array<{ id: string; payload: string }> = [];
+          let initialReplayComplete = false;
+          const pushOrBufferLive = (payload: string) => {
+            if (initialReplayComplete) {
+              pushVisible(payload);
+              return;
+            }
+            const event = eventFromSsePayload(payload);
+            if (event) liveBuffer.push({ id: event.id, payload });
+          };
+
           const { replay, unsubscribe } = broker.subscribe(
             gameRoomId,
-            Number.isFinite(lastSeq) ? lastSeq : 0,
-            pushVisible
+            lastEventId,
+            pushOrBufferLive
           );
 
-          // If the broker can't fully cover everything since `lastSeq` (e.g.,
-          // after a process restart its in-memory history is empty), fall back
-          // to the durable event log in the DB so the client gets a complete
-          // catch-up before live events start streaming. Without this, clients
-          // reconnecting after an API restart would silently miss events.
-          const replayStart =
-            replay.length > 0 && replay[0]?.seq !== undefined
-              ? replay[0].seq
-              : Infinity;
-          const needsDbReplay =
-            store && (replay.length === 0 || replayStart > lastSeq + 1);
-
-          if (needsDbReplay) {
+          const replayedEventIds = new Set<string>();
+          if (store) {
             try {
-              const view = perspective();
-              const dbEvents = filterEventsForUser(
-                await store.loadEventsSince(gameRoomId, lastSeq),
-                view.myPlayerId,
-                view.isWolf,
-                view.revealAll
-              );
-              const minBrokerSeq = replayStart;
-              for (const event of dbEvents) {
-                if (event.seq >= minBrokerSeq) break; // broker covers the rest
-                const serialized = `id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`;
-                controller.enqueue(encoder.encode(serialized));
+              const dbEvents = (
+                await store.loadRawSsePayloadsAfter(gameRoomId, lastEventId)
+              ).flatMap((row) => {
+                const event = eventFromSsePayload(row.rawSsePayload);
+                return event ? [{ ...row, event }] : [];
+              });
+              for (const row of dbEvents) {
+                replayedEventIds.add(row.id);
+              }
+              for (const row of dbEvents) {
+                pushVisible(row.rawSsePayload);
               }
             } catch (err) {
               console.error("[SSE] DB replay failed:", err);
@@ -119,8 +120,19 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
           }
 
           for (const item of replay) {
+            if (replayedEventIds.has(item.id)) continue;
+            replayedEventIds.add(item.id);
             pushVisible(item.payload);
           }
+
+          for (const item of liveBuffer.sort((a, b) => compareEventIds(a.id, b.id))) {
+            if (!isEventIdAfter(item.id, lastEventId)) continue;
+            if (replayedEventIds.has(item.id)) continue;
+            replayedEventIds.add(item.id);
+            pushVisible(item.payload);
+          }
+          liveBuffer.length = 0;
+          initialReplayComplete = true;
 
           c.req.raw.signal.addEventListener("abort", () => unsubscribe(), {
             once: true,
@@ -171,6 +183,7 @@ function buildPerspective(
     room: { ...room, events, privateStates },
     events,
     privateStates,
+    snapshotEventId: room.events.at(-1)?.id ?? "",
     myPlayerId: myPlayer?.id,
     isWolf,
     revealAll,

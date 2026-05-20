@@ -2,17 +2,21 @@ import { useCallback, useEffect, useRef } from "react";
 import type {
   GameEventDto,
   GameRoom,
+  GameReadSnapshot,
   PlayerPrivateState,
   RoomProjection,
 } from "../api/client";
-import { computeTimelineBaseSeq } from "../game/timelineState";
-// import { un } from "@unseal-network/mobile-log";
+import {
+  computeTimelineBaseEventId,
+  computeTimelineBaseSeq,
+} from "../game/timelineState";
 
 export interface SubscribeSnapshot {
   room: GameRoom;
   projection: RoomProjection | null;
   privateStates: PlayerPrivateState[];
   events: GameEventDto[];
+  snapshotEventId?: string;
 }
 
 export type SubscribeMessage =
@@ -25,6 +29,7 @@ export interface SnapshotSseState {
   privateStates: PlayerPrivateState[];
   timeline: GameEventDto[];
   timelineBaseSeq: number;
+  timelineBaseEventId: string;
 }
 
 export function stripPayloadFromEvent(raw: string): string {
@@ -70,7 +75,9 @@ export function parseSubscribeMessage(raw: string): SubscribeMessage | undefined
     if ("snapshot" in candidate) {
       return {
         kind: "snapshot",
-        snapshot: (candidate as { snapshot: SubscribeSnapshot }).snapshot,
+        snapshot: normalizeSubscribeSnapshot(
+          (candidate as { snapshot: SubscribeSnapshot | GameReadSnapshot }).snapshot
+        ),
       };
     }
     const event = parseSseEvent(payload);
@@ -136,20 +143,49 @@ export function applySubscribeMessage(
   if (!message) return state;
   if (message.kind === "snapshot") {
     const timeline = collapseStreamingTimelineEvents(message.snapshot.events);
+    const timelineBaseEventId =
+      message.snapshot.snapshotEventId ?? computeTimelineBaseEventId(timeline);
     return {
       roomSnapshot: message.snapshot.room,
       projectionSnapshot: message.snapshot.projection,
       privateStates: message.snapshot.privateStates,
       timeline,
       timelineBaseSeq: computeTimelineBaseSeq(timeline),
+      timelineBaseEventId,
     };
   }
   const timeline = appendTimelineEvent(state.timeline, message.event);
   return {
     ...state,
     timeline,
-    timelineBaseSeq: Math.max(state.timelineBaseSeq, message.event.seq),
+    timelineBaseSeq: Math.max(state.timelineBaseSeq, message.event.seq ?? 0),
+    timelineBaseEventId: computeTimelineBaseEventId(timeline),
   };
+}
+
+export { computeTimelineBaseEventId };
+
+function normalizeSubscribeSnapshot(
+  snapshot: SubscribeSnapshot | GameReadSnapshot
+): SubscribeSnapshot {
+  if ("displayState" in snapshot) {
+    return {
+      room: snapshot.displayState.room,
+      projection:
+        snapshot.displayState.projection ?? snapshot.displayState.room.projection,
+      privateStates: snapshot.displayState.privateStates,
+      events: [],
+      snapshotEventId: snapshot.snapshotEventId,
+    };
+  }
+  const normalized: SubscribeSnapshot = {
+    ...snapshot,
+    events: snapshot.events ?? [],
+  };
+  if (snapshot.snapshotEventId !== undefined) {
+    normalized.snapshotEventId = snapshot.snapshotEventId;
+  }
+  return normalized;
 }
 
 export interface UseSnapshotSseOptions {
@@ -158,6 +194,20 @@ export interface UseSnapshotSseOptions {
   onEvent(event: GameEventDto): void;
   onMessage?: (message: SubscribeMessage) => void;
   reconnectDelayMs?: number;
+}
+
+const maxSseReconnectDelayMs = 30000;
+
+export function computeSseReconnectDelayMs(
+  attempt: number,
+  initialDelayMs: number
+): number {
+  const normalizedAttempt = Math.max(0, attempt);
+  const normalizedInitialDelay = Math.max(250, initialDelayMs);
+  return Math.min(
+    maxSseReconnectDelayMs,
+    normalizedInitialDelay * 2 ** normalizedAttempt
+  );
 }
 
 export function useSnapshotSse({
@@ -169,6 +219,7 @@ export function useSnapshotSse({
 }: UseSnapshotSseOptions) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptRef = useRef(0);
   const onSnapshotRef = useRef(onSnapshot);
   const onEventRef = useRef(onEvent);
   const onMessageRef = useRef(onMessage);
@@ -190,7 +241,11 @@ export function useSnapshotSse({
   const connect = useCallback(() => {
     close();
     const source = new EventSource(subscribeUrl);
+    source.onopen = () => {
+      reconnectAttemptRef.current = 0;
+    };
     source.onmessage = (event) => {
+      reconnectAttemptRef.current = 0;
       // un.log('[onmessage]', event.data)
       const parsed = parseSubscribeMessage(event.data);
       if (!parsed) return;
@@ -204,12 +259,18 @@ export function useSnapshotSse({
     source.onerror = () => {
       source.close();
       eventSourceRef.current = null;
-      reconnectTimerRef.current = window.setTimeout(connect, reconnectDelayMs);
+      const delayMs = computeSseReconnectDelayMs(
+        reconnectAttemptRef.current,
+        reconnectDelayMs
+      );
+      reconnectAttemptRef.current += 1;
+      reconnectTimerRef.current = window.setTimeout(connect, delayMs);
     };
     eventSourceRef.current = source;
   }, [close, reconnectDelayMs, subscribeUrl]);
 
   useEffect(() => {
+    reconnectAttemptRef.current = 0;
     connect();
     return close;
   }, [close, connect]);

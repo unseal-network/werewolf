@@ -56,7 +56,89 @@ function passAgentTurn(input: RuntimeAgentTurnInput) {
   });
 }
 
+function fakeLivekitMeeting() {
+  return {
+    ensureRoom: vi.fn(async () => undefined),
+    setRoomSnapshotProvider: vi.fn(),
+    syncForRoom: vi.fn(async () => undefined),
+    syncForLivekitEvent: vi.fn(async () => undefined),
+    syncPublicSpeaker: vi.fn(async () => undefined),
+    syncWolfDiscussion: vi.fn(async () => undefined),
+    clearPlayerAudio: vi.fn(async () => undefined),
+  };
+}
+
 describe("InMemoryGameService rules", () => {
+  it("installs a room snapshot provider for LiveKit event resync", () => {
+    const games = new InMemoryGameService();
+    const livekitMeeting = fakeLivekitMeeting();
+
+    games.setLivekitMeetingController(livekitMeeting);
+
+    expect(livekitMeeting.setRoomSnapshotProvider).toHaveBeenCalledWith(expect.any(Function));
+    const provider = livekitMeeting.setRoomSnapshotProvider.mock.calls[0]![0];
+    expect(provider("missing")).toBeNull();
+  });
+
+  it("syncs GM subscriptions before playing phase narration", async () => {
+    const games = new InMemoryGameService();
+    const livekitMeeting = fakeLivekitMeeting();
+    const calls: string[] = [];
+    livekitMeeting.syncForRoom.mockImplementation(async () => {
+      calls.push("sync");
+    });
+    games.setLivekitMeetingController(livekitMeeting);
+    games.setVoiceAgents({
+      getOrCreate: async () => ({
+        registerPlayerVoiceIdentity: () => undefined,
+        playAudioFiles: async () => {
+          calls.push("gm");
+        },
+      }),
+      get: () => null,
+      setTranscriptHandler: () => undefined,
+      destroy: async () => undefined,
+    } as unknown as VoiceAgentRegistry);
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Rules",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    for (const [userId, name] of players.slice(0, 6)) games.join(room.id, userId, name);
+
+    games.start(room.id, players[0][0]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(calls[0]).toBe("sync");
+  });
+
+  it("syncs wolf discussion with living wolves only", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const livekitMeeting = fakeLivekitMeeting();
+    games.setLivekitMeetingController(livekitMeeting);
+    const room = games.snapshot(gameRoomId);
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+    };
+    const livingWolves = room.privateStates
+      .filter((state) => state.role === "werewolf" && state.alive)
+      .map((state) => state.playerId);
+
+    await games.advanceGame(gameRoomId, passAgentTurn);
+
+    expect(livekitMeeting.syncWolfDiscussion).toHaveBeenCalledWith(
+      expect.objectContaining({ id: gameRoomId }),
+      livingWolves,
+      "nightWolfDiscussionWindow"
+    );
+  });
+
   it("registers Matrix identities with the voice agent instead of internal player ids", async () => {
     const games = new InMemoryGameService();
     const registrations: Array<{ playerId: string; matrixUserId: string }> = [];
@@ -465,12 +547,11 @@ describe("InMemoryGameService rules", () => {
     );
   });
 
-  it("allows pass to affect only the phase version it was submitted for", async () => {
+  it("accepts pass based on the server's current phase", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);
     const seer = room.privateStates.find((state) => state.role === "seer");
     expect(seer).toBeDefined();
-    const staleVersion = 24;
     room.projection = {
       ...room.projection!,
       phase: "night_seer",
@@ -480,32 +561,8 @@ describe("InMemoryGameService rules", () => {
     };
     room.pendingNightActions = [];
 
-    await expect(
-      games.submitAction(gameRoomId, seer!.playerId, {
-        kind: "pass",
-        expectedPhase: "night_witch_poison",
-        expectedDay: room.projection.day,
-        expectedVersion: staleVersion,
-      })
-    ).rejects.toThrow("Action phase has changed");
-
-    expect(room.projection.phase).toBe("night_seer");
-    expect(
-      room.pendingNightActions.some((action) => action.actorPlayerId === seer!.playerId)
-    ).toBe(false);
-    expect(
-      room.events.some(
-        (event) =>
-          event.type === "night_action_submitted" &&
-          event.actorId === seer!.playerId
-      )
-    ).toBe(false);
-
     const event = await games.submitAction(gameRoomId, seer!.playerId, {
       kind: "pass",
-      expectedPhase: "night_seer",
-      expectedDay: room.projection.day,
-      expectedVersion: room.projection.version,
     });
     expect(event).toEqual(
       expect.objectContaining({
@@ -535,9 +592,6 @@ describe("InMemoryGameService rules", () => {
     room.pendingNightActions = [];
     await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "pass",
-      expectedPhase: "night_witch_heal",
-      expectedDay: 1,
-      expectedVersion: 30,
     });
 
     room.projection = {
@@ -548,9 +602,6 @@ describe("InMemoryGameService rules", () => {
     };
     const poisonPass = await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "pass",
-      expectedPhase: "night_witch_poison",
-      expectedDay: 1,
-      expectedVersion: 31,
     });
 
     expect(poisonPass).toEqual(
@@ -597,9 +648,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "nightAction",
       targetPlayerId: victim!.playerId,
-      expectedPhase: "night_witch_heal",
-      expectedDay: 1,
-      expectedVersion: 32,
     });
 
     expect(witch!.witchItems).toEqual({
@@ -628,9 +676,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, witch!.playerId, {
         kind: "nightAction",
         targetPlayerId: victim!.playerId,
-        expectedPhase: "night_witch_heal",
-        expectedDay: 2,
-        expectedVersion: 33,
       })
     ).rejects.toThrow("Heal item is not available");
   });
@@ -658,9 +703,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "nightAction",
       targetPlayerId: target!.playerId,
-      expectedPhase: "night_witch_poison",
-      expectedDay: 1,
-      expectedVersion: 34,
     });
 
     expect(witch!.witchItems).toEqual({
@@ -681,9 +723,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, witch!.playerId, {
         kind: "nightAction",
         targetPlayerId: target!.playerId,
-        expectedPhase: "night_witch_poison",
-        expectedDay: 2,
-        expectedVersion: 35,
       })
     ).rejects.toThrow("Poison item is not available");
   });
@@ -721,9 +760,6 @@ describe("InMemoryGameService rules", () => {
     await expect(
       games.submitAction(gameRoomId, speaker.id, {
         kind: "speechComplete",
-        expectedPhase: "day_speak",
-        expectedDay: 1,
-        expectedVersion: 40,
       })
     ).rejects.toThrow("Action turn has changed");
 
@@ -759,9 +795,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, witch!.playerId, {
         kind: "nightAction",
         targetPlayerId: wolf!.playerId,
-        expectedPhase: "night_seer",
-        expectedDay: 1,
-        expectedVersion: 50,
       })
     ).rejects.toThrow("You do not have the role for this action");
 
@@ -783,9 +816,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, wolf!.playerId, {
         kind: "nightAction",
         targetPlayerId: seer!.playerId,
-        expectedPhase: "night_witch_heal",
-        expectedDay: 1,
-        expectedVersion: 51,
       })
     ).rejects.toThrow("You do not have the role for this action");
   });
@@ -811,9 +841,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, wolves[0]!.playerId, {
       kind: "nightAction",
       targetPlayerId: wolves[1]!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 55,
     });
 
     expect(event).toEqual(
@@ -843,9 +870,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, guard!.playerId, {
       kind: "nightAction",
       targetPlayerId: guard!.playerId,
-      expectedPhase: "night_guard",
-      expectedDay: 1,
-      expectedVersion: 56,
     });
 
     expect(event).toEqual(
@@ -875,9 +899,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, wolf!.playerId, {
       kind: "nightAction",
       targetPlayerId: wolf!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 57,
     });
 
     expect(event).toEqual(
@@ -914,9 +935,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, wolves[0]!.playerId, {
       kind: "nightAction",
       targetPlayerId: goodTargets[0]!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 56,
     });
 
     expect(room.projection.phase).toBe("night_wolf");
@@ -924,9 +942,6 @@ describe("InMemoryGameService rules", () => {
     await games.submitAction(gameRoomId, wolves[1]!.playerId, {
       kind: "nightAction",
       targetPlayerId: goodTargets[0]!.playerId,
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 56,
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -938,6 +953,64 @@ describe("InMemoryGameService rules", () => {
         payload: expect.objectContaining({
           tally: { [goodTargets[0]!.playerId]: 2 },
           targetPlayerId: goodTargets[0]!.playerId,
+          valid: true,
+        }),
+      })
+    );
+    expect(room.pendingNightActions).toContainEqual(
+      expect.objectContaining({
+        actorPlayerId: "wolf_team",
+        kind: "wolfKill",
+        targetPlayerId: goodTargets[0]!.playerId,
+      })
+    );
+  });
+
+  it("resolves tied wolf kill votes to the first submitted target", async () => {
+    const { games, gameRoomId } = createStartedServiceGameWithPlayers(7);
+    const room = games.snapshot(gameRoomId);
+    const wolves = room.privateStates.filter(
+      (state) => state.role === "werewolf"
+    );
+    const goodTargets = room.privateStates.filter(
+      (state) => state.team === "good" && state.alive
+    );
+    expect(wolves).toHaveLength(2);
+    expect(goodTargets.length).toBeGreaterThanOrEqual(2);
+
+    room.projection = {
+      ...room.projection!,
+      phase: "night_wolf",
+      day: 1,
+      version: 56,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      alivePlayerIds: room.privateStates.map((state) => state.playerId),
+    };
+    room.pendingNightActions = [];
+
+    await games.submitAction(gameRoomId, wolves[0]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: goodTargets[0]!.playerId,
+    });
+    await games.submitAction(gameRoomId, wolves[1]!.playerId, {
+      kind: "nightAction",
+      targetPlayerId: goodTargets[1]!.playerId,
+    });
+
+    expect(room.events).toContainEqual(
+      expect.objectContaining({
+        type: "wolf_vote_resolved",
+        subjectId: goodTargets[0]!.playerId,
+        payload: expect.objectContaining({
+          tally: {
+            [goodTargets[0]!.playerId]: 1,
+            [goodTargets[1]!.playerId]: 1,
+          },
+          targetPlayerId: goodTargets[0]!.playerId,
+          tiedPlayerIds: [
+            goodTargets[0]!.playerId,
+            goodTargets[1]!.playerId,
+          ],
           valid: true,
         }),
       })
@@ -1040,9 +1113,6 @@ describe("InMemoryGameService rules", () => {
     const event = await games.submitAction(gameRoomId, witch!.playerId, {
       kind: "nightAction",
       targetPlayerId: witch!.playerId,
-      expectedPhase: "night_witch_heal",
-      expectedDay: 1,
-      expectedVersion: 58,
     });
 
     expect(event).toEqual(
@@ -1073,9 +1143,6 @@ describe("InMemoryGameService rules", () => {
     await expect(
       games.submitAction(gameRoomId, other.id, {
         kind: "speechComplete",
-        expectedPhase: "day_speak",
-        expectedDay: 1,
-        expectedVersion: 60,
       })
     ).rejects.toThrow("Not your turn to speak");
 
@@ -1099,9 +1166,6 @@ describe("InMemoryGameService rules", () => {
       games.submitAction(gameRoomId, villager!.playerId, {
         kind: "speech",
         speech: "I should not be in wolf chat.",
-        expectedPhase: "night_wolf",
-        expectedDay: 1,
-        expectedVersion: 70,
       })
     ).rejects.toThrow("Speech not allowed in this phase");
   });
@@ -1169,9 +1233,6 @@ describe("InMemoryGameService rules", () => {
 
     const event = await games.submitAction(gameRoomId, wolf!.playerId, {
       kind: "speechComplete",
-      expectedPhase: "night_wolf",
-      expectedDay: 1,
-      expectedVersion: 73,
     });
 
     expect(event).toEqual(
@@ -1783,13 +1844,24 @@ describe("InMemoryGameService rules", () => {
     const agentSpeaker = room.players[0]!;
     const humanSpeaker = room.players[1]!;
     let resolveSpeak: () => void = () => undefined;
+    let speakStarted = false;
+    let onSpeechProgress: ((text: string) => void) | undefined;
     const speakDone = new Promise<boolean>((resolve) => {
       resolveSpeak = () => resolve(true);
     });
 
     games.setVoiceAgents({
       get: () => ({
-        speak: () => speakDone,
+        speak: (
+          _text: string,
+          _playerId?: string | null,
+          _playbackRate?: number,
+          options?: { onSpeechProgress?: (text: string) => void }
+        ) => {
+          speakStarted = true;
+          onSpeechProgress = options?.onSpeechProgress;
+          return speakDone;
+        },
       }),
     } as unknown as VoiceAgentRegistry);
     agentSpeaker.kind = "agent";
@@ -1801,14 +1873,27 @@ describe("InMemoryGameService rules", () => {
       deadlineAt: new Date(Date.now() + 60_000).toISOString(),
     };
     room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+    const llmSpeech =
+      "  我先说结论。3号这轮发言偏防守，\n我今天会先归3号。  ";
 
     const advance = games.advanceGame(gameRoomId, async () => ({
       text: "unused",
       toolName: "saySpeech",
       input: {
-        speech: "我先说结论。3号这轮发言偏防守，我今天会先归3号。",
+        speech: llmSpeech,
       },
     }));
+
+    await vi.waitFor(() => expect(speakStarted).toBe(true));
+    expect(
+      room.events.some(
+        (event) =>
+          event.type === "stream" &&
+          event.actorId === agentSpeaker.id
+      )
+    ).toBe(false);
+
+    onSpeechProgress?.("我先说结论。");
 
     await vi.waitFor(() => {
       expect(
@@ -1841,6 +1926,7 @@ describe("InMemoryGameService rules", () => {
       (event) =>
         event.type === "speech_submitted" && event.actorId === agentSpeaker.id
     );
+    const speechEvent = room.events[speechEventIndex];
     const lastDeltaIndex =
       room.events.length -
       1 -
@@ -1863,12 +1949,60 @@ describe("InMemoryGameService rules", () => {
         source: "agent",
       },
     });
-    expect(String(deltaEvents[0]!.payload.text)).toBe(
-      "我先说结论。3号这轮发言偏防守，我今天会先归3号。"
-    );
+    expect(String(deltaEvents[0]!.payload.text)).toBe("我先说结论。");
     expect(lastDeltaIndex).toBeGreaterThan(-1);
     expect(speechEventIndex).toBeGreaterThan(lastDeltaIndex);
+    expect(speechEvent?.payload.speech).toBe(llmSpeech);
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
+  });
+
+  it("streams agent speech from TTS progress while storing the original speech", async () => {
+    const { games, gameRoomId } = createStartedServiceGame();
+    const room = games.snapshot(gameRoomId);
+    const agentSpeaker = room.players[0]!;
+    const humanSpeaker = room.players[1]!;
+    const originalSpeech =
+      "我先说结论。3号这轮发言偏防守，我今天会先归3号。";
+
+    games.setVoiceAgents({
+      get: () => ({
+        speak: async (
+          _text: string,
+          _playerId: string,
+          _playbackRate: number,
+          onProgress?: (text: string) => void
+        ) => {
+          onProgress?.("我先说结论。");
+          onProgress?.("我先说结论。3号这轮发言偏防守，");
+          return true;
+        },
+      }),
+    } as unknown as VoiceAgentRegistry);
+    agentSpeaker.kind = "agent";
+    agentSpeaker.agentId = "@agent-speaker:example.com";
+    room.projection = {
+      ...room.projection!,
+      phase: "day_speak",
+      currentSpeakerPlayerId: agentSpeaker.id,
+      deadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    };
+    room.speechQueue = [agentSpeaker.id, humanSpeaker.id];
+
+    await games.advanceGame(gameRoomId, async () => ({
+      text: "unused",
+      toolName: "saySpeech",
+      input: { speech: originalSpeech },
+    }));
+
+    const streamEvent = room.events.find(
+      (event) => event.type === "stream" && event.actorId === agentSpeaker.id
+    );
+    const speechEvent = room.events.find(
+      (event) =>
+        event.type === "speech_submitted" && event.actorId === agentSpeaker.id
+    );
+    expect(streamEvent?.payload.text).toBe("我先说结论。3号这轮发言偏防守，");
+    expect(speechEvent?.payload.speech).toBe(originalSpeech);
   });
 
   it("submits final agent speech even when TTS fails after deltas", async () => {
@@ -1949,7 +2083,10 @@ describe("InMemoryGameService rules", () => {
     expect(speak).toHaveBeenCalledWith(
       "我先看2号发言偏保守。\n今天可以先归2号。",
       agentSpeaker.id,
-      room.timing.agentSpeechRate
+      room.timing.agentSpeechRate,
+      expect.objectContaining({
+        onSpeechProgress: expect.any(Function),
+      })
     );
     expect(room.projection.currentSpeakerPlayerId).toBe(humanSpeaker.id);
     expect(speechEvent?.payload.speech).toBe(
@@ -2342,9 +2479,6 @@ describe("InMemoryGameService rules", () => {
 
     const complete = games.submitAction(gameRoomId, speaker.id, {
       kind: "speechComplete",
-      expectedPhase: "day_speak",
-      expectedDay: 1,
-      expectedVersion: 80,
     });
     await vi.waitFor(() => expect(flushCalls).toBe(1));
 
@@ -2412,9 +2546,6 @@ describe("InMemoryGameService rules", () => {
 
     const complete = games.submitAction(gameRoomId, speaker.id, {
       kind: "speechComplete",
-      expectedPhase: "day_speak",
-      expectedDay: 1,
-      expectedVersion: 90,
     });
     await vi.waitFor(() => expect(flushCalls).toBe(1));
 

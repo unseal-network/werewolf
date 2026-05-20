@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { GameEventDto, GameRoom, RoomProjection } from "../api/client";
 import {
+  compareGameEventIdStrings,
   deriveTimelineDisplayState,
+  computeTimelineBaseEventId,
   computeTimelineBaseSeq,
   actorDayKey,
   actorPhaseDayKey,
@@ -76,6 +78,10 @@ function room(): GameRoom {
 }
 
 describe("timeline state derivation", () => {
+  it("orders numeric event ids by numeric suffix", () => {
+    expect(compareGameEventIdStrings("event_10", "event_9")).toBeGreaterThan(0);
+  });
+
   it("does not replay historical turn events over the current subscribe snapshot", () => {
     const history = [
       event(154, "turn_started", {
@@ -126,6 +132,45 @@ describe("timeline state derivation", () => {
 
     expect(next.projection?.currentSpeakerPlayerId).toBe("player_7");
     expect(next.projection?.version).toBe(160);
+  });
+
+  it("applies only events newer than the snapshot base event id when seq is absent", () => {
+    const base = projection();
+    const nextTurnEvent = {
+      id: "event_160",
+      type: "turn_started",
+      visibility: "public",
+      payload: {
+        phase: "day_speak",
+        day: 2,
+        currentSpeakerPlayerId: "player_7",
+        deadlineAt: "2026-05-12T13:01:00.000Z",
+      },
+      createdAt: "2026-05-12T13:00:00.000Z",
+    } satisfies GameEventDto;
+    const next = deriveTimelineDisplayState(
+      room(),
+      base,
+      [
+        {
+          id: "event_159",
+          type: "turn_started",
+          visibility: "public",
+          payload: {
+            phase: "day_speak",
+            day: 2,
+            currentSpeakerPlayerId: "player_5",
+          },
+          createdAt: "2026-05-12T12:59:00.000Z",
+        },
+        nextTurnEvent,
+      ],
+      "event_159"
+    );
+
+    expect(computeTimelineBaseEventId([nextTurnEvent])).toBe("event_160");
+    expect(next.projection?.currentSpeakerPlayerId).toBe("player_7");
+    expect(next.projection?.version).toBe("event_160");
   });
 
   it("clears the current speaker as soon as their speech event is received", () => {

@@ -4,6 +4,8 @@ import {
   appendTimelineEvent,
   applySubscribeMessage,
   collapseStreamingTimelineEvents,
+  computeTimelineBaseEventId,
+  computeSseReconnectDelayMs,
   parseSubscribeMessage,
   type SnapshotSseState,
 } from "./snapshotSse";
@@ -51,6 +53,14 @@ const event = {
 } satisfies GameEventDto;
 
 describe("snapshot-first SSE state", () => {
+  it("backs off subscribe reconnects so auth failures do not hammer the server", () => {
+    expect(computeSseReconnectDelayMs(0, 1000)).toBe(1000);
+    expect(computeSseReconnectDelayMs(1, 1000)).toBe(2000);
+    expect(computeSseReconnectDelayMs(5, 1000)).toBe(30000);
+    expect(computeSseReconnectDelayMs(10, 1000)).toBe(30000);
+    expect(computeSseReconnectDelayMs(0, 1)).toBe(250);
+  });
+
   it("rebuilds room state and timeline from the first snapshot message", () => {
     const parsed = parseSubscribeMessage(
       JSON.stringify({
@@ -70,6 +80,58 @@ describe("snapshot-first SSE state", () => {
     expect(next.privateStates).toEqual([privateState]);
     expect(next.timeline).toEqual([event]);
     expect(next.timelineBaseSeq).toBe(3);
+  });
+
+  it("accepts snapshot-first messages without an embedded timeline", () => {
+    const parsed = parseSubscribeMessage(
+      JSON.stringify({
+        snapshot: {
+          snapshotEventId: "evt_9",
+          latestEventId: "evt_9",
+          displayState: {
+            room,
+            projection,
+            privateStates: [privateState],
+          },
+        },
+        timelineCursor: { after: "evt_9" },
+      })
+    );
+
+    const next = applySubscribeMessage(emptyState(), parsed);
+
+    expect(next.roomSnapshot?.id).toBe("game_1");
+    expect(next.projectionSnapshot?.phase).toBe("day_speak");
+    expect(next.privateStates).toEqual([privateState]);
+    expect(next.timeline).toEqual([]);
+    expect(next.timelineBaseEventId).toBe("evt_9");
+  });
+
+  it("uses the server snapshot cursor even when visible events are older", () => {
+    const visibleEvent = {
+      id: "evt_7",
+      gameRoomId: "game_1",
+      type: "phase_started",
+      visibility: "public",
+      payload: { phase: "day_speak" },
+      createdAt: "2026-05-14T00:00:00.000Z",
+    } satisfies GameEventDto;
+    const parsed = parseSubscribeMessage(
+      JSON.stringify({
+        snapshot: {
+          room,
+          projection,
+          privateStates: [privateState],
+          events: [visibleEvent],
+          snapshotEventId: "evt_9",
+        },
+      })
+    );
+
+    const next = applySubscribeMessage(emptyState(), parsed);
+
+    expect(next.timeline).toEqual([visibleEvent]);
+    expect(next.timelineBaseEventId).toBe("evt_9");
   });
 
   it("deduplicates replayed live events by id after a snapshot", () => {
@@ -120,6 +182,25 @@ describe("snapshot-first SSE state", () => {
     expect(next.timeline).toEqual([latest]);
     expect(next.timelineBaseSeq).toBe(59);
   });
+
+  it("tracks event id cursors when live events do not carry seq", () => {
+    const noSeqEvent = {
+      id: "evt_10",
+      gameRoomId: "game_1",
+      type: "phase_started",
+      visibility: "public",
+      payload: { phase: "night_guard" },
+      createdAt: "2026-05-14T00:00:10.000Z",
+    } satisfies GameEventDto;
+
+    const next = applySubscribeMessage(emptyState(), {
+      kind: "event",
+      event: noSeqEvent,
+    });
+
+    expect(computeTimelineBaseEventId(next.timeline)).toBe("evt_10");
+    expect(next.timelineBaseEventId).toBe("evt_10");
+  });
 });
 
 function transcriptEvent(seq: number, text: string): GameEventDto {
@@ -148,5 +229,6 @@ function emptyState(): SnapshotSseState {
     privateStates: [],
     timeline: [],
     timelineBaseSeq: 0,
+    timelineBaseEventId: "",
   };
 }

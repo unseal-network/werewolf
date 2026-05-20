@@ -5,17 +5,22 @@ import {
   useState,
 } from "react";
 import { useT } from "../i18n/I18nProvider";
+import { GameIconButton } from "./GameIconButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 interface GameEventLike {
   id: string;
-  seq: number;
+  seq?: number;
   type: string;
   actorId?: string;
   subjectId?: string;
   visibility: string;
   payload: Record<string, unknown>;
   createdAt: string;
+}
+
+function eventLabel(event: GameEventLike): string {
+  return event.seq !== undefined ? `#${event.seq}` : event.id;
 }
 
 interface TimelinePlayerLike {
@@ -323,14 +328,13 @@ export function TimelineCapsule({
             <div className="sheet-title">{t("timeline.title")}</div>
             <div className="sheet-sub">{t("timeline.sub")}</div>
           </div>
-          <button
-            type="button"
+          <GameIconButton
             className="sheet-close"
             onClick={() => setOpen(false)}
             aria-label={t("user.close")}
-          >
-            ×
-          </button>
+            label="×"
+            size="md"
+          />
         </div>
         <div className="log-grid">
           {visibleEvents.length === 0 ? (
@@ -346,6 +350,7 @@ export function TimelineCapsule({
                 {group.events.map((event) => {
                   const formatted = formatEvent(event);
                   const isExpanded = expandedIds.has(event.id);
+                  const label = eventLabel(event);
                   return (
                     <div
                       className={`log-row ${isExpanded ? "is-expanded" : ""}`}
@@ -357,12 +362,12 @@ export function TimelineCapsule({
                         <div className="log-text">{formatted.text}</div>
                         {isExpanded ? (
                           <div className="log-meta">
-                            #{event.seq} · {event.actorId ? `${event.actorId} · ` : ""}
+                            {label} · {event.actorId ? `${event.actorId} · ` : ""}
                             {new Date(event.createdAt).toLocaleTimeString()}
                           </div>
                         ) : null}
                       </div>
-                      <div className="log-time">#{event.seq}</div>
+                      <div className="log-time">{label}</div>
                     </div>
                   );
                 })}

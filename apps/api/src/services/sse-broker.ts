@@ -1,17 +1,21 @@
+import { isEventIdAfter } from "./event-id-cursor";
+
 export class SseBroker {
   private listeners = new Map<string, Set<(payload: string) => void>>();
   private histories = new Map<
     string,
-    Array<{ seq: number; payload: string }>
+    Array<{ id: string; payload: string }>
   >();
 
   subscribe(
     gameRoomId: string,
-    lastSeq: number,
+    lastEventId: string,
     listener: (payload: string) => void
-  ): { replay: Array<{ seq: number; payload: string }>; unsubscribe: () => void } {
+  ): { replay: Array<{ id: string; payload: string }>; unsubscribe: () => void } {
     const history = this.histories.get(gameRoomId) ?? [];
-    const replay = history.filter((e) => e.seq > lastSeq);
+    const replay = lastEventId
+      ? history.filter((event) => isEventIdAfter(event.id, lastEventId))
+      : history;
 
     const set = this.listeners.get(gameRoomId) ?? new Set();
     set.add(listener);
@@ -28,23 +32,16 @@ export class SseBroker {
     };
   }
 
-  publish(gameRoomId: string, seq: number, payload: unknown): void {
-    const serialized = `id: ${seq}\ndata: ${JSON.stringify(payload)}\n\n`;
+  publish(gameRoomId: string, eventId: string, payload: unknown): void {
+    const serialized = `id: ${eventId}\ndata: ${JSON.stringify(payload)}\n\n`;
 
     const history = this.histories.get(gameRoomId) ?? [];
-    history.push({ seq, payload: serialized });
+    history.push({ id: eventId, payload: serialized });
     if (history.length > 500) history.shift();
     this.histories.set(gameRoomId, history);
 
     for (const listener of this.listeners.get(gameRoomId) ?? []) {
       listener(serialized);
     }
-  }
-
-  lastSeq(gameRoomId: string): number {
-    const history = this.histories.get(gameRoomId);
-    if (!history || history.length === 0) return 0;
-    const last = history[history.length - 1];
-    return last?.seq ?? 0;
   }
 }

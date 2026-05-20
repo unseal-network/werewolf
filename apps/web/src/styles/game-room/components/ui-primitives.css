@@ -186,6 +186,97 @@
   min-width: 0;
 }
 
+.game-layout-root .ww-game-button {
+  --ww-button-scale: 1;
+  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
+  --ww-button-skin-slice: 40 64;
+  --ww-button-border-y: calc(21px * var(--ww-button-scale));
+  --ww-button-border-x: calc(32px * var(--ww-button-scale));
+  --ww-button-min-width: calc(180px * var(--ww-button-scale));
+  --ww-button-min-height: calc(56px * var(--ww-button-scale));
+  --ww-button-padding-y: calc(10px * var(--ww-button-scale));
+  --ww-button-padding-x: calc(38px * var(--ww-button-scale));
+  --ww-button-font-size: calc(18px * var(--ww-button-scale));
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  min-width: var(--ww-button-min-width);
+  min-height: var(--ww-button-min-height);
+  display: inline-grid;
+  place-items: center;
+  padding: var(--ww-button-padding-y) var(--ww-button-padding-x);
+  border-style: solid;
+  border-color: transparent;
+  border-width: var(--ww-button-border-y) var(--ww-button-border-x);
+  border-image-source: var(--ww-button-skin-image);
+  border-image-slice: var(--ww-button-skin-slice) fill;
+  border-image-width: var(--ww-button-border-y) var(--ww-button-border-x);
+  border-image-repeat: stretch;
+  background: transparent;
+  color: #fff7d8;
+  font: inherit;
+  font-size: var(--ww-button-font-size);
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.86),
+    0 0 12px rgba(0, 0, 0, 0.46);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.game-layout-root .ww-game-button--sm {
+  --ww-button-scale: 0.78;
+}
+
+.game-layout-root .ww-game-button--lg {
+  --ww-button-scale: 1.12;
+}
+
+.game-layout-root .ww-game-button--primary {
+  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp");
+  --ww-button-skin-slice: 76 168;
+  --ww-button-border-y: calc(38px * var(--ww-button-scale));
+  --ww-button-border-x: calc(84px * var(--ww-button-scale));
+  --ww-button-min-width: calc(190px * var(--ww-button-scale));
+  --ww-button-min-height: calc(52px * var(--ww-button-scale));
+  --ww-button-padding-y: calc(10px * var(--ww-button-scale));
+  --ww-button-padding-x: calc(62px * var(--ww-button-scale));
+}
+
+.game-layout-root .ww-game-button--confirm {
+  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
+}
+
+.game-layout-root .ww-game-button--secondary {
+  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/cancel-button-9slice.webp");
+  --ww-button-skin-slice: 76 168;
+  --ww-button-border-y: calc(38px * var(--ww-button-scale));
+  --ww-button-border-x: calc(84px * var(--ww-button-scale));
+  --ww-button-min-width: calc(190px * var(--ww-button-scale));
+  --ww-button-min-height: calc(52px * var(--ww-button-scale));
+  --ww-button-padding-y: calc(10px * var(--ww-button-scale));
+  --ww-button-padding-x: calc(62px * var(--ww-button-scale));
+}
+
+.game-layout-root .ww-game-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  filter: grayscale(0.42) brightness(0.78);
+}
+
+.game-layout-root .ww-game-button:not(:disabled):active,
+.game-layout-root .ww-game-button.is-pressed:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+.game-layout-root .ww-game-button:focus-visible {
+  outline: 2px solid rgba(255, 235, 160, 0.78);
+  outline-offset: 3px;
+}
+
 .game-layout-root .profile-dialog.ww-ui-panel {
   --ww-panel-scale: 0.34;
   --ww-panel-content-top: 50px;
@@ -284,11 +375,6 @@
   grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   gap: 10px;
-}
-
-.game-layout-root .start-dialog.ww-ui-panel .start-actions .ww-game-button {
-  --ww-button-width: 100%;
-  width: 100%;
 }
 
 .game-layout-root .agent-picker.ww-ui-panel {
@@ -391,189 +477,6 @@
   overflow: visible;
 }
 
-.game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .ww-game-button {
-  width: 100%;
-  max-width: 100%;
-  justify-self: stretch;
-}
-
-.game-layout-root .ww-game-button {
-  --ww-button-scale: 1;
-  --ww-button-width: calc(260px * var(--ww-button-scale));
-  --ww-button-aspect-ratio: 3;
-  --ww-button-font-size: calc(18px * var(--ww-button-scale));
-  --ww-button-label-optical-y: 0;
-  --ww-button-chrome-slice: 40 64;
-  --ww-button-chrome-width: calc(22px * var(--ww-button-scale)) calc(32px * var(--ww-button-scale));
-  --ww-button-chrome-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
-  --ww-button-content-inset-x: calc(44px * var(--ww-button-scale));
-  position: relative;
-  box-sizing: border-box;
-  width: var(--ww-button-width);
-  height: auto;
-  aspect-ratio: var(--ww-button-aspect-ratio);
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background-color: transparent;
-  background-image: none;
-  color: #fff7d8;
-  font-size: var(--ww-button-font-size);
-  font-weight: 900;
-  letter-spacing: 0;
-  line-height: normal;
-  text-align: center;
-  text-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.82),
-    0 0 12px rgba(0, 0, 0, 0.48);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.game-layout-root .ww-game-button--sm {
-  --ww-button-scale: 0.86;
-}
-
-.game-layout-root .ww-game-button--lg {
-  --ww-button-scale: 1.18;
-}
-
-.game-layout-root .ww-game-button--primary {
-  --ww-button-aspect-ratio: 5.3333;
-  --ww-button-width: calc(300px * var(--ww-button-scale));
-  --ww-button-chrome-image: url("/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp");
-  --ww-button-chrome-slice: 76 168;
-  --ww-button-chrome-width: calc(38px * var(--ww-button-scale)) calc(84px * var(--ww-button-scale));
-  --ww-button-content-inset-x: calc(98px * var(--ww-button-scale));
-  color: #fff7d8;
-  text-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.88),
-    0 0 12px rgba(0, 0, 0, 0.56);
-}
-
-.game-layout-root .ww-game-button--confirm {
-  --ww-button-chrome-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
-  --ww-button-chrome-slice: 40 64;
-  --ww-button-chrome-width: calc(22px * var(--ww-button-scale)) calc(32px * var(--ww-button-scale));
-  --ww-button-content-inset-x: calc(42px * var(--ww-button-scale));
-}
-
-.game-layout-root .ww-game-button--secondary {
-  --ww-button-aspect-ratio: 5.3333;
-  --ww-button-width: calc(250px * var(--ww-button-scale));
-  --ww-button-chrome-image: url("/assets/werewolf-ui/final/button/decision/cancel-button-9slice.webp");
-  --ww-button-chrome-slice: 76 168;
-  --ww-button-chrome-width: calc(38px * var(--ww-button-scale)) calc(84px * var(--ww-button-scale));
-  --ww-button-content-inset-x: calc(82px * var(--ww-button-scale));
-}
-
-.game-layout-root .ww-game-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.58;
-  filter: grayscale(0.32) brightness(0.84);
-}
-
-.game-layout-root .ww-game-button:not(:disabled):active {
-  transform: translateY(1px) scale(0.99);
-}
-
-.game-layout-root .ww-game-button:focus-visible {
-  outline: 2px solid rgba(255, 235, 160, 0.78);
-  outline-offset: 3px;
-}
-
-.game-layout-root .ww-game-button__chrome {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  box-sizing: border-box;
-  border-style: solid;
-  border-color: transparent;
-  border-width: var(--ww-button-chrome-width);
-  border-image-source: var(--ww-button-chrome-image);
-  border-image-slice: var(--ww-button-chrome-slice);
-  border-image-width: var(--ww-button-chrome-width);
-  border-image-repeat: stretch;
-  background: transparent;
-  pointer-events: none;
-}
-
-.game-layout-root .ww-game-button__content {
-  position: absolute;
-  top: 10px;
-  right: var(--ww-button-content-inset-x);
-  bottom: 0;
-  left: var(--ww-button-content-inset-x);
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  padding-inline: calc(8px * var(--ww-button-scale));
-  border: 0;
-  background: transparent;
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-
-.game-layout-root .ww-game-button__label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: calc(8px * var(--ww-button-scale));
-  max-width: 100%;
-  min-width: 0;
-  line-height: 1;
-  transform: translateY(var(--ww-button-label-optical-y));
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.game-layout-root .ww-game-button--primary .ww-game-button__content,
-.game-layout-root .ww-game-button--confirm .ww-game-button__content,
-.game-layout-root .ww-game-button--secondary .ww-game-button__content {
-  color: inherit;
-  text-shadow: inherit;
-}
-
-.game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .ww-game-button {
-  --ww-button-scale: 0.52;
-  --ww-button-width: 100%;
-}
-
-.game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button {
-  --ww-agent-add-size: 44px;
-  width: var(--ww-agent-add-size);
-  height: var(--ww-agent-add-size);
-  aspect-ratio: 1;
-  max-width: 100%;
-  justify-self: end;
-  border: 1px solid rgba(235, 203, 123, 0.62);
-  border-radius: 999px;
-  background-color: rgba(11, 14, 16, 0.72);
-  background-image: none;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 239, 181, 0.13),
-    0 0 0 1px rgba(0, 0, 0, 0.42),
-    0 8px 18px rgba(0, 0, 0, 0.28);
-  color: #fff7d8;
-  font-size: 26px;
-  line-height: 1;
-  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.78);
-}
-
-.game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button::before {
-  content: none;
-}
-
-.game-layout-root .agent-picker.ww-ui-panel .agent-add-button.ww-game-button .ww-game-button__content {
-  padding: 0;
-}
-
 @media (max-width: 560px) {
   .game-layout-root .agent-picker.ww-ui-panel {
     --ww-panel-scale: 0.28;
@@ -588,35 +491,10 @@
     gap: 10px;
   }
 
-  .game-layout-root .agent-picker.ww-ui-panel .agent-add-button {
-    grid-column: auto;
-    --ww-agent-add-size: 42px;
-    justify-self: end;
-  }
-
   .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
     min-height: 112px;
     grid-template-columns: minmax(0, 1fr);
     gap: 8px;
     padding-bottom: 6px;
-  }
-
-  .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .ww-game-button {
-    --ww-button-scale: 0.46;
-  }
-}
-
-.game-layout-root .ww-game-button__spinner {
-  width: calc(14px * var(--ww-button-scale));
-  height: calc(14px * var(--ww-button-scale));
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 999px;
-  animation: ww-game-button-spin 700ms linear infinite;
-}
-
-@keyframes ww-game-button-spin {
-  to {
-    transform: rotate(360deg);
   }
 }

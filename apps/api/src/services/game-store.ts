@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNotNull, lte, or, sql as rawSql } from "drizzle-orm";
+import { and, eq, inArray, or, sql as rawSql } from "drizzle-orm";
 import {
   type DbClient,
   gameEvents,
@@ -9,6 +9,7 @@ import {
 } from "@werewolf/db";
 import type { GameEvent } from "@werewolf/shared";
 import type { PlayerPrivateState, RoomProjection } from "@werewolf/engine";
+import { compareEventIds, isEventIdAfter } from "./event-id-cursor";
 import type { StoredGameRoom, StoredPlayer } from "./game-service";
 
 /**
@@ -179,29 +180,20 @@ export class GameStore {
   }
 
   /**
-   * Append events to the event log. Existing (room, seq) pairs are ignored —
-   * the unique index makes this idempotent so re-runs after partial failure
-   * are safe.
+   * Append events to the event log. Existing legacy events are keyed by their
+   * event id until the room-actor command pipeline owns this write path.
    */
   async appendEvents(roomId: string, events: GameEvent[]): Promise<void> {
     if (events.length === 0) return;
     await this.db
       .insert(gameEvents)
-      .values(
-        events.map((e) => ({
-          id: e.id,
-          gameRoomId: roomId,
-          seq: e.seq,
-          type: e.type,
-          visibility: e.visibility,
-          actorId: e.actorId ?? null,
-          subjectId: e.subjectId ?? null,
-          payload: e.payload,
-          createdAt: new Date(e.createdAt),
-        }))
-      )
+      .values(events.map((event) => toLegacyGameEventRow(roomId, event)))
       .onConflictDoNothing({
-        target: [gameEvents.gameRoomId, gameEvents.seq],
+        target: [
+          gameEvents.gameRoomId,
+          gameEvents.commandId,
+          gameEvents.commandEventIndex,
+        ],
       });
   }
 
@@ -330,27 +322,22 @@ export class GameStore {
       if (events.length > 0) {
         await tx
           .insert(gameEvents)
-          .values(
-            events.map((event) => ({
-              id: event.id,
-              gameRoomId: room.id,
-              seq: event.seq,
-              type: event.type,
-              visibility: event.visibility,
-              actorId: event.actorId ?? null,
-              subjectId: event.subjectId ?? null,
-              payload: event.payload,
-              createdAt: new Date(event.createdAt),
-            }))
-          )
+          .values(events.map((event) => toLegacyGameEventRow(room.id, event)))
           .onConflictDoUpdate({
-            target: [gameEvents.gameRoomId, gameEvents.seq],
+            target: [
+              gameEvents.gameRoomId,
+              gameEvents.commandId,
+              gameEvents.commandEventIndex,
+            ],
             set: {
               type: rawSql`excluded.type`,
               visibility: rawSql`excluded.visibility`,
               actorId: rawSql`excluded.actor_id`,
               subjectId: rawSql`excluded.subject_id`,
               payload: rawSql`excluded.payload`,
+              rawEventJson: rawSql`excluded.raw_event_json`,
+              rawSsePayload: rawSql`excluded.raw_sse_payload`,
+              visibleToPlayerIds: rawSql`excluded.visible_to_player_ids`,
             },
           });
       }
@@ -391,7 +378,7 @@ export class GameStore {
     if (roomRows.length === 0) return [];
     const roomIds = roomRows.map((r) => r.id);
 
-    const [playerRows, projRows, privateRows, eventRows] = await Promise.all([
+    const [playerRows, projRows, privateRows, eventWatermarkRows] = await Promise.all([
       this.db
         .select()
         .from(gameRoomPlayers)
@@ -405,16 +392,18 @@ export class GameStore {
         .from(playerPrivateState)
         .where(inArray(playerPrivateState.gameRoomId, roomIds)),
       this.db
-        .select()
+        .select({
+          gameRoomId: gameEvents.gameRoomId,
+          id: gameEvents.id,
+        })
         .from(gameEvents)
-        .where(inArray(gameEvents.gameRoomId, roomIds))
-        .orderBy(asc(gameEvents.seq)),
+        .where(inArray(gameEvents.gameRoomId, roomIds)),
     ]);
 
     const playersByRoom = groupBy(playerRows, (p) => p.gameRoomId);
     const projByRoom = new Map(projRows.map((p) => [p.gameRoomId, p]));
     const privateByRoom = groupBy(privateRows, (p) => p.gameRoomId);
-    const eventsByRoom = groupBy(eventRows, (e) => e.gameRoomId);
+    const eventIdsByRoom = groupBy(eventWatermarkRows, (e) => e.gameRoomId);
 
     return roomRows.map<StoredGameRoom>((r) => {
       const projRow = projByRoom.get(r.id);
@@ -440,17 +429,6 @@ export class GameStore {
       const privateStates = (privateByRoom.get(r.id) ?? []).map(
         (row) => row.privateState as PlayerPrivateState
       );
-      const events = (eventsByRoom.get(r.id) ?? []).map<GameEvent>((row) => ({
-        id: row.id,
-        gameRoomId: row.gameRoomId,
-        seq: row.seq,
-        type: row.type as GameEvent["type"],
-        visibility: row.visibility as GameEvent["visibility"],
-        ...(row.actorId !== null ? { actorId: row.actorId } : {}),
-        ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
-        payload: (row.payload ?? {}) as GameEvent["payload"],
-        createdAt: row.createdAt.toISOString(),
-      }));
       return {
         id: r.id,
         creatorUserId: r.creatorUserId,
@@ -464,7 +442,11 @@ export class GameStore {
         players,
         projection: payload?.projection ?? null,
         privateStates,
-        events,
+        events: [],
+        nextEventIndex: nextLegacyEventIndex(
+          r.id,
+          eventIdsByRoom.get(r.id)?.map((event) => event.id) ?? []
+        ),
         pendingNightActions: (payload?.runtime?.pendingNightActions ??
           []) as StoredGameRoom["pendingNightActions"],
         pendingVotes: payload?.runtime?.pendingVotes ?? [],
@@ -501,36 +483,29 @@ export class GameStore {
     return rows.map((row) => row.id);
   }
 
-  /**
-   * Load all events for a room with seq > `sinceSeq`, ordered by seq. Used
-   * by the SSE subscribe endpoint to replay history after a process restart
-   * (when the broker's in-memory history is empty).
-   */
-  async loadEventsSince(
+  async loadEventsAfter(
     gameRoomId: string,
-    sinceSeq: number
+    afterEventId: string | null | undefined
   ): Promise<GameEvent[]> {
+    void gameRoomId;
+    void afterEventId;
+    return [];
+  }
+
+  async loadRawSsePayloadsAfter(
+    gameRoomId: string,
+    afterEventId: string | null | undefined
+  ): Promise<Array<{ id: string; rawSsePayload: string }>> {
     const rows = await this.db
-      .select()
+      .select({
+        id: gameEvents.id,
+        rawSsePayload: gameEvents.rawSsePayload,
+      })
       .from(gameEvents)
-      .where(
-        and(
-          eq(gameEvents.gameRoomId, gameRoomId),
-          gt(gameEvents.seq, sinceSeq)
-        )
-      )
-      .orderBy(asc(gameEvents.seq));
-    return rows.map<GameEvent>((row) => ({
-      id: row.id,
-      gameRoomId: row.gameRoomId,
-      seq: row.seq,
-      type: row.type as GameEvent["type"],
-      visibility: row.visibility as GameEvent["visibility"],
-      ...(row.actorId !== null ? { actorId: row.actorId } : {}),
-      ...(row.subjectId !== null ? { subjectId: row.subjectId } : {}),
-      payload: (row.payload ?? {}) as GameEvent["payload"],
-      createdAt: row.createdAt.toISOString(),
-    }));
+      .where(eq(gameEvents.gameRoomId, gameRoomId));
+    return rows
+      .filter((row) => !afterEventId || isEventIdAfter(row.id, afterEventId))
+      .sort((a, b) => compareEventIds(a.id, b.id));
   }
 
   /** Drop everything for a room — only used by tests / dev tools. */
@@ -562,5 +537,47 @@ function groupBy<T, K>(items: T[], key: (item: T) => K): Map<K, T[]> {
   return out;
 }
 
-// Suppress unused-import warnings — `rawSql` is exported for future use.
-void rawSql;
+export function nextLegacyEventIndex(roomId: string, eventIds: string[]): number {
+  let maxIndex = 0;
+  const prefix = `${roomId}_`;
+  for (const id of eventIds) {
+    if (!id.startsWith(prefix)) continue;
+    const suffix = id.slice(prefix.length);
+    if (!/^\d+$/.test(suffix)) continue;
+    maxIndex = Math.max(maxIndex, Number(suffix));
+  }
+  return Math.max(maxIndex, eventIds.length) + 1;
+}
+
+type GameEventInsert = typeof gameEvents.$inferInsert;
+
+export function toLegacyGameEventRow(
+  roomId: string,
+  event: GameEvent
+): GameEventInsert {
+  const rawEvent = {
+    id: event.id,
+    gameRoomId: roomId,
+    type: event.type,
+    visibility: event.visibility,
+    ...(event.actorId !== undefined ? { actorId: event.actorId } : {}),
+    ...(event.subjectId !== undefined ? { subjectId: event.subjectId } : {}),
+    payload: event.payload,
+    createdAt: event.createdAt,
+  };
+  return {
+    id: event.id,
+    gameRoomId: roomId,
+    commandId: event.id,
+    commandEventIndex: 0,
+    type: event.type,
+    visibility: event.visibility,
+    actorId: event.actorId ?? null,
+    subjectId: event.subjectId ?? null,
+    payload: event.payload,
+    rawEventJson: JSON.stringify(rawEvent),
+    rawSsePayload: `id: ${event.id}\ndata: ${JSON.stringify(event)}\n\n`,
+    visibleToPlayerIds: [],
+    createdAt: new Date(event.createdAt),
+  };
+}

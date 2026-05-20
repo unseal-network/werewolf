@@ -147,7 +147,7 @@ export function applyProjectionEvent(
       ...projectionBaseForEvent(projection, event),
       status: "active",
       alivePlayerIds: playerIds,
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   if (event.type === "phase_started") {
@@ -162,7 +162,7 @@ export function applyProjectionEvent(
           ? event.payload.deadlineAt
           : null,
       currentSpeakerPlayerId: null,
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   if (event.type === "turn_started") {
@@ -180,7 +180,7 @@ export function applyProjectionEvent(
         typeof event.payload.currentSpeakerPlayerId === "string"
           ? event.payload.currentSpeakerPlayerId
           : event.subjectId ?? baseProjection.currentSpeakerPlayerId,
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   if (!projection) return projection;
@@ -191,7 +191,7 @@ export function applyProjectionEvent(
         event.actorId && event.actorId === projection.currentSpeakerPlayerId
           ? null
           : projection.currentSpeakerPlayerId,
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   if (event.type === "phase_closed") {
@@ -204,7 +204,7 @@ export function applyProjectionEvent(
       phase: nextPhase,
       deadlineAt: null,
       currentSpeakerPlayerId: null,
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   if (event.type === "player_eliminated") {
@@ -213,7 +213,7 @@ export function applyProjectionEvent(
     return {
       ...projection,
       alivePlayerIds: projection.alivePlayerIds.filter((id) => id !== playerId),
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   if (event.type === "game_ended") {
@@ -227,7 +227,7 @@ export function applyProjectionEvent(
           : projection.winner,
       deadlineAt: null,
       currentSpeakerPlayerId: null,
-      version: event.seq,
+      version: eventVersion(event),
     };
   }
   return projection;
@@ -252,8 +252,12 @@ function projectionBaseForEvent(
     currentSpeakerPlayerId: null,
     winner: null,
     alivePlayerIds: [],
-    version: event.seq,
+    version: eventVersion(event),
   };
+}
+
+function eventVersion(event: GameEventDto): number | string {
+  return event.seq ?? event.id;
 }
 
 function roomPlayerPayload(value: unknown): RoomPlayer | null {
@@ -290,20 +294,20 @@ function roomPlayerPayload(value: unknown): RoomPlayer | null {
 function deriveRoomFromTimeline(
   snapshot: GameRoom | null,
   timeline: GameEventDto[],
-  baseSeq: number
+  baseEventId: string
 ): GameRoom | null {
   return timeline
-    .filter((event) => event.seq > baseSeq)
+    .filter((event) => isEventIdAfter(event.id, baseEventId))
     .reduce(applyRoomEvent, snapshot);
 }
 
 function deriveProjectionFromTimeline(
   snapshot: RoomProjection | null,
   timeline: GameEventDto[],
-  baseSeq: number
+  baseEventId: string
 ): RoomProjection | null {
   return timeline
-    .filter((event) => event.seq > baseSeq)
+    .filter((event) => isEventIdAfter(event.id, baseEventId))
     .reduce(applyProjectionEvent, snapshot);
 }
 
@@ -462,7 +466,7 @@ export function deriveTimelineDisplayFacts(
   timeline: GameEventDto[]
 ): TimelineDisplayFacts {
   return [...timeline]
-    .sort((a, b) => a.seq - b.seq)
+    .sort(compareGameEventIds)
     .reduce(applyTimelineFactEvent, createTimelineDisplayFacts());
 }
 
@@ -543,18 +547,22 @@ export function deriveTimelineDisplayState(
   roomSnapshot: GameRoom | null,
   projectionSnapshot: RoomProjection | null,
   timeline: GameEventDto[],
-  baseSeq: number,
+  baseCursor: number | string,
   viewerUserId?: string
 ): TimelineDisplayState {
-  const orderedTimeline = [...timeline].sort((a, b) => a.seq - b.seq);
-  const liveEvents = orderedTimeline.filter((event) => event.seq > baseSeq);
+  const baseEventId =
+    typeof baseCursor === "string" ? baseCursor : legacyBaseEventId(timeline, baseCursor);
+  const orderedTimeline = [...timeline].sort(compareGameEventIds);
+  const liveEvents = orderedTimeline.filter((event) =>
+    isEventIdAfter(event.id, baseEventId)
+  );
   const projectionBase = projectionSnapshot ?? roomSnapshot?.projection ?? null;
   const projection = deriveProjectionFromTimeline(
     projectionBase,
     liveEvents,
-    0
+    ""
   );
-  const room = deriveRoomFromTimeline(roomSnapshot, liveEvents, 0);
+  const room = deriveRoomFromTimeline(roomSnapshot, liveEvents, "");
 
   // un.log('room', room)
   return {
@@ -576,5 +584,49 @@ export function deriveTimelineDisplayState(
 }
 
 export function computeTimelineBaseSeq(events: GameEventDto[]): number {
-  return events.reduce((maxSeq, event) => Math.max(maxSeq, event.seq), 0);
+  return events.reduce((maxSeq, event) => Math.max(maxSeq, event.seq ?? 0), 0);
+}
+
+export function computeTimelineBaseEventId(events: GameEventDto[]): string {
+  return events.reduce(
+    (maxEventId, event) =>
+      compareEventIds(event.id, maxEventId) > 0 ? event.id : maxEventId,
+    ""
+  );
+}
+
+export function compareGameEventIds(a: GameEventDto, b: GameEventDto): number {
+  return compareEventIds(a.id, b.id);
+}
+
+export function compareGameEventIdStrings(a: string, b: string): number {
+  return compareEventIds(a, b);
+}
+
+function legacyBaseEventId(events: GameEventDto[], baseSeq: number): string {
+  return computeTimelineBaseEventId(
+    events.filter((event) => (event.seq ?? 0) <= baseSeq)
+  );
+}
+
+function isEventIdAfter(eventId: string, baseEventId: string): boolean {
+  return !baseEventId || compareEventIds(eventId, baseEventId) > 0;
+}
+
+function compareEventIds(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a) return b ? -1 : 0;
+  if (!b) return 1;
+  const aParts = splitNumericSuffix(a);
+  const bParts = splitNumericSuffix(b);
+  if (aParts && bParts && aParts.prefix === bParts.prefix) {
+    return aParts.value - bParts.value;
+  }
+  return a.localeCompare(b);
+}
+
+function splitNumericSuffix(value: string): { prefix: string; value: number } | null {
+  const match = value.match(/^(.*?)(\d+)$/);
+  if (!match) return null;
+  return { prefix: match[1]!, value: Number(match[2]) };
 }

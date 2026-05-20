@@ -1,5 +1,7 @@
 import type { SeatData } from "./SeatAvatar";
 import { useT } from "../i18n/I18nProvider";
+import { GameButton } from "./GameButton";
+import { GameIconButton } from "./GameIconButton";
 import { UiPanelFrame } from "./UiPanelFrame";
 
 interface UserInfoPanelProps {
@@ -70,14 +72,13 @@ export function UserInfoPanel({
                   {t("seat.numberLabel", { n: seat.seatNo })} · {status}
                 </div>
               </div>
-              <button
-                type="button"
+              <GameIconButton
                 className="profile-close"
                 onClick={onClose}
                 aria-label={t("user.close")}
-              >
-                ×
-              </button>
+                label="×"
+                size="sm"
+              />
             </div>
             <div className="profile-facts">
               <div className="profile-fact">
@@ -98,13 +99,13 @@ export function UserInfoPanel({
               </div>
             </div>
             {canRemove && !seat.isEmpty ? (
-              <button
-                type="button"
-                className="stage-skip profile-remove"
+              <GameButton
+                className="profile-remove"
+                variant="secondary"
+                size="sm"
                 onClick={onRemove}
-              >
-                {t("user.removeFromSeat")}
-              </button>
+                label={t("user.removeFromSeat")}
+              />
             ) : null}
           </>
         ) : null}

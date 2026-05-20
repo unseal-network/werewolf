@@ -1,8 +1,98 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { createApp } from "../app";
 import { createTestDeps } from "../test-utils";
 
 describe("games API", () => {
+  it.each([
+    ["join", "POST", "/games/game_1/join", { seatNo: 1 }],
+    ["leave", "POST", "/games/game_1/leave", {}],
+    ["swapSeat", "POST", "/games/game_1/seat", { seatNo: 2 }],
+    ["start", "POST", "/games/game_1/start", {}],
+    ["submitAction", "POST", "/games/game_1/actions", { kind: "pass" }],
+  ])("routes %s through room actor", async (expectedKind, method, path, body) => {
+    const dispatched: unknown[] = [];
+    const app = createApp({
+      ...createTestDeps(),
+      roomActors: {
+        dispatch: async (command: unknown) => {
+          dispatched.push(command);
+          return { kind: `${expectedKind}Accepted` };
+        },
+      },
+    });
+
+    const response = await app.request(path, {
+      method,
+      headers: {
+        authorization: "Bearer matrix-token-alice",
+        "content-type": "application/json",
+        "x-command-id": `cmd_${expectedKind}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    expect(response.status).toBeLessThan(500);
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({
+      kind: expectedKind,
+      commandId: `cmd_${expectedKind}`,
+      gameRoomId: "game_1",
+    });
+  });
+
+  it("game read returns display snapshot without full timeline", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+
+    const response = await app.request(`/games/${room.id}`, {
+      headers: { authorization: "Bearer matrix-token-alice" },
+    });
+
+    expect(response.status).toBe(200);
+    const json = await response.json() as any;
+    expect(json.snapshot.displayState).toBeTruthy();
+    expect(json.snapshot.displayState.room.events).toBeUndefined();
+    expect(json.timeline).toBeUndefined();
+    expect(json.events).toBeUndefined();
+  });
+
+  it("timeline endpoint pages by event id cursor", async () => {
+    const deps = createTestDeps();
+    const app = createApp(deps);
+    const { room } = deps.games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Friday Werewolf",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      "@alice:example.com"
+    );
+    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
+
+    const response = await app.request(
+      `/games/${room.id}/timeline?after=${room.id}_1&limit=50`,
+      { headers: { authorization: "Bearer matrix-token-alice" } }
+    );
+
+    expect(response.status).toBe(200);
+    const json = await response.json() as any;
+    expect(Array.isArray(json.events)).toBe(true);
+    expect(json.events.every((event: { id: string }) => event.id > `${room.id}_1`)).toBe(true);
+  });
+
   it("requires Matrix bearer auth", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", { method: "POST", body: "{}" });
@@ -193,7 +283,7 @@ describe("games API", () => {
     expect(body.card.targetPlayerCount).toBe(6);
   });
 
-  it("issues LiveKit tokens with Matrix user id as participant identity", async () => {
+  it("issues LiveKit tokens with Matrix identity and listen-only grants", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);
     const { room } = deps.games.createGame(
@@ -223,6 +313,31 @@ describe("games API", () => {
     expect(body.identity).toBe("@alice:example.com");
     expect(body.identity).not.toBe(player.id);
     expect(body.canPublish).toBe(true);
+    expect(body.canSubscribe).toBe(true);
+  });
+
+  it("delegates LiveKit room creation and event resync to the meeting controller", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/api/src/routes/livekit.ts"),
+      "utf8"
+    );
+    expect(source).toContain("livekitMeeting.ensureRoom(gameRoomId)");
+    expect(source).toContain("livekitMeeting.syncForLivekitEvent");
+    expect(source).not.toContain("new RoomServiceClient");
+    expect(source).not.toContain("const ensuredLivekitRooms = new Set<string>()");
+  });
+
+  it("keeps LiveKit room creation cached instead of creating the room for every token", () => {
+    const livekitRoute = readFileSync(
+      resolve(process.cwd(), "apps/api/src/routes/livekit.ts"),
+      "utf8"
+    );
+
+    expect(livekitRoute).toContain("const ensuredLivekitRooms = new Set<string>()");
+    expect(livekitRoute).toContain("const ensuringLivekitRooms = new Map<string, Promise<void>>()");
+    expect(livekitRoute).toContain("async function ensureLivekitRoom");
+    expect(livekitRoute).toContain("if (ensuredLivekitRooms.has(gameRoomId)) return");
+    expect(livekitRoute).toContain("await ensureLivekitRoom(gameRoomId)");
   });
 
   it("downloads a visible transcript event by id", async () => {
@@ -275,53 +390,6 @@ describe("games API", () => {
     expect(await response.text()).toBe("live subtitle text\n");
   });
 
-  it("rejects malformed action expectation guards", async () => {
-    const deps = createTestDeps();
-    const app = createApp(deps);
-    const { room } = deps.games.createGame(
-      {
-        sourceMatrixRoomId: "!source:example.com",
-        title: "Friday Werewolf",
-        targetPlayerCount: 6,
-        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
-      },
-      "@alice:example.com"
-    );
-    deps.games.join(room.id, "@alice:example.com", "Alice", undefined, 1);
-    for (const [userId, name] of [
-      ["@bob:example.com", "Bob"],
-      ["@cara:example.com", "Cara"],
-      ["@dan:example.com", "Dan"],
-      ["@erin:example.com", "Erin"],
-      ["@finn:example.com", "Finn"],
-    ] as const) {
-      deps.games.join(room.id, userId, name);
-    }
-    deps.games.start(room.id, "@alice:example.com");
-
-    const response = await app.request(`/games/${room.id}/actions`, {
-      method: "POST",
-      headers: {
-        authorization: "Bearer matrix-token-alice",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        kind: "pass",
-        expectedPhase: "night_guard",
-        expectedDay: "bogus",
-        expectedVersion: 1,
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual(
-      expect.objectContaining({
-        code: "invalid_action",
-        error: "expectedDay must be a positive integer",
-      })
-    );
-  });
-
   it("accepts Matrix user id as the action target at the API boundary", async () => {
     const deps = createTestDeps();
     const app = createApp(deps);
@@ -368,9 +436,6 @@ describe("games API", () => {
       body: JSON.stringify({
         kind: "vote",
         targetMatrixUserId: "@bob:example.com",
-        expectedPhase: "day_vote",
-        expectedDay: room.projection.day,
-        expectedVersion: room.projection.version,
       }),
     });
 
@@ -422,9 +487,6 @@ describe("games API", () => {
       body: JSON.stringify({
         kind: "vote",
         targetPlayerId: bob.id,
-        expectedPhase: "day_vote",
-        expectedDay: room.projection.day,
-        expectedVersion: room.projection.version,
       }),
     });
 

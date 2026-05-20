@@ -1,8 +1,11 @@
 import {
+  bigint,
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -65,18 +68,79 @@ export const gameEvents = pgTable(
   {
     id: text("id").primaryKey(),
     gameRoomId: text("game_room_id").notNull(),
-    seq: integer("seq").notNull(),
+    commandId: text("command_id").notNull(),
+    commandEventIndex: integer("command_event_index").notNull(),
     type: text("type").notNull(),
     visibility: text("visibility").notNull(),
     actorId: text("actor_id"),
     subjectId: text("subject_id"),
-    payload: jsonb("payload").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    payload: jsonb("payload").notNull().default({}),
+    rawEventJson: text("raw_event_json").notNull(),
+    rawSsePayload: text("raw_sse_payload").notNull(),
+    visibleToPlayerIds: jsonb("visible_to_player_ids").notNull().default([]),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
-    uniqueIndex("game_events_room_seq_idx").on(table.gameRoomId, table.seq),
+    uniqueIndex("game_events_room_command_index_idx").on(
+      table.gameRoomId,
+      table.commandId,
+      table.commandEventIndex
+    ),
+    index("game_events_room_id_idx").on(table.gameRoomId, table.id),
   ]
 );
+
+export const gameCommands = pgTable(
+  "game_commands",
+  {
+    gameRoomId: text("game_room_id").notNull(),
+    commandId: text("command_id").notNull(),
+    kind: text("kind").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    status: text("status").notNull(),
+    resultJson: jsonb("result_json").notNull().default({}),
+    firstEventId: text("first_event_id"),
+    lastEventId: text("last_event_id"),
+    errorCode: text("error_code"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.gameRoomId, table.commandId] }),
+  })
+);
+
+export const roomSnapshots = pgTable("room_snapshots", {
+  gameRoomId: text("game_room_id").primaryKey(),
+  snapshotEventId: text("snapshot_event_id").notNull(),
+  canonicalStateJson: jsonb("canonical_state_json").notNull(),
+  displayStateJson: jsonb("display_state_json").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const roomOwnership = pgTable("room_ownership", {
+  gameRoomId: text("game_room_id").primaryKey(),
+  ownerId: text("owner_id").notNull(),
+  fencingToken: bigint("fencing_token", { mode: "bigint" }).notNull(),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const eventIdWorkers = pgTable("event_id_workers", {
+  workerId: integer("worker_id").primaryKey(),
+  ownerId: text("owner_id").notNull(),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }).notNull(),
+});
 
 export const roomProjection = pgTable("room_projection", {
   gameRoomId: text("game_room_id").primaryKey(),

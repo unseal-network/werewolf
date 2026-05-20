@@ -29,9 +29,7 @@ export function buildHarnessContext(
     canSeeEvent(event, player.id, isWolf, includeWolfPrivate)
   );
 
-  const targetPlayerIds = room.projection.alivePlayerIds.filter(
-    (id) => id !== player.id
-  );
+  const targetPlayerIds = legalTargetPlayerIds(room, player, state);
 
   const sections = [
     buildPrivateInfoSection(room, player, state, playersById),
@@ -59,6 +57,93 @@ export function buildHarnessContext(
     alivePlayerIds: room.projection.alivePlayerIds,
     targetPlayerIds,
   };
+}
+
+function legalTargetPlayerIds(
+  room: HarnessContextInput["room"],
+  player: StoredPlayer,
+  state: HarnessContextInput["state"]
+): string[] {
+  if (!room.projection) return [];
+  const phase = room.projection.phase;
+  let targetPlayerIds = room.projection.alivePlayerIds.filter(
+    (id) => id !== player.id
+  );
+
+  if (phase === "night_guard" && state.role === "guard") {
+    const previousTargetId = lastGuardTarget(room, player.id);
+    if (previousTargetId) {
+      targetPlayerIds = targetPlayerIds.filter((id) => id !== previousTargetId);
+    }
+    if (
+      room.projection.alivePlayerIds.includes(player.id) &&
+      previousTargetId !== player.id
+    ) {
+      targetPlayerIds = [player.id, ...targetPlayerIds];
+    }
+  }
+
+  if (phase === "night_witch_heal" && state.role === "witch") {
+    if (!state.witchItems?.healAvailable) return [];
+    const wolfTargetId = currentWolfKillTarget(room);
+    return wolfTargetId ? [wolfTargetId] : [];
+  }
+
+  if (phase === "night_witch_poison" && state.role === "witch") {
+    if (!state.witchItems?.poisonAvailable) return [];
+  }
+
+  if (phase === "night_seer" && state.role === "seer") {
+    const inspectedIds = new Set(
+      room.events
+        .filter(
+          (event) =>
+            event.type === "seer_result_revealed" &&
+            event.payload?.seerPlayerId === player.id
+        )
+        .map((event) => String(event.payload?.inspectedPlayerId ?? ""))
+        .filter(Boolean)
+    );
+    targetPlayerIds = targetPlayerIds.filter((id) => !inspectedIds.has(id));
+  }
+
+  return targetPlayerIds;
+}
+
+function currentWolfKillTarget(room: HarnessContextInput["room"]): string | undefined {
+  const day = room.projection?.day;
+  const event = [...room.events].reverse().find(
+    (candidate) =>
+      candidate.type === "night_action_submitted" &&
+      candidate.payload?.phase === "night_wolf" &&
+      candidate.payload?.day === day &&
+      (candidate.payload?.action as { kind?: unknown } | undefined)?.kind ===
+        "wolfKill"
+  );
+  return event?.subjectId ?? nightActionTargetId(event);
+}
+
+function lastGuardTarget(
+  room: HarnessContextInput["room"],
+  guardPlayerId: string
+): string | undefined {
+  const event = [...room.events].reverse().find(
+    (candidate) =>
+      candidate.type === "night_action_submitted" &&
+      candidate.actorId === guardPlayerId &&
+      (candidate.payload?.action as { kind?: unknown } | undefined)?.kind ===
+        "guardProtect"
+  );
+  return event?.subjectId ?? nightActionTargetId(event);
+}
+
+function nightActionTargetId(event: GameEvent | undefined): string | undefined {
+  const action = event?.payload?.action;
+  if (!action || typeof action !== "object" || Array.isArray(action)) {
+    return undefined;
+  }
+  const targetPlayerId = (action as { targetPlayerId?: unknown }).targetPlayerId;
+  return typeof targetPlayerId === "string" ? targetPlayerId : undefined;
 }
 
 function buildTimelineText(
