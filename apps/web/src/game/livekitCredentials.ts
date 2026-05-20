@@ -25,6 +25,10 @@ export function getStableLivekitCredentials(
   return pending;
 }
 
+export function clearLivekitCredential(key: string): void {
+  credentialCache.delete(key);
+}
+
 export function clearLivekitCredentialCacheForTests(): void {
   credentialCache.clear();
 }

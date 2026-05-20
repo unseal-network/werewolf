@@ -53,6 +53,7 @@ export function useVoiceRoom(): VoiceRoomContextValue {
 export interface VoiceRoomProviderProps {
   serverUrl: string | null;
   token: string | null;
+  onTokenUnauthorized?: (() => void) | undefined;
   children: ReactNode;
 }
 
@@ -92,9 +93,21 @@ function isLivekitRateLimitError(err: unknown): boolean {
   return /\b429\b/.test(message) || /too many requests/i.test(message);
 }
 
+function isLivekitUnauthorizedError(err: unknown): boolean {
+  if (!err) return false;
+  if (typeof err === "object") {
+    const status = (err as { status?: unknown; code?: unknown }).status;
+    const code = (err as { status?: unknown; code?: unknown }).code;
+    if (status === 401 || code === 401 || code === "401") return true;
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return /\b401\b/.test(message) || /unauthorized/i.test(message);
+}
+
 export function VoiceRoomProvider({
   serverUrl,
   token,
+  onTokenUnauthorized,
   children,
 }: VoiceRoomProviderProps) {
   const [room, setRoom] = useState<Room | null>(null);
@@ -141,6 +154,7 @@ export function VoiceRoomProvider({
 
     let cancelled = false;
     let rateLimitPaused = false;
+    let tokenRefreshRequested = false;
     const lkRoom = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -294,6 +308,7 @@ export function VoiceRoomProvider({
         clearUnlockListener();
         clearRemoteAudioElements();
         if (rateLimitPaused) return;
+        if (tokenRefreshRequested) return;
         scheduleRoomReconnect("room disconnected");
       })
       .on(RoomEvent.LocalTrackPublished, updateMicState)
@@ -336,12 +351,22 @@ export function VoiceRoomProvider({
         if (cancelled) return;
         const attempt = retryAttemptRef.current;
         const rateLimited = isLivekitRateLimitError(err);
+        const unauthorized = isLivekitUnauthorizedError(err);
         console.error("[VoiceRoom] connect failed", {
           err,
           attempt,
           rateLimited,
-          willRetry: !rateLimited,
+          unauthorized,
+          willRetry: !rateLimited && !unauthorized,
         });
+        if (unauthorized) {
+          tokenRefreshRequested = true;
+          clearRetryTimer();
+          setState("reconnecting");
+          setErrorMessage("语音登录已过期，正在刷新连接");
+          onTokenUnauthorized?.();
+          return;
+        }
         if (rateLimited) {
           rateLimitPaused = true;
           clearRetryTimer();
@@ -360,7 +385,7 @@ export function VoiceRoomProvider({
       void lkRoom.disconnect().catch(() => {});
       setRoom((current) => (current === lkRoom ? null : current));
     };
-  }, [serverUrl, token, reconnectNonce]);
+  }, [serverUrl, token, reconnectNonce, onTokenUnauthorized]);
 
   const enableMicrophone = useCallback(async () => {
     if (!room) {
