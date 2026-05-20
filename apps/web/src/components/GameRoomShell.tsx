@@ -182,7 +182,6 @@ function shouldSuppressGameContextMenu(target: EventTarget | null): boolean {
         ".player-picker-wheel",
         ".player-picker-avatar",
         ".player-picker-slice",
-        ".stage-action-button",
         ".role-card-entry",
       ].join(", ")
     )

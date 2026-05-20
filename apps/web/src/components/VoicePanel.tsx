@@ -284,7 +284,7 @@ export function VoicePanel({
       <div className="target-row voice-actions">
         {bubbleLayout.action === "submit" ? (
           <StageActionButton
-            className="stage-confirm"
+            className="voice-submit-action"
             label={submitLabel}
             variant="primary"
             onClick={handleTextSubmit}
@@ -293,7 +293,7 @@ export function VoicePanel({
           />
         ) : (
           <StageActionButton
-            className="stage-confirm"
+            className="voice-submit-action"
             label={submitLabel}
             variant="primary"
             onClick={finishVoiceSpeech}

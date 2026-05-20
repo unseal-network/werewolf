@@ -18,9 +18,11 @@ const agents: AgentCandidate[] = [
 function renderPicker({
   errorMessage,
   candidates = agents,
+  canStart = true,
 }: {
   errorMessage?: string;
   candidates?: AgentCandidate[];
+  canStart?: boolean;
 } = {}) {
   return renderToStaticMarkup(
     createElement(
@@ -37,7 +39,7 @@ function renderPicker({
         onAdd: async () => undefined,
         onRemove: async () => undefined,
         onRefresh: () => undefined,
-        onStartNow: () => undefined,
+        ...(canStart ? { onStartNow: () => undefined } : {}),
         onClose: () => undefined,
       })
     )
@@ -59,7 +61,7 @@ describe("AgentPicker", () => {
     const html = renderPicker();
 
     expect(html).toContain("agent-add-button");
-    expect(html).toContain(">+</button>");
+    expect(html).toContain('<span class="art-icon-button__label">+</span>');
     expect(html).not.toContain("加入座位");
     expect(html).not.toContain("ww-game-button__label");
   });
@@ -70,7 +72,7 @@ describe("AgentPicker", () => {
     });
 
     expect(html).toContain("agent-add-button added");
-    expect(html).toContain(">-</button>");
+    expect(html).toContain('<span class="art-icon-button__label">-</span>');
     expect(html).not.toContain("已入座");
     expect(html).not.toContain("ww-game-button__label");
   });
@@ -82,5 +84,12 @@ describe("AgentPicker", () => {
     expect(html).not.toContain("从源 Matrix 房间挑选 AI");
     expect(html).not.toContain("源房间 id");
     expect(html).not.toContain("!source:keepsecret.io");
+  });
+
+  it("hides start-now when the caller does not provide the start action", () => {
+    const html = renderPicker({ canStart: false });
+
+    expect(html).toContain("刷新列表");
+    expect(html).not.toContain("立刻开始");
   });
 });

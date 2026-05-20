@@ -56,13 +56,18 @@ describe("new UI primitives", () => {
     expect(css).toContain(".game-layout-root .ww-ui-panel__content");
     expect(css).toContain("overflow: hidden");
     expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-row");
-    expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) 128px");
+    expect(css).toContain("grid-template-columns: 48px minmax(0, 1fr) auto");
+    expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button");
+    expect(css).toContain("justify-self: end");
+    expect(css).toContain("grid-template-columns: repeat(2, minmax(0, 96px))");
+    expect(css).toContain("--art-button-width: 96px");
+    expect(css).toContain("justify-content: center");
     expect(css).toContain("overflow-x: hidden");
     expect(css).not.toContain(".agent-add-button.ww-icon-button");
     expect(css).not.toContain("--ww-agent-add-size");
   });
 
-  it("keeps compact agent add/remove glyphs as direct button text", () => {
+  it("keeps compact agent add/remove glyphs centered by the shared icon button", () => {
     const html = renderToStaticMarkup(
       createElement(GameIconButton, {
         label: "+",
@@ -76,15 +81,16 @@ describe("new UI primitives", () => {
       "utf8"
     );
 
-    expect(html).toContain("ww-icon-button");
-    expect(html).toContain("ww-icon-button--lg");
-    expect(html).toContain(">+</button>");
+    expect(html).toContain("art-icon-button");
+    expect(html).toContain("agent-add-button");
+    expect(html).toContain('<span class="art-icon-button__label">+</span>');
     expect(html).not.toContain("ww-icon-button__content");
     expect(css).not.toContain(".game-layout-root .ww-icon-button");
+    expect(css).not.toContain("--ww-icon-button-size");
     expect(css).not.toContain(".game-layout-root .ww-icon-button__content");
   });
 
-  it("renders decision buttons with shared 9-slice art skins and live text", () => {
+  it("renders decision buttons without generated visual skin classes", () => {
     const html = renderToStaticMarkup(
       createElement(
         "div",
@@ -99,25 +105,18 @@ describe("new UI primitives", () => {
       "utf8"
     );
 
-    expect(html).toContain("ww-game-button--primary");
-    expect(html).toContain("ww-game-button--confirm");
-    expect(html).toContain("ww-game-button--secondary");
-    expect(html).toContain('data-game-button-variant="primary"');
-    expect(html).toContain('data-game-button-variant="confirm"');
-    expect(html).toContain('data-game-button-variant="secondary"');
+    expect(html).not.toContain("ww-game-button");
+    expect(html).not.toContain("data-game-button-variant");
     expect(html).toContain(">Start<");
     expect(html).not.toContain("ww-game-button__chrome");
     expect(html).not.toContain("ww-game-button__content");
     expect(html).not.toContain("ww-game-button__label");
-    expect(css).toContain(".game-layout-root .ww-game-button");
-    expect(css).toContain("submit-button-9slice.webp");
-    expect(css).toContain("confirm-button-9slice.webp");
-    expect(css).toContain("cancel-button-9slice.webp");
-    expect(css).toContain("border-image-source: var(--ww-button-skin-image)");
-    expect(css).toContain("border-image-slice: var(--ww-button-skin-slice) fill");
+    expect(css).not.toContain(".game-layout-root .ww-game-button");
+    expect(css).not.toContain("button/decision");
+    expect(css).not.toContain("border-image-source: var(--ww-button-skin-image)");
   });
 
-  it("renders reusable icon buttons without shared visual chrome", () => {
+  it("renders reusable icon buttons with one shared icon style", () => {
     const html = renderToStaticMarkup(
       createElement(GameIconButton, {
         label: "+",
@@ -131,12 +130,10 @@ describe("new UI primitives", () => {
       "utf8"
     );
 
-    expect(html).toContain("ww-icon-button");
-    expect(html).toContain("ww-icon-button--lg");
+    expect(html).not.toContain("ww-icon-button");
     expect(html).toContain(">+<");
     expect(html).not.toContain("ww-icon-button__content");
     expect(css).not.toContain(".game-layout-root .ww-icon-button");
-    expect(css).not.toContain("--ww-icon-button-size");
   });
 
   it("renders segmented controls from unstyled button primitives", () => {
@@ -155,41 +152,53 @@ describe("new UI primitives", () => {
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
       "utf8"
     );
+    const actionCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
+      "utf8"
+    );
 
     expect(html).toContain("ww-segmented-control");
-    expect(html).toContain("ww-game-button--primary");
-    expect(html).toContain("ww-game-button--secondary");
+    expect(html).not.toContain("ww-game-button");
     expect(css).not.toContain(".game-layout-root .ww-segmented-control");
     expect(css).not.toContain(".ww-segmented-control__option");
     expect(css).not.toContain(".ww-segmented-control button.active");
+    expect(actionCss).toContain(".game-layout-root .action-region .ww-segmented-control");
+    expect(actionCss).toContain("grid-template-columns: repeat(2, minmax(0, calc(112px * var(--layout-action-scale, 1))))");
+    expect(actionCss).toContain(".game-layout-root .action-region .ww-segmented-control__option");
+    expect(actionCss).toContain("--art-button-width: calc(112px * var(--layout-action-scale, 1))");
   });
 
-  it("maps the room start action to the primary button skin", () => {
+  it("does not add generated stage action classes", () => {
     const html = renderToStaticMarkup(
       createElement(StageActionButton, {
-        className: "stage-start",
+        className: "action-start",
         label: "Start",
       })
     );
 
-    expect(html).toContain("ww-game-button--primary");
-    expect(html).not.toContain("ww-game-button--confirm");
+    expect(html).toContain("art-button");
+    expect(html).toContain("action-start");
+    expect(html).toContain('<img class="art-button__image"');
+    expect(html).toContain('<span class="art-button__label">Start</span>');
+    expect(html).not.toContain("stage-action-button");
+    expect(html).not.toContain("ww-game-button");
   });
 
-  it("maps primary stage actions to the shared primary button skin", () => {
+  it("keeps caller layout classes only for primary stage actions", () => {
     const html = renderToStaticMarkup(
       createElement(StageActionButton, {
-        className: "stage-confirm player-picker-action",
+        className: "action-confirm player-picker-action",
         label: "确认查验",
         variant: "primary",
       })
     );
 
-    expect(html).toContain("ww-game-button--primary");
-    expect(html).not.toContain("ww-game-button--confirm");
+    expect(html).toContain("action-confirm player-picker-action");
+    expect(html).toContain('<img class="art-button__image"');
+    expect(html).not.toContain("ww-game-button");
   });
 
-  it("removes legacy action container and picker button backgrounds", () => {
+  it("keeps action containers visual-free without owning button skins", () => {
     const css = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
       "utf8"
@@ -199,15 +208,14 @@ describe("new UI primitives", () => {
     expect(css).toContain("background: transparent !important");
     expect(css).toContain("box-shadow: none !important");
     expect(css).toContain("backdrop-filter: none !important");
-    expect(css).toContain(".game-layout-root .action-region .stage-start");
+    expect(css).toContain(".game-layout-root .action-region .action-start");
     expect(css).toContain(".game-layout-root .action-region .player-picker-action");
-    expect(css).toContain("padding: 0 !important");
-    expect(css).toContain("border: 0 !important");
-    expect(css).toContain("background: none !important");
-    expect(css).toContain("background-image: none !important");
+    expect(css).toContain("pointer-events: none");
+    expect(css).not.toContain("border-image-source: var(--ww-button-skin-image)");
+    expect(css).not.toContain("border-image-slice: var(--ww-button-skin-slice) fill");
   });
 
-  it("keeps action buttons positioned by the scene while clearing visual styles", () => {
+  it("keeps action buttons positioned by the scene while skins stay in primitives", () => {
     const primitiveCss = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/ui-primitives.css"),
       "utf8"
@@ -217,20 +225,20 @@ describe("new UI primitives", () => {
       "utf8"
     );
     const actionButtonCss = actionCss.slice(
-      actionCss.indexOf(".game-layout-root .action-region .stage-start")
+      actionCss.indexOf(".game-layout-root .action-region .action-start")
     );
-    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
     expect(primitiveCss).not.toContain(".game-layout-root .ww-icon-button");
-    expect(actionButtonCss).toContain("width: var(--action-button-width) !important");
-    expect(actionButtonCss).toContain("max-width: var(--action-button-width) !important");
-    expect(actionButtonCss).toContain("background: none !important");
-    expect(actionButtonCss).toContain("background-image: none !important");
-    expect(actionButtonCss).toContain("box-shadow: none !important");
+    expect(actionButtonCss).toContain("--art-button-width: var(--action-button-width)");
+    expect(actionButtonCss).toContain("max-width: 100%");
+    expect(actionButtonCss).not.toContain("border-image-source");
+    expect(actionButtonCss).not.toContain("background: none !important");
     const nonResetBackgroundLines = actionButtonCss
       .split("\n")
       .filter((line) => /\bbackground\s*:/.test(line))
       .filter((line) => !line.includes("background: none"))
-      .filter((line) => !line.includes("background: transparent"));
+      .filter((line) => !line.includes("background: transparent"))
+      .filter((line) => !line.includes("var(--voice-frame-layer)"));
 
     expect(nonResetBackgroundLines).toEqual([]);
     expect(actionButtonCss).not.toContain("rgba(255, 255, 255");
@@ -240,12 +248,26 @@ describe("new UI primitives", () => {
     expect(actionCss).toContain("--voice-active-fill-layer: transparent");
   });
 
-  it("centers the lobby add-agent glyph inside its short stage button", () => {
+  it("removes old stage button skins from legacy styles", () => {
+    const legacyCss = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/legacy.css"),
+      "utf8"
+    );
+
+    expect(legacyCss).not.toContain(".stage-confirm");
+    expect(legacyCss).not.toContain(".stage-start");
+    expect(legacyCss).not.toContain(".stage-skip");
+    expect(legacyCss).not.toContain(".stage-action-button");
+    expect(legacyCss).not.toContain("stage-button-spin");
+    expect(legacyCss).not.toContain(".player-picker .player-picker-action");
+  });
+
+  it("keeps the lobby add-agent action as a small icon next to the main button", () => {
     const html = renderToStaticMarkup(
-      createElement(StageActionButton, {
-        className: "stage-skip stage-add-player",
+      createElement(GameIconButton, {
+        className: "action-add-player",
         label: "+",
-        variant: "secondary",
+        size: "sm",
       })
     );
     const css = readFileSync(
@@ -253,13 +275,20 @@ describe("new UI primitives", () => {
       "utf8"
     );
 
-    expect(html).toContain("stage-add-player");
-    expect(html).toContain(">+</button>");
+    expect(html).toContain("action-add-player");
+    expect(html).toContain('<span class="art-icon-button__label">+</span>');
     expect(html).not.toContain("ww-game-button__label");
     expect(css).not.toContain(".stage-add-player .ww-game-button__label");
-    expect(css).toContain(".game-layout-root .action-region .stage-skip");
-    expect(css).toContain("width: var(--action-secondary-button-width) !important");
-    expect(css).toContain("transform: none !important");
+    expect(css).toContain(".game-layout-root .action-region .action-add-player");
+    expect(css).toContain("--art-icon-button-size");
+    expect(css).toContain("--action-primary-button-width: min(100%, calc(225px * var(--layout-action-scale, 1)))");
+    expect(css).toContain("grid-template-columns: minmax(0, 1fr) minmax(0, var(--action-primary-button-width)) minmax(0, 1fr)");
+    expect(css).toContain(".game-layout-root .action-region .lobby-action-row .action-start");
+    expect(css).toContain("grid-column: 2");
+    expect(css).toContain("grid-column: 3");
+    expect(css).toContain("justify-self: start !important");
+    expect(css).not.toContain(".game-layout-root .action-region .action-add-player {\n  --art-button-width");
+    expect(css).not.toContain("transform: none !important");
   });
 
   it("routes one-glyph chrome buttons through GameIconButton", () => {
@@ -290,17 +319,15 @@ describe("new UI primitives", () => {
     expect(source).not.toContain('className="action-mode-switch"');
   });
 
-  it("removes legacy action button press overlays from the new button skins", () => {
+  it("deletes legacy action button press overlays from the action region", () => {
     const css = readFileSync(
       resolve(process.cwd(), "apps/web/src/styles/game-room/components/action-region.css"),
       "utf8"
     );
 
-    expect(css).toContain(".game-layout-root .action-region .stage-action-button::after");
-    expect(css).toContain(".game-layout-root .action-region .player-picker-action::after");
-    expect(css).toContain("content: none !important");
-    expect(css).toContain("display: none !important");
-    expect(css).toContain(".game-layout-root .action-region .stage-action-button.is-pressed");
+    expect(css).not.toContain(".game-layout-root .action-region .stage-action-button::after");
+    expect(css).not.toContain(".game-layout-root .action-region .player-picker-action::after");
+    expect(css).not.toContain(".game-layout-root .action-region .stage-action-button.is-pressed");
     expect(css).not.toContain(".game-layout-root .action-region .stage-action-button__content");
     expect(css).not.toContain("--ww-button-content-offset-y");
     expect(css).not.toContain("line-height: 1 !important");

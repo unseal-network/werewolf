@@ -186,93 +186,151 @@
   min-width: 0;
 }
 
-.game-layout-root .ww-game-button {
-  --ww-button-scale: 1;
-  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
-  --ww-button-skin-slice: 40 64;
-  --ww-button-border-y: calc(21px * var(--ww-button-scale));
-  --ww-button-border-x: calc(32px * var(--ww-button-scale));
-  --ww-button-min-width: calc(180px * var(--ww-button-scale));
-  --ww-button-min-height: calc(56px * var(--ww-button-scale));
-  --ww-button-padding-y: calc(10px * var(--ww-button-scale));
-  --ww-button-padding-x: calc(38px * var(--ww-button-scale));
-  --ww-button-font-size: calc(18px * var(--ww-button-scale));
+.game-layout-root .art-button {
+  --art-button-width: 280px;
+  --art-button-aspect: 775 / 239;
+  --art-button-font-size: 20px;
   appearance: none;
   -webkit-appearance: none;
+  position: relative;
   box-sizing: border-box;
-  min-width: var(--ww-button-min-width);
-  min-height: var(--ww-button-min-height);
-  display: inline-grid;
-  place-items: center;
-  padding: var(--ww-button-padding-y) var(--ww-button-padding-x);
-  border-style: solid;
-  border-color: transparent;
-  border-width: var(--ww-button-border-y) var(--ww-button-border-x);
-  border-image-source: var(--ww-button-skin-image);
-  border-image-slice: var(--ww-button-skin-slice) fill;
-  border-image-width: var(--ww-button-border-y) var(--ww-button-border-x);
-  border-image-repeat: stretch;
+  width: min(100%, var(--art-button-width));
+  aspect-ratio: var(--art-button-aspect);
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   color: #fff7d8;
   font: inherit;
-  font-size: var(--ww-button-font-size);
+  font-size: var(--art-button-font-size);
   font-weight: 950;
   line-height: 1;
   text-align: center;
   text-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.86),
-    0 0 12px rgba(0, 0, 0, 0.46);
+    0 2px 4px rgba(0, 0, 0, 0.88),
+    0 0 12px rgba(0, 0, 0, 0.50);
   cursor: pointer;
   user-select: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
-.game-layout-root .ww-game-button--sm {
-  --ww-button-scale: 0.78;
+.game-layout-root .art-button--sm {
+  --art-button-width: 190px;
+  --art-button-font-size: 15px;
 }
 
-.game-layout-root .ww-game-button--lg {
-  --ww-button-scale: 1.12;
+.game-layout-root .art-button--md {
+  --art-button-width: 280px;
+  --art-button-font-size: 20px;
 }
 
-.game-layout-root .ww-game-button--primary {
-  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/submit-button-9slice.webp");
-  --ww-button-skin-slice: 76 168;
-  --ww-button-border-y: calc(38px * var(--ww-button-scale));
-  --ww-button-border-x: calc(84px * var(--ww-button-scale));
-  --ww-button-min-width: calc(190px * var(--ww-button-scale));
-  --ww-button-min-height: calc(52px * var(--ww-button-scale));
-  --ww-button-padding-y: calc(10px * var(--ww-button-scale));
-  --ww-button-padding-x: calc(62px * var(--ww-button-scale));
+.game-layout-root .art-button--lg {
+  --art-button-width: 390px;
+  --art-button-font-size: 24px;
 }
 
-.game-layout-root .ww-game-button--confirm {
-  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/confirm-button-9slice.webp");
+.game-layout-root .art-button--primary,
+.game-layout-root .art-button--secondary {
+  --art-button-width: 300px;
 }
 
-.game-layout-root .ww-game-button--secondary {
-  --ww-button-skin-image: url("/assets/werewolf-ui/final/button/decision/cancel-button-9slice.webp");
-  --ww-button-skin-slice: 76 168;
-  --ww-button-border-y: calc(38px * var(--ww-button-scale));
-  --ww-button-border-x: calc(84px * var(--ww-button-scale));
-  --ww-button-min-width: calc(190px * var(--ww-button-scale));
-  --ww-button-min-height: calc(52px * var(--ww-button-scale));
-  --ww-button-padding-y: calc(10px * var(--ww-button-scale));
-  --ww-button-padding-x: calc(62px * var(--ww-button-scale));
+.game-layout-root .art-button--confirm {
+  --art-button-width: 240px;
 }
 
-.game-layout-root .ww-game-button:disabled {
+.game-layout-root .art-button__image,
+.game-layout-root .art-button__label {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.game-layout-root .art-button__image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  user-select: none;
+}
+
+.game-layout-root .art-button__label {
+  display: grid;
+  place-items: center;
+  padding: 0 18%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-layout-root .art-button:disabled {
   cursor: not-allowed;
-  opacity: 0.58;
-  filter: grayscale(0.42) brightness(0.78);
+  opacity: 0.48;
+  filter: grayscale(0.38) brightness(0.78);
 }
 
-.game-layout-root .ww-game-button:not(:disabled):active,
-.game-layout-root .ww-game-button.is-pressed:not(:disabled) {
+.game-layout-root .art-button:not(:disabled):active,
+.game-layout-root .art-button[aria-pressed="true"]:not(:disabled) {
   transform: translateY(1px) scale(0.99);
 }
 
-.game-layout-root .ww-game-button:focus-visible {
+.game-layout-root .art-button:focus-visible {
+  outline: 2px solid rgba(255, 235, 160, 0.78);
+  outline-offset: 3px;
+}
+
+.game-layout-root .art-icon-button {
+  --art-icon-button-size: 38px;
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: var(--art-icon-button-size);
+  height: var(--art-icon-button-size);
+  min-width: var(--art-icon-button-size);
+  min-height: var(--art-icon-button-size);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(226, 202, 139, 0.36);
+  border-radius: 999px;
+  background: rgba(3, 8, 10, 0.74);
+  color: #fff7d8;
+  font: inherit;
+  font-size: calc(var(--art-icon-button-size) * 0.52);
+  font-weight: 950;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.game-layout-root .art-icon-button--sm {
+  --art-icon-button-size: 34px;
+}
+
+.game-layout-root .art-icon-button--md {
+  --art-icon-button-size: 38px;
+}
+
+.game-layout-root .art-icon-button--lg {
+  --art-icon-button-size: 44px;
+}
+
+.game-layout-root .art-icon-button__label {
+  pointer-events: none;
+}
+
+.game-layout-root .art-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.game-layout-root .art-icon-button:focus-visible {
   outline: 2px solid rgba(255, 235, 160, 0.78);
   outline-offset: 3px;
 }
@@ -438,7 +496,8 @@
   max-width: 100%;
   min-width: 0;
   min-height: 72px;
-  grid-template-columns: 48px minmax(0, 1fr) 128px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  column-gap: 14px;
   overflow: hidden;
   padding: 10px 12px;
 }
@@ -465,16 +524,27 @@
   line-height: 1.25;
 }
 
+.game-layout-root .agent-picker.ww-ui-panel .agent-add-button {
+  justify-self: end;
+  margin-left: auto;
+}
+
 .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
   width: 100%;
   max-width: 100%;
   min-height: 64px;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  justify-items: stretch;
+  grid-template-columns: repeat(2, minmax(0, 96px));
+  justify-content: center;
+  justify-items: center;
   align-items: center;
   align-self: end;
   padding-bottom: 8px;
   overflow: visible;
+}
+
+.game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .art-button {
+  --art-button-width: 96px;
+  --art-button-font-size: 13px;
 }
 
 @media (max-width: 560px) {
@@ -487,14 +557,20 @@
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-row {
-    grid-template-columns: 42px minmax(0, 1fr) 112px;
+    grid-template-columns: 42px minmax(0, 1fr) auto;
     gap: 10px;
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
-    min-height: 112px;
-    grid-template-columns: minmax(0, 1fr);
+    min-height: 84px;
+    grid-template-columns: repeat(2, minmax(0, 92px));
+    justify-content: center;
     gap: 8px;
     padding-bottom: 6px;
+  }
+
+  .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .art-button {
+    --art-button-width: 92px;
+    --art-button-font-size: 12px;
   }
 }

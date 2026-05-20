@@ -330,12 +330,10 @@ describe("game room seat layout", () => {
     expect(primitiveCss).toContain("center / 100% 100%");
     expect(primitiveCss).toContain("no-repeat");
     expect(primitiveCss).not.toContain("inset: var(--ww-panel-fill-inset)");
-    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
-    expect(primitiveCss).toContain("button/decision/submit-button-9slice.webp");
-    expect(primitiveCss).toContain("button/decision/confirm-button-9slice.webp");
-    expect(primitiveCss).toContain("button/decision/cancel-button-9slice.webp");
-    expect(gameButton).toContain('"ww-game-button"');
-    expect(gameButton).toContain("data-game-button-variant");
+    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).not.toContain("button/decision");
+    expect(gameButton).not.toContain('"ww-game-button"');
+    expect(gameButton).not.toContain("data-game-button-variant");
     expect(gameButton).not.toContain("ww-game-button__chrome");
     expect(gameButton).not.toContain("ww-game-button__content");
     expect(seatAvatar).toContain("seatBadgeId");
@@ -367,15 +365,14 @@ describe("game room seat layout", () => {
 
     expect(shell).toContain("compact ? 340");
     expect(shell).toContain("compact ? 380");
-    expect(primitiveCss).toContain(".game-layout-root .ww-game-button");
+    expect(primitiveCss).not.toContain(".game-layout-root .ww-game-button");
     expect(primitiveCss).not.toContain(".game-layout-root .ww-icon-button");
-    expect(primitiveCss).toContain("button/decision");
-    expect(primitiveCss).toContain("border-image-source: var(--ww-button-skin-image)");
-    expect(actionCss).toContain(".game-layout-root .action-region .stage-start");
-    expect(actionCss).toContain("width: var(--action-primary-button-width) !important");
-    expect(actionCss).toContain("background: none !important");
-    expect(actionCss).toContain("background-image: none !important");
-    expect(actionCss).toContain("box-shadow: none !important");
+    expect(primitiveCss).not.toContain("border-image-source");
+    expect(actionCss).toContain(".game-layout-root .action-region .action-start");
+    expect(actionCss).toContain("--art-button-width: var(--action-primary-button-width)");
+    expect(actionCss).toContain("--action-primary-button-width: min(100%, calc(225px * var(--layout-action-scale, 1)))");
+    expect(actionCss).not.toContain("border-image-source: var(--ww-button-skin-image)");
+    expect(actionCss).not.toContain("border-image-slice: var(--ww-button-skin-slice) fill");
     expect(actionCss).toContain("calc(100vw - 24px)");
   });
 
@@ -521,9 +518,22 @@ describe("game room seat layout", () => {
     expect(voiceRoom).toContain("scheduleRoomReconnect");
     expect(voiceRoom).toContain("setReconnectNonce((value) => value + 1)");
     expect(voiceRoom).toContain("}, [serverUrl, token, reconnectNonce])");
-    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\")");
+    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\", { rateLimited })");
     expect(disconnectedHandler).toContain("clearRemoteAudioElements()");
     expect(disconnectedHandler).toContain("scheduleRoomReconnect(\"room disconnected\")");
+  });
+
+  it("backs off LiveKit Cloud 429 reconnects without refreshing credentials", () => {
+    const voiceRoom = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
+      "utf8"
+    );
+
+    expect(voiceRoom).toContain("VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS");
+    expect(voiceRoom).toContain("isLivekitRateLimitError");
+    expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\", { rateLimited })");
+    expect(voiceRoom).toContain("语音服务请求过快，稍后自动重连");
+    expect(voiceRoom).not.toContain("client.getLivekitToken");
   });
 
   it("keeps the closed timeline sheet from blocking action controls", () => {
