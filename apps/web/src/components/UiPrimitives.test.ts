@@ -58,10 +58,11 @@ describe("new UI primitives", () => {
     expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-row");
     expect(css).toContain("width: min(680px, calc(100vw - 28px))");
     expect(css).toContain("height: min(82dvh, 720px)");
-    expect(css).toContain("--agent-row-avatar-size: clamp(48px, 6.4dvh, 62px)");
-    expect(css).toContain("--agent-row-icon-size: clamp(46px, 6dvh, 58px)");
-    expect(css).toContain("min-height: clamp(82px, 10.8dvh, 106px)");
+    expect(css).toContain("--agent-row-avatar-size: clamp(42px, 5.4dvh, 52px)");
+    expect(css).toContain("--agent-row-icon-size: clamp(40px, 5.2dvh, 50px)");
+    expect(css).toContain("min-height: clamp(68px, 8.8dvh, 84px)");
     expect(css).toContain("grid-template-columns: var(--agent-row-avatar-size) minmax(0, 1fr) auto");
+    expect(css).toContain("font-size: clamp(16px, 2.2dvh, 19px)");
     expect(css).toContain(".game-layout-root .agent-picker.ww-ui-panel .agent-add-button");
     expect(css).toContain("--art-icon-button-size: var(--agent-row-icon-size)");
     expect(css).toContain("justify-self: end");
@@ -70,6 +71,9 @@ describe("new UI primitives", () => {
     expect(css).toContain("justify-content: center");
     expect(css).toContain("align-items: end");
     expect(css).toContain("margin-top: auto");
+    expect(css).toContain("padding: 10px 0 8px");
+    expect(css).not.toContain("min-height: 128px");
+    expect(css).not.toContain("min-height: 116px");
     expect(css).toContain("overflow-x: hidden");
     expect(css).not.toContain(".agent-add-button.ww-icon-button");
     expect(css).not.toContain("--ww-agent-add-size");

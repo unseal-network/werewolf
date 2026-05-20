@@ -492,16 +492,16 @@
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-row {
-  --agent-row-avatar-size: clamp(48px, 6.4dvh, 62px);
-  --agent-row-icon-size: clamp(46px, 6dvh, 58px);
+  --agent-row-avatar-size: clamp(42px, 5.4dvh, 52px);
+  --agent-row-icon-size: clamp(40px, 5.2dvh, 50px);
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  min-height: clamp(82px, 10.8dvh, 106px);
+  min-height: clamp(68px, 8.8dvh, 84px);
   grid-template-columns: var(--agent-row-avatar-size) minmax(0, 1fr) auto;
-  column-gap: clamp(14px, 2.2dvh, 22px);
+  column-gap: clamp(12px, 1.8dvh, 18px);
   overflow: hidden;
-  padding: clamp(12px, 1.8dvh, 18px) clamp(12px, 2.2dvh, 18px);
+  padding: clamp(8px, 1.25dvh, 12px) clamp(10px, 1.8dvh, 14px);
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-avatar,
@@ -517,12 +517,12 @@
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-name {
-  font-size: clamp(18px, 2.7dvh, 22px);
+  font-size: clamp(16px, 2.2dvh, 19px);
   line-height: 1.2;
 }
 
 .game-layout-root .agent-picker.ww-ui-panel .agent-id {
-  font-size: clamp(13px, 2dvh, 16px);
+  font-size: clamp(12px, 1.7dvh, 14px);
   line-height: 1.25;
 }
 
@@ -535,7 +535,6 @@
 .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
   width: 100%;
   max-width: 100%;
-  min-height: 128px;
   grid-template-columns: repeat(2, minmax(0, 150px));
   justify-content: center;
   justify-items: center;
@@ -543,7 +542,7 @@
   align-self: end;
   margin-top: auto;
   gap: 14px;
-  padding-bottom: 10px;
+  padding: 10px 0 8px;
   overflow: visible;
 }
 
@@ -562,21 +561,20 @@
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-row {
-    --agent-row-avatar-size: clamp(46px, 6.2dvh, 56px);
-    --agent-row-icon-size: clamp(44px, 5.8dvh, 52px);
-    min-height: clamp(78px, 10.2dvh, 96px);
+    --agent-row-avatar-size: clamp(40px, 5.2dvh, 48px);
+    --agent-row-icon-size: clamp(38px, 5dvh, 46px);
+    min-height: clamp(64px, 8.2dvh, 78px);
     grid-template-columns: var(--agent-row-avatar-size) minmax(0, 1fr) auto;
     gap: 10px;
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions {
-    min-height: 116px;
     grid-template-columns: repeat(2, minmax(0, 136px));
     justify-content: center;
     align-items: end;
     margin-top: auto;
     gap: 10px;
-    padding-bottom: 8px;
+    padding: 8px 0 6px;
   }
 
   .game-layout-root .agent-picker.ww-ui-panel .agent-picker-actions .art-button {
