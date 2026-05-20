@@ -6,7 +6,6 @@ import {
   shouldCompleteSpeechOnPointerRelease,
   shouldStopMicOnPointerCancel,
   shouldStopMicOnPointerRelease,
-  shouldToggleMicOnPointerDown,
   type SpeechInputMode,
 } from "./voicePanelLogic";
 import { StageActionButton } from "./StageActionButton";
@@ -195,15 +194,7 @@ export function VoicePanel({
               ? (event) => {
                   event.preventDefault();
                   capturePointer(event);
-                  const action = shouldToggleMicOnPointerDown(
-                    event.pointerType,
-                    voice.isMicrophoneEnabled || micPressing || micPressActiveRef.current,
-                  );
-                  if (action === "stop") {
-                    void stopMicrophone();
-                  } else {
-                    void startMicrophone();
-                  }
+                  void startMicrophone();
                 }
               : undefined
           }
@@ -211,7 +202,7 @@ export function VoicePanel({
             inputMode === "voice"
               ? (event) => {
                   releasePointer(event);
-                  if (!shouldStopMicOnPointerRelease(event.pointerType)) return;
+                  if (!shouldStopMicOnPointerRelease()) return;
                   if (shouldCompleteSpeechOnPointerRelease()) {
                     void finishVoiceSpeech();
                   } else {
@@ -224,7 +215,7 @@ export function VoicePanel({
             inputMode === "voice"
               ? (event) => {
                   releasePointer(event);
-                  if (!shouldStopMicOnPointerCancel(event.pointerType)) return;
+                  if (!shouldStopMicOnPointerCancel()) return;
                   void stopMicrophone();
                 }
               : undefined

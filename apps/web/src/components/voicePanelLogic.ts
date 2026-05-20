@@ -1,5 +1,4 @@
 export type MicToggleIntent = "enable-mic" | "stop-mic";
-export type MicPointerStartAction = "start" | "stop";
 export type SpeechInputMode = "voice" | "text";
 export type SpeechBubbleSlot = "large-mic" | "small-keyboard" | "small-mic" | "large-text";
 export type SpeechActionMode = "complete" | "submit";
@@ -24,19 +23,12 @@ export function shouldCompleteSpeechOnPointerRelease() {
   return false;
 }
 
-export function shouldToggleMicOnPointerDown(
-  pointerType: string | undefined,
-  isMicActive: boolean,
-): MicPointerStartAction {
-  return pointerType === "touch" && isMicActive ? "stop" : "start";
+export function shouldStopMicOnPointerRelease() {
+  return true;
 }
 
-export function shouldStopMicOnPointerRelease(pointerType: string | undefined) {
-  return pointerType !== "touch";
-}
-
-export function shouldStopMicOnPointerCancel(pointerType: string | undefined) {
-  return pointerType !== "touch";
+export function shouldStopMicOnPointerCancel() {
+  return true;
 }
 
 export function getSpeechBubbleLayout(mode: SpeechInputMode): {
