@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { VoiceAgentService, type VoiceAgentConfig } from "./voice-agent";
+import { AudioFrame } from "@livekit/rtc-node";
+import {
+  VoiceAgentService,
+  downmixAudioFrameToMonoForStt,
+  type VoiceAgentConfig,
+} from "./voice-agent";
 import { resamplePcmForPlaybackRate } from "./voice-audio";
 
 const config: VoiceAgentConfig = {
@@ -31,6 +36,22 @@ function createSession(overrides: Record<string, unknown> = {}) {
 }
 
 describe("VoiceAgentService STT buffering", () => {
+  it("downmixes multi-channel browser microphone frames before sending them to STT", () => {
+    const stereo = new AudioFrame(
+      Int16Array.from([1000, 3000, -1000, 1000, 2000, -2000]),
+      48000,
+      2,
+      3
+    );
+
+    const mono = downmixAudioFrameToMonoForStt(stereo);
+
+    expect(mono.channels).toBe(1);
+    expect(mono.sampleRate).toBe(48000);
+    expect(mono.samplesPerChannel).toBe(3);
+    expect(Array.from(mono.data)).toEqual([2000, 0, 0]);
+  });
+
   it("deduplicates repeated LiveKit callbacks for the same player track", () => {
     const agent = new VoiceAgentService("game_1", config);
     agent.registerPlayerVoiceIdentity("player_6", "@raysonx:keepsecret.io");

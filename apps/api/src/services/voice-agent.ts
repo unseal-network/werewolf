@@ -874,7 +874,6 @@ export class VoiceAgentService {
         if (done) break;
         if (!frame) continue;
         if (!session.active) continue;
-        if (frame.channels !== 1) continue;
         if (!firstFrameLogged) {
           firstFrameLogged = true;
           console.info("[VoiceAgent] first STT audio frame", {
@@ -886,7 +885,8 @@ export class VoiceAgentService {
             samplesPerChannel: frame.samplesPerChannel,
           });
         }
-        for (const out of this.resampleToStt(session, frame)) {
+        const sttFrame = downmixAudioFrameToMonoForStt(frame);
+        for (const out of this.resampleToStt(session, sttFrame)) {
           if (out.data.length === 0) continue;
           if (session.client.sendAudio(out.data, STT_TARGET_SAMPLE_RATE)) {
             session.lastSentChunk = out.data;
@@ -1415,6 +1415,27 @@ function objectValue(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+export function downmixAudioFrameToMonoForStt(frame: AudioFrame): AudioFrame {
+  if (frame.channels === 1) return frame;
+  const channelCount = Math.max(1, frame.channels);
+  const sampleCount = frame.samplesPerChannel;
+  const mono = new Int16Array(sampleCount);
+  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
+    let mixed = 0;
+    for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
+      mixed += frame.data[sampleIndex * channelCount + channelIndex] ?? 0;
+    }
+    mono[sampleIndex] = clampPcm16(Math.round(mixed / channelCount));
+  }
+  return new AudioFrame(mono, frame.sampleRate, 1, sampleCount);
+}
+
+function clampPcm16(value: number): number {
+  if (value > 32767) return 32767;
+  if (value < -32768) return -32768;
+  return value;
 }
 
 /** One VoiceAgentService per game room. */

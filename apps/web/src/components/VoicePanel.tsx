@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useVoiceRoom } from "./VoiceRoom";
 import {
   getSpeechBubbleLayout,
   shouldCompleteSpeechOnPointerLeave,
   shouldCompleteSpeechOnPointerRelease,
+  shouldStopMicOnPointerCancel,
+  shouldStopMicOnPointerRelease,
+  shouldToggleMicOnPointerDown,
   type SpeechInputMode,
 } from "./voicePanelLogic";
 import { StageActionButton } from "./StageActionButton";
@@ -145,6 +148,24 @@ export function VoicePanel({
     setModePulse("voice");
   }
 
+  function capturePointer(event: PointerEvent<HTMLButtonElement>) {
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // iOS WebViews can reject pointer capture while microphone permission UI is opening.
+    }
+  }
+
+  function releasePointer(event: PointerEvent<HTMLButtonElement>) {
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Pointer capture can disappear after iOS pointer cancellation.
+    }
+  }
+
   return (
     <div
       className="voice-panel"
@@ -173,17 +194,24 @@ export function VoicePanel({
             inputMode === "voice"
               ? (event) => {
                   event.preventDefault();
-                  event.currentTarget.setPointerCapture(event.pointerId);
-                  void startMicrophone();
+                  capturePointer(event);
+                  const action = shouldToggleMicOnPointerDown(
+                    event.pointerType,
+                    voice.isMicrophoneEnabled || micPressing || micPressActiveRef.current,
+                  );
+                  if (action === "stop") {
+                    void stopMicrophone();
+                  } else {
+                    void startMicrophone();
+                  }
                 }
               : undefined
           }
           onPointerUp={
             inputMode === "voice"
               ? (event) => {
-                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }
+                  releasePointer(event);
+                  if (!shouldStopMicOnPointerRelease(event.pointerType)) return;
                   if (shouldCompleteSpeechOnPointerRelease()) {
                     void finishVoiceSpeech();
                   } else {
@@ -195,9 +223,8 @@ export function VoicePanel({
           onPointerCancel={
             inputMode === "voice"
               ? (event) => {
-                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }
+                  releasePointer(event);
+                  if (!shouldStopMicOnPointerCancel(event.pointerType)) return;
                   void stopMicrophone();
                 }
               : undefined
