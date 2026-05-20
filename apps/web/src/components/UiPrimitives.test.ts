@@ -120,12 +120,24 @@ describe("new UI primitives", () => {
     expect(html).not.toContain("ww-game-button");
     expect(html).not.toContain("data-game-button-variant");
     expect(html).toContain(">Start<");
+    expect(html).toContain('src="/assets/werewolf-ui/final/button/art/primary-button.png"');
     expect(html).not.toContain("ww-game-button__chrome");
     expect(html).not.toContain("ww-game-button__content");
     expect(html).not.toContain("ww-game-button__label");
     expect(css).not.toContain(".game-layout-root .ww-game-button");
     expect(css).not.toContain("button/decision");
     expect(css).not.toContain("border-image-source: var(--ww-button-skin-image)");
+  });
+
+  it("resolves button art from the Vite base path instead of a hard-coded root", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/GameButton.tsx"),
+      "utf8"
+    );
+
+    expect(source).toContain("import.meta.env.BASE_URL");
+    expect(source).toContain("assets/werewolf-ui/final/button/art");
+    expect(source).not.toContain('"/assets/werewolf-ui/final/button/art');
   });
 
   it("renders reusable icon buttons with one shared icon style", () => {
