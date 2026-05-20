@@ -31,7 +31,7 @@ export default defineConfig(({ mode }) => {
   const env = loadMergedEnv(mode);
 
   return {
-    base: normalizeBasePath(env.VITE_APP_BASE_PATH ?? env.BASE_PATH),
+    // base: '',//normalizeBasePath(env.VITE_APP_BASE_PATH ?? env.BASE_PATH),
     define: clientEnvDefines(env),
     plugins: [tailwindcss(), react()],
     server: {
