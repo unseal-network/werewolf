@@ -261,4 +261,82 @@ describe("CenterInfoPanel", () => {
     expect(text).not.toContain("5/6");
     expect(text).not.toContain("存活");
   });
+
+  it("shows the exiled player during day resolution after voting closes", () => {
+    const players = Array.from({ length: 4 }, (_, index) =>
+      player({
+        id: `p${index + 1}`,
+        displayName: `${index + 1}号玩家`,
+        seatNo: index + 1,
+      })
+    );
+    const [voterOne, voterTwo, exiled, voterFour] = players as [
+      RoomPlayer,
+      RoomPlayer,
+      RoomPlayer,
+      RoomPlayer,
+    ];
+    const html = renderPanel({
+      rawPhase: "day_resolution",
+      scene: "day",
+      day: 2,
+      players,
+      events: [
+        event({
+          id: "vote-exiled-1",
+          seq: 1,
+          type: "vote_submitted",
+          actorId: voterOne.id,
+          subjectId: exiled.id,
+          payload: { day: 2 },
+        }),
+        event({
+          id: "vote-exiled-2",
+          seq: 2,
+          type: "vote_submitted",
+          actorId: voterTwo.id,
+          subjectId: exiled.id,
+          payload: { day: 2 },
+        }),
+        event({
+          id: "vote-other",
+          seq: 3,
+          type: "vote_submitted",
+          actorId: exiled.id,
+          subjectId: voterFour.id,
+          payload: { day: 2 },
+        }),
+        event({
+          id: "day-vote-closed",
+          seq: 4,
+          type: "phase_closed",
+          actorId: "runtime",
+          payload: {
+            phase: "day_vote",
+            day: 2,
+            tally: { [exiled.id]: 2, [voterFour.id]: 1 },
+            exiledPlayerId: exiled.id,
+            tiedPlayerIds: [],
+            nextPhase: "day_resolution",
+          },
+        }),
+        event({
+          id: "exiled",
+          seq: 5,
+          type: "player_eliminated",
+          actorId: "runtime",
+          subjectId: exiled.id,
+          payload: { playerId: exiled.id, reason: "vote" },
+        }),
+      ],
+    });
+    const text = visibleText(html);
+
+    expect(text).toContain("投票结果");
+    expect(text).toContain("3号 3号玩家");
+    expect(text).toContain("被放逐");
+    expect(text).toContain("2 票出局");
+    expect(text).toContain("投票人: 1号，2号");
+    expect(text).not.toContain("等待玩家投票");
+  });
 });

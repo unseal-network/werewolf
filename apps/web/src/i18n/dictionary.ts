@@ -190,6 +190,11 @@ export const dictionaries: Record<Locale, Dict> = {
     "centerInfo.latestSpeaker": "{seat} 号 {name} 刚刚发言",
     "centerInfo.waitingSpeech": "等待发言开始",
     "centerInfo.noSpeechYet": "暂无发言内容",
+    "centerInfo.voteResult": "投票结果",
+    "centerInfo.exiledPlayer": "被放逐",
+    "centerInfo.exiledVoteCount": "{count} 票出局",
+    "centerInfo.exiledByVote": "投票出局",
+    "centerInfo.voters": "投票人",
 
     "roleCard.entry": "查看身份牌",
     "roleCard.title": "身份牌",
@@ -403,6 +408,11 @@ export const dictionaries: Record<Locale, Dict> = {
     "centerInfo.latestSpeaker": "Seat {seat} {name} just spoke",
     "centerInfo.waitingSpeech": "Waiting for speech",
     "centerInfo.noSpeechYet": "No speech yet",
+    "centerInfo.voteResult": "Vote result",
+    "centerInfo.exiledPlayer": "Exiled",
+    "centerInfo.exiledVoteCount": "Exiled with {count} votes",
+    "centerInfo.exiledByVote": "Exiled by vote",
+    "centerInfo.voters": "Voters",
 
     "roleCard.entry": "View role card",
     "roleCard.title": "Identity",

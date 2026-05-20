@@ -46,7 +46,8 @@
 }
 
 .game-layout-root .center-vote-block,
-.game-layout-root .center-speech-block {
+.game-layout-root .center-speech-block,
+.game-layout-root .center-vote-result-block {
   flex: 0 1 auto;
   display: flex;
   flex-direction: column;
@@ -173,4 +174,62 @@
   color: rgba(246, 240, 220, 0.52);
   font-size: 11px;
   font-weight: 750;
+}
+
+.game-layout-root .center-vote-result-player {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  margin-top: 10px;
+  text-align: left;
+}
+
+.game-layout-root .center-vote-result-player .center-mini-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.game-layout-root .center-vote-result-player div {
+  min-width: 0;
+}
+
+.game-layout-root .center-vote-result-player strong {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #fff6d6;
+  font-size: clamp(15px, 3vw, 18px);
+  font-weight: 950;
+  line-height: 1.18;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-layout-root .center-vote-result-player span {
+  display: block;
+  margin-top: 3px;
+  color: rgba(255, 111, 111, 0.9);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.game-layout-root .center-vote-result-meta {
+  display: grid;
+  gap: 4px;
+  margin-top: 9px;
+  color: rgba(246, 240, 220, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.game-layout-root .center-vote-result-meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

@@ -20,6 +20,13 @@ interface VoteGroup {
   voters: RoomPlayer[];
 }
 
+interface VoteResult {
+  exiled: RoomPlayer | undefined;
+  exiledId: string;
+  voteCount: number | null;
+  voters: RoomPlayer[];
+}
+
 function numberPayload(value: unknown): number | null {
   const next = Number(value);
   return Number.isFinite(next) ? next : null;
@@ -143,6 +150,44 @@ function voteGroupsForDay(
     });
 }
 
+function latestVoteResultForDay(
+  events: GameEventDto[],
+  players: RoomPlayer[],
+  day: number | undefined
+): VoteResult | null {
+  const resultEvent = [...events].reverse().find((event) => {
+    if (event.type !== "phase_closed") return false;
+    const phase = stringPayload(event.payload.phase);
+    if (phase !== "day_vote" && phase !== "tie_vote") return false;
+    const eventDay = numberPayload(event.payload.day);
+    if (day !== undefined && eventDay !== null && eventDay !== day) return false;
+    return stringPayload(event.payload.exiledPlayerId) !== null;
+  });
+  if (!resultEvent) return null;
+
+  const exiledId = stringPayload(resultEvent.payload.exiledPlayerId);
+  if (!exiledId) return null;
+
+  const playersById = playerById(players);
+  const tally = resultEvent.payload.tally;
+  const rawVoteCount =
+    tally && typeof tally === "object"
+      ? (tally as Record<string, unknown>)[exiledId]
+      : undefined;
+  const voteCount = numberPayload(rawVoteCount);
+  const voters =
+    voteGroupsForDay(events, players, day, "day_vote").find(
+      (group) => group.targetId === exiledId
+    )?.voters ?? [];
+
+  return {
+    exiledId,
+    exiled: playersById.get(exiledId),
+    voteCount,
+    voters,
+  };
+}
+
 function MiniAvatar({ player }: { player: RoomPlayer | undefined }) {
   const seed = player?.userId ?? player?.agentId ?? player?.id ?? "unknown";
   const palette = avatarPalette(seed);
@@ -177,6 +222,9 @@ export function CenterInfoPanel({
     scene === "tie";
   const isSpeechPhase = rawPhase === "day_speak" || rawPhase === "tie_speech";
   const voteGroups = voteGroupsForDay(events, players, day, rawPhase);
+  const voteResult = latestVoteResultForDay(events, players, day);
+  const showVoteResult =
+    Boolean(voteResult) && !isVotePhase && !isSpeechPhase && rawPhase === "day_resolution";
   const latestSpeech = latestSpeechEvent(
     events,
     day,
@@ -218,7 +266,7 @@ export function CenterInfoPanel({
     node.scrollTop = node.scrollHeight;
   }, [displayText]);
 
-  if (!isVotePhase && !isSpeechPhase) {
+  if (!isVotePhase && !isSpeechPhase && !showVoteResult) {
     return null;
   }
 
@@ -293,6 +341,38 @@ export function CenterInfoPanel({
             ) : (
               <div className="center-info-empty">{t("centerInfo.noSpeechYet")}</div>
             )}
+          </div>
+        ) : null}
+
+        {showVoteResult && voteResult ? (
+          <div className="center-live-block center-vote-result-block">
+            <div className="center-live-heading">
+              <span>{t("centerInfo.voteResult")}</span>
+            </div>
+            <div className="center-vote-result-player">
+              <MiniAvatar player={voteResult.exiled} />
+              <div>
+                <strong>
+                  {seatNoLabel(voteResult.exiled?.seatNo, t("centerInfo.seatSuffix"))}
+                  {" "}
+                  {playerLabel(voteResult.exiled, voteResult.exiledId)}
+                </strong>
+                <span>{t("centerInfo.exiledPlayer")}</span>
+              </div>
+            </div>
+            <div className="center-vote-result-meta">
+              {voteResult.voteCount !== null
+                ? t("centerInfo.exiledVoteCount", { count: voteResult.voteCount })
+                : t("centerInfo.exiledByVote")}
+              {voteResult.voters.length ? (
+                <span>
+                  {t("centerInfo.voters")}:{" "}
+                  {voteResult.voters
+                    .map((voter) => seatNoLabel(voter.seatNo, t("centerInfo.seatSuffix")))
+                    .join("，")}
+                </span>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>
