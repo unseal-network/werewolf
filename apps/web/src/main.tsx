@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { un } from "@unseal-network/mobile-log";
 import { RootLayout } from "./routes/__root";
 import { CreateGamePage } from "./routes/create";
 import { GameRoomPage } from "./routes/game.$gameRoomId";
@@ -24,6 +23,7 @@ import {
 } from "./runtime/bootstrap";
 import { isHostRuntime } from "./runtime/hostBridge";
 import { createUnsealClient, UnsealApiError, type UnsealClient } from "./runtime/unsealClient";
+import { un } from "./runtime/devLog";
 import "./index.css";
 import "./styles/game-room.css";
 

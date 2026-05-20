@@ -1,4 +1,4 @@
-import { un } from "@unseal-network/mobile-log";
+import { un } from "./devLog";
 
 export interface UnsealEnterResponse {
   token: string;
