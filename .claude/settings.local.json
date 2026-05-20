@@ -19,7 +19,12 @@
       "Bash(git config *)",
       "Bash(git push *)",
       "Bash(git fetch *)",
-      "Bash(ssh -T git@github.com)"
+      "Bash(ssh -T git@github.com)",
+      "Bash(curl -v --max-time 5 \"https://werewolf-y4vro0s1.livekit.cloud\")",
+      "Bash(grep -i \"livekit\\\\|7880\\\\|werewolf\" /etc/hosts 2>/dev/null; echo \"---\"; lsof -i :7880 2>/dev/null | head -5)",
+      "Bash(curl -v --max-time 5 \"wss://werewolf-y4vro0s1.livekit.cloud\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(curl -v --max-time 8 -H \"Upgrade: websocket\" -H \"Connection: Upgrade\" -H \"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" -H \"Sec-WebSocket-Version: 13\" \"https://werewolf-y4vro0s1.livekit.cloud/rtc\")"
     ]
   }
 }
