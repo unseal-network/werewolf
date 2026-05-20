@@ -4,6 +4,8 @@ import {
   getSpeechBubbleLayout,
   shouldCompleteSpeechOnPointerLeave,
   shouldCompleteSpeechOnPointerRelease,
+  shouldStopMicOnPointerCancel,
+  shouldStopMicOnPointerRelease,
   shouldShowTextSpeechInput,
 } from "./voicePanelLogic";
 
@@ -22,6 +24,11 @@ describe("voice panel mic toggle", () => {
 
   it("does not complete speech just because the pointer is released", () => {
     expect(shouldCompleteSpeechOnPointerRelease()).toBe(false);
+  });
+
+  it("stops hold-to-speak recording on pointer release or cancellation", () => {
+    expect(shouldStopMicOnPointerRelease()).toBe(true);
+    expect(shouldStopMicOnPointerCancel()).toBe(true);
   });
 
   it("only shows text input in text mode", () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  clearLivekitCredential,
   clearLivekitCredentialCacheForTests,
   getStableLivekitCredentials,
 } from "./livekitCredentials";
@@ -45,6 +46,29 @@ describe("getStableLivekitCredentials", () => {
       token: "join-token",
       serverUrl: "wss://livekit.test",
     });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it("can clear one cached credential so a 401 can fetch a fresh LiveKit token", async () => {
+    clearLivekitCredentialCacheForTests();
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce({
+        token: "stale-token",
+        serverUrl: "wss://livekit.test",
+      })
+      .mockResolvedValueOnce({
+        token: "fresh-token",
+        serverUrl: "wss://livekit.test",
+      });
+
+    await expect(
+      getStableLivekitCredentials("game_1:@alice:test", fetcher)
+    ).resolves.toMatchObject({ token: "stale-token" });
+    clearLivekitCredential("game_1:@alice:test");
+    await expect(
+      getStableLivekitCredentials("game_1:@alice:test", fetcher)
+    ).resolves.toMatchObject({ token: "fresh-token" });
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 });

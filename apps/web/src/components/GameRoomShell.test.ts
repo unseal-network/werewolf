@@ -465,13 +465,17 @@ describe("game room seat layout", () => {
       "const credentialKey = `${gameRoomId}:${matrixUserId}:publish-token-v2`"
     );
     expect(route).toContain(
-      "if (livekitCredentialKeyRef.current === credentialKey)"
+      "if (livekitRefreshNonce === 0 && livekitCredentialKeyRef.current === credentialKey)"
     );
-    expect(route).toContain("}, [matrixUserId, client, gameRoomId]);");
+    expect(route).toContain("clearLivekitCredential(credentialKey)");
+    expect(route).toContain("setLivekitRefreshNonce((value) => value + 1)");
+    expect(route).toContain("onTokenUnauthorized={refreshLivekitToken}");
+    expect(route).toContain("}, [matrixUserId, client, gameRoomId, livekitRefreshNonce]);");
     expect(route).not.toContain(
       "}, [matrixUserId, client, gameRoomId, livekitToken, livekitServerUrl]);"
     );
-    expect(voiceRoom).not.toContain("token refresh");
+    expect(voiceRoom).toContain("isLivekitUnauthorizedError");
+    expect(voiceRoom).toContain("onTokenUnauthorized?.()");
   });
 
   it("auto-subscribes to LiveKit tracks in the browser", () => {
@@ -517,7 +521,7 @@ describe("game room seat layout", () => {
     expect(voiceRoom).toContain("const [reconnectNonce, setReconnectNonce]");
     expect(voiceRoom).toContain("scheduleRoomReconnect");
     expect(voiceRoom).toContain("setReconnectNonce((value) => value + 1)");
-    expect(voiceRoom).toContain("}, [serverUrl, token, reconnectNonce])");
+    expect(voiceRoom).toContain("}, [serverUrl, token, reconnectNonce, onTokenUnauthorized])");
     expect(voiceRoom).toContain("scheduleRoomReconnect(\"connect failed\")");
     expect(disconnectedHandler).toContain("clearRemoteAudioElements()");
     expect(disconnectedHandler).toContain("scheduleRoomReconnect(\"room disconnected\")");
@@ -530,7 +534,12 @@ describe("game room seat layout", () => {
     );
 
     expect(voiceRoom).toContain("isLivekitRateLimitError");
-    expect(voiceRoom).toContain("willRetry: !rateLimited");
+    expect(voiceRoom).toContain("const unauthorized = isLivekitUnauthorizedError(err)");
+    expect(voiceRoom).toContain("willRetry: !rateLimited && !unauthorized");
+    expect(voiceRoom).toContain("let rateLimitPaused = false");
+    expect(voiceRoom).toContain("if (rateLimitPaused) return");
+    expect(voiceRoom).toContain("rateLimitPaused = true");
+    expect(voiceRoom).toContain("clearRetryTimer()");
     expect(voiceRoom).toContain("语音服务请求过快，已暂停自动重连");
     expect(voiceRoom).not.toContain("VOICE_RATE_LIMIT_RECONNECT_DELAYS_MS");
     expect(voiceRoom).not.toContain("client.getLivekitToken");

@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useVoiceRoom } from "./VoiceRoom";
 import {
   getSpeechBubbleLayout,
   shouldCompleteSpeechOnPointerLeave,
   shouldCompleteSpeechOnPointerRelease,
+  shouldStopMicOnPointerCancel,
+  shouldStopMicOnPointerRelease,
   type SpeechInputMode,
 } from "./voicePanelLogic";
 import { StageActionButton } from "./StageActionButton";
@@ -145,6 +147,24 @@ export function VoicePanel({
     setModePulse("voice");
   }
 
+  function capturePointer(event: PointerEvent<HTMLButtonElement>) {
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // iOS WebViews can reject pointer capture while microphone permission UI is opening.
+    }
+  }
+
+  function releasePointer(event: PointerEvent<HTMLButtonElement>) {
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      }
+    } catch {
+      // Pointer capture can disappear after iOS pointer cancellation.
+    }
+  }
+
   return (
     <div
       className="voice-panel"
@@ -173,7 +193,7 @@ export function VoicePanel({
             inputMode === "voice"
               ? (event) => {
                   event.preventDefault();
-                  event.currentTarget.setPointerCapture(event.pointerId);
+                  capturePointer(event);
                   void startMicrophone();
                 }
               : undefined
@@ -181,9 +201,8 @@ export function VoicePanel({
           onPointerUp={
             inputMode === "voice"
               ? (event) => {
-                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }
+                  releasePointer(event);
+                  if (!shouldStopMicOnPointerRelease()) return;
                   if (shouldCompleteSpeechOnPointerRelease()) {
                     void finishVoiceSpeech();
                   } else {
@@ -195,9 +214,8 @@ export function VoicePanel({
           onPointerCancel={
             inputMode === "voice"
               ? (event) => {
-                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                    event.currentTarget.releasePointerCapture(event.pointerId);
-                  }
+                  releasePointer(event);
+                  if (!shouldStopMicOnPointerCancel()) return;
                   void stopMicrophone();
                 }
               : undefined

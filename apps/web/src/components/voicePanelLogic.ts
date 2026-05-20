@@ -23,6 +23,14 @@ export function shouldCompleteSpeechOnPointerRelease() {
   return false;
 }
 
+export function shouldStopMicOnPointerRelease() {
+  return true;
+}
+
+export function shouldStopMicOnPointerCancel() {
+  return true;
+}
+
 export function getSpeechBubbleLayout(mode: SpeechInputMode): {
   left: SpeechBubbleSlot;
   right: SpeechBubbleSlot;

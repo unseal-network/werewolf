@@ -23,7 +23,7 @@ import {
 } from "../game/timelineState";
 import { canUseActionPanel } from "../game/actionAvailability";
 import { isActionStateConflictError } from "../game/actionConflict";
-import { getStableLivekitCredentials } from "../game/livekitCredentials";
+import { clearLivekitCredential, getStableLivekitCredentials } from "../game/livekitCredentials";
 import {
   PHASE_DRESSING,
   mapServerPhaseToUi,
@@ -209,6 +209,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   const [actionLoading, setActionLoading] = useState(false);
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitServerUrl, setLivekitServerUrl] = useState<string | null>(null);
+  const [livekitRefreshNonce, setLivekitRefreshNonce] = useState(0);
   const livekitCredentialKeyRef = useRef<string>("");
   const [roleRevealNonce, setRoleRevealNonce] = useState(0);
   const [roleRevealOpen, setRoleRevealOpen] = useState(false);
@@ -460,7 +461,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       return;
     }
     const credentialKey = `${gameRoomId}:${matrixUserId}:publish-token-v2`;
-    if (livekitCredentialKeyRef.current === credentialKey) {
+    if (livekitRefreshNonce === 0 && livekitCredentialKeyRef.current === credentialKey) {
       return;
     }
     let cancelled = false;
@@ -488,7 +489,16 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     return () => {
       cancelled = true;
     };
-  }, [matrixUserId, client, gameRoomId]);
+  }, [matrixUserId, client, gameRoomId, livekitRefreshNonce]);
+
+  const refreshLivekitToken = useCallback(() => {
+    const credentialKey = livekitCredentialKeyRef.current;
+    if (credentialKey) clearLivekitCredential(credentialKey);
+    livekitCredentialKeyRef.current = "";
+    setLivekitToken(null);
+    setLivekitServerUrl(null);
+    setLivekitRefreshNonce((value) => value + 1);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -1311,7 +1321,11 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   );
 
   return (
-    <VoiceRoomProvider serverUrl={livekitServerUrl} token={livekitToken}>
+    <VoiceRoomProvider
+      serverUrl={livekitServerUrl}
+      token={livekitToken}
+      onTokenUnauthorized={refreshLivekitToken}
+    >
       <GameRoomShell
         engineGameState={engineGameState}
         onRoleCardClose={() => setRoleRevealOpen(false)}

@@ -1,6 +1,7 @@
 const appBase = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}`;
 const werewolfUiBase = `${appBase}assets/werewolf-ui/final`;
 const roleCardBase = `${appBase}assets/role-cards`;
+const worldBackgroundBase = `${appBase}assets/world/backgrounds`;
 
 const WEREWOLF_UI_ASSET_PATHS = [
   "avatar/dead-overlay.webp",
@@ -9,7 +10,9 @@ const WEREWOLF_UI_ASSET_PATHS = [
   "avatar/frame-selected.webp",
   "avatar/frame-speaking.webp",
   "avatar/glow-selected.webp",
+  "avatar/name-line.webp",
   "avatar/portrait-hooded.webp",
+  "avatar/status-dot.webp",
   "background/night-village.avif",
   "background/vignette-overlay.avif",
   "badge/blade.webp",
@@ -18,6 +21,9 @@ const WEREWOLF_UI_ASSET_PATHS = [
   "badge/people.webp",
   "badge/shield.webp",
   "badge/star.webp",
+  "button/decision/cancel-button-9slice.webp",
+  "button/decision/confirm-button-9slice.webp",
+  "button/decision/submit-button-9slice.webp",
   "button/log-corner-bl.webp",
   "button/log-corner-br.webp",
   "button/log-corner-tl.webp",
@@ -57,6 +63,15 @@ const WEREWOLF_UI_ASSET_PATHS = [
   "panel-9slice/ornament-top.webp",
 ] as const;
 
+const WORLD_BACKGROUND_ASSET_PATHS = [
+  "moonlit-village-day.avif",
+  "moonlit-village-desktop.avif",
+  "moonlit-village-good-victory.avif",
+  "moonlit-village-mobile.avif",
+  "moonlit-village-vote.avif",
+  "moonlit-village-wolf-victory.avif",
+] as const;
+
 const BUTTON_ART_ASSET_PATHS = [
   "button/art/danger-button.png",
   "button/art/disabled-button.png",
@@ -84,6 +99,7 @@ export const GAME_ASSET_URLS = Array.from(
     ...WEREWOLF_UI_ASSET_PATHS.map((path) => `${werewolfUiBase}/${path}`),
     ...GAME_BUTTON_ASSET_URLS,
     ...ROLE_CARD_ASSET_PATHS.map((path) => `${roleCardBase}/${path}`),
+    ...WORLD_BACKGROUND_ASSET_PATHS.map((path) => `${worldBackgroundBase}/${path}`),
   ])
 );
 
