@@ -25,7 +25,8 @@
       "Bash(curl -v --max-time 5 \"wss://werewolf-y4vro0s1.livekit.cloud\")",
       "Bash(echo \"exit: $?\")",
       "Bash(curl -v --max-time 8 -H \"Upgrade: websocket\" -H \"Connection: Upgrade\" -H \"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" -H \"Sec-WebSocket-Version: 13\" \"https://werewolf-y4vro0s1.livekit.cloud/rtc\")",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(pnpm build:app)"
     ]
   }
 }

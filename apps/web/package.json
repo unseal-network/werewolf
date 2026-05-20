@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
+    "build:app": "vite build --mode app",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
