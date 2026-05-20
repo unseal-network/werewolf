@@ -290,20 +290,7 @@ export class ServerLivekitMeetingController implements LivekitMeetingController 
       return Boolean(identity && connectedIdentities.has(identity));
     });
     const trackIndex = this.indexAudioTracks(participantInfos, room.players);
-    const allPlayerTrackSids = Array.from(trackIndex.playerAudioTrackSids);
     const gmTrackSids = trackIndex.gmAudioTrackSids;
-
-    for (const listener of activeConnectedPlayers) {
-      const identity = resolveLivekitIdentity(listener);
-      if (!identity || allPlayerTrackSids.length === 0) continue;
-      await this.tryUpdateSubscriptions(
-        room.id,
-        identity,
-        allPlayerTrackSids,
-        false
-      );
-    }
-    if (this.latestRequestedVersion.get(room.id) !== versionKey) return;
 
     for (const player of activeConnectedPlayers) {
       const identity = resolveLivekitIdentity(player);

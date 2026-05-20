@@ -308,7 +308,7 @@ export function VoiceRoomProvider({
     eagerStartAudio();
 
     void lkRoom
-      .connect(serverUrl, token, { autoSubscribe: false })
+      .connect(serverUrl, token, { autoSubscribe: true })
       .then(async () => {
         if (cancelled) {
           void lkRoom.disconnect().catch(() => {});

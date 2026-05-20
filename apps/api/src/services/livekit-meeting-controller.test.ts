@@ -89,14 +89,12 @@ describe("ServerLivekitMeetingController", () => {
     );
     expect(subscriptionCalls(service)).toEqual(
       expect.arrayContaining([
-        { room: "game_1", identity: "@alice:example.com", trackSids: ["TR_ALICE", "TR_BOB", "TR_CARA", "TR_DAN"], subscribe: false },
         { room: "game_1", identity: "@alice:example.com", trackSids: ["TR_BOB", "TR_GM"], subscribe: true },
-        { room: "game_1", identity: "@bob:example.com", trackSids: ["TR_ALICE", "TR_BOB", "TR_CARA", "TR_DAN"], subscribe: false },
         { room: "game_1", identity: "@bob:example.com", trackSids: ["TR_BOB", "TR_GM"], subscribe: true },
-        { room: "game_1", identity: "@cara:example.com", trackSids: ["TR_ALICE", "TR_BOB", "TR_CARA", "TR_DAN"], subscribe: false },
         { room: "game_1", identity: "@cara:example.com", trackSids: ["TR_BOB", "TR_GM"], subscribe: true },
       ])
     );
+    expect(subscriptionCalls(service).some((call) => !call.subscribe)).toBe(false);
   });
 
   it("wolf discussion lets living wolves hear wolf tracks and keeps non-wolves on GM only", async () => {

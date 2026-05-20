@@ -474,12 +474,12 @@ describe("game room seat layout", () => {
     expect(voiceRoom).not.toContain("token refresh");
   });
 
-  it("does not auto-subscribe to LiveKit tracks in the browser", () => {
+  it("auto-subscribes to LiveKit tracks in the browser", () => {
     const voiceRoom = readFileSync(
       resolve(process.cwd(), "apps/web/src/components/VoiceRoom.tsx"),
       "utf8"
     );
-    expect(voiceRoom).toContain("autoSubscribe: false");
+    expect(voiceRoom).toContain("autoSubscribe: true");
     expect(voiceRoom).not.toContain("publication.setSubscribed(true)");
   });
 
