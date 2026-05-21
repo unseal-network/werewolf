@@ -10,6 +10,7 @@ import {
   computeTimelineBaseEventId,
   computeTimelineBaseSeq,
 } from "../game/timelineState";
+import { un } from "@unseal-network/mobile-log";
 
 export interface SubscribeSnapshot {
   room: GameRoom;
@@ -110,19 +111,19 @@ export function appendTimelineEvent(
       ? [...timeline.filter((candidate) => !sameSpeechStream(candidate)), event]
       : event.type === "speech_submitted"
         ? [
-            ...timeline.filter(
-              (candidate) =>
-                !(
-                  (candidate.type === "stream" ||
-                    candidate.type === "speech_transcript_delta") &&
-                  (candidate.payload.kind === undefined ||
-                    candidate.payload.kind === "speech") &&
-                  candidate.actorId === event.actorId &&
-                  candidate.payload.day === event.payload.day
-                )
-            ),
-            event,
-          ]
+          ...timeline.filter(
+            (candidate) =>
+              !(
+                (candidate.type === "stream" ||
+                  candidate.type === "speech_transcript_delta") &&
+                (candidate.payload.kind === undefined ||
+                  candidate.payload.kind === "speech") &&
+                candidate.actorId === event.actorId &&
+                candidate.payload.day === event.payload.day
+              )
+          ),
+          event,
+        ]
         : [...timeline, event];
   return next.length <= 260 ? next : next.slice(-260);
 }
@@ -253,13 +254,14 @@ export function useSnapshotSse({
 
   const connect = useCallback(() => {
     close();
+    un.log('[werewolf] eventsource start')
     const source = new EventSource(subscribeUrl);
     source.onopen = () => {
       reconnectAttemptRef.current = 0;
     };
     source.onmessage = (event) => {
       reconnectAttemptRef.current = 0;
-      // un.log('[onmessage]', event.data)
+      un.log('[werewolf] eventsource data', event.data)
       const parsed = parseSubscribeMessage(event.data);
       if (!parsed) return;
       onMessageRef.current?.(parsed);
@@ -270,6 +272,7 @@ export function useSnapshotSse({
       }
     };
     source.onerror = () => {
+      un.log('[werewolf] eventsource error')
       source.close();
       eventSourceRef.current = null;
       const delayMs = computeSseReconnectDelayMs(

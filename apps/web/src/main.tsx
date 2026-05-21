@@ -64,7 +64,6 @@ function App() {
 
   // ── popstate listener ──────────────────────────────────────────────────────
   useEffect(() => {
-    un.log("[werewolf] start");
     const onPop = () => setSearch(window.location.search);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -100,9 +99,7 @@ function App() {
     ) => {
       if (cancelled) return;
       try {
-        un.log("[werewolf] poll linkRoomId");
         const room = await client.getRoom(hostRoomId, jwt);
-        un.log("[werewolf] poll result", room);
         if (room.linkRoomId) {
           setGameUrl(room.linkRoomId);
           setHostBootstrap({ status: "ready", session: hostSessionRef.current });
@@ -120,12 +117,10 @@ function App() {
       setHostBootstrap({ status: "checking" });
       try {
         // ── Step 1: get GameInfo + Token via SDK hook ──────────────────────
-        un.log("[werewolf] run: calling iframeAuth.init()");
         const gameInfo = await iframeAuth.init();
         const hostToken = iframeAuth.getTokenSync().trim();
 
         if (cancelled) return;
-        un.log("[werewolf] run: gameInfo", gameInfo);
 
         if (!hostToken) {
           throw new Error("未从 Unseal app 获取到登录 token，请重新打开游戏");
@@ -146,12 +141,10 @@ function App() {
 
         const admin = (gameInfo.powerLevel ?? 0) >= 100;
         setIsAdmin(admin);
-        un.log("[werewolf] run: admin =", admin, "hostRoomId =", hostRoomId);
         let linkRoomId: string | null = gameInfo.linkRoomId || null;
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
         const unsealBase = unsealBaseFromStreamUrl(gameInfo.config?.streamURL);
-        un.log("[werewolf] run: unsealBase =", unsealBase);
 
         if (unsealBase && hostToken) {
           let unsealClientForRefresh: UnsealClient;
@@ -176,10 +169,7 @@ function App() {
             },
           });
           unsealClientForRefresh = unsealClient;
-          un.log("[werewolf] run: hostToken", hostToken);
           const entered = await unsealClient.enter(hostToken);
-          un.log("[werewolf] run: 2222", hostToken);
-          un.log("[werewolf] run: unseal entered", entered);
           unsealJwt = entered.token;
 
           if (entered.user?.userId) {
@@ -192,7 +182,6 @@ function App() {
           if (hostRoomId) {
             try {
               const room = await unsealClient.getRoom(hostRoomId, unsealJwt);
-              un.log("[werewolf] run: unseal room", room);
               linkRoomId = room.linkRoomId;
             } catch (error) {
               if (!(error instanceof UnsealApiError && error.code === "ROOM_002")) {
@@ -213,7 +202,6 @@ function App() {
           isHostRuntime: true,
           isAdmin: admin,
         });
-        un.log("[werewolf] run: decision", decision);
 
         if (decision.kind === "resume") {
           setGameUrl(decision.gameRoomId);
@@ -223,14 +211,12 @@ function App() {
         if (decision.kind === "wait-for-host-link") {
           setHostBootstrap({ status: "waiting", hostRoomId: decision.hostRoomId });
           if (unsealClient && unsealJwt) {
-            un.log('[wolf] waitting start')
             void pollForLink(unsealClient, decision.hostRoomId, unsealJwt);
           }
           return;
         }
         setHostBootstrap({ status: "ready", session });
       } catch (error) {
-        un.log("[werewolf] run: error", (error as Error).message);
         if (!cancelled) {
           setHostBootstrap({
             status: "error",

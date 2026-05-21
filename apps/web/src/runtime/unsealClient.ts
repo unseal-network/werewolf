@@ -64,12 +64,10 @@ export function createUnsealClient(
     init: RequestInit = {},
     retryOnUnauthorized = true
   ): Promise<T> {
-    un.log('[request]', path, init)
     const headers = headersWithRefreshedJwt(init);
     const requestInit: RequestInit = { ...init };
     if (headers) requestInit.headers = headers;
     const response = await fetch(`${normalized}${path}`, requestInit);
-    un.log('[werewolf] request request', response)
     if (!response.ok) {
       if (response.status === 401 && retryOnUnauthorized) {
         const nextJwt = await refreshJwt().catch(() => null);
@@ -80,7 +78,6 @@ export function createUnsealClient(
         message?: string;
       } | null;
       if (body?.code) {
-        un.log('[werewolf] request response', response.status)
         throw new UnsealApiError(
           body.code,
           body.message ?? `Unseal API ${path} failed`,
@@ -89,7 +86,9 @@ export function createUnsealClient(
       }
       throw new Error(`Unseal API ${path} failed (${response.status})`);
     }
-    return (await response.json()) as T;
+    
+    const resp = (await response.json()) as T;
+    return resp
   }
 
   return {
