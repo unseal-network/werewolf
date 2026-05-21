@@ -346,30 +346,6 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     }
   });
 
-  app.post("/:gameRoomId/runtime/tick", async (c) => {
-    try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
-      if (!deps.games.hasRunAgentTurn()) {
-        throw new AppError("conflict", "Runtime agent turn runner is not configured", 409);
-      }
-      const gameRoomId = c.req.param("gameRoomId");
-      return c.json(
-        await dispatchActorCommand(deps, c.req.raw, {
-          commandId: commandId(c.req.raw),
-          gameRoomId,
-          actorUserId: user.id,
-          kind: "runtimeTick",
-        })
-      );
-    } catch (error) {
-      if (error instanceof AppError) return appErrorResponse(error);
-      return c.json(
-        { error: error instanceof Error ? error.message : String(error) },
-        400
-      );
-    }
-  });
-
   app.get("/:gameRoomId/events/:eventId/transcript", async (c) => {
     try {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);

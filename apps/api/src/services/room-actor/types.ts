@@ -34,7 +34,6 @@ export const roomCommandSchema = z.discriminatedUnion("kind", [
     kind: z.literal("submitAction"),
     action: z.record(z.string(), z.unknown()),
   }),
-  base.extend({ kind: z.literal("runtimeTick") }),
   base.extend({ kind: z.literal("agentTurn") }),
 ]);
 

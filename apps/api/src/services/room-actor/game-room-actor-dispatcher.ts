@@ -96,8 +96,6 @@ class GameRoomActor {
         return this.start(command);
       case "submitAction":
         return this.submitAction(command);
-      case "runtimeTick":
-        return this.runtimeTick(command);
       case "agentTurn":
         await this.games.scheduleAdvance(command.gameRoomId);
         return { accepted: true };
@@ -146,40 +144,6 @@ class GameRoomActor {
     return { success: true, event };
   }
 
-  private async runtimeTick(
-    command: Extract<RoomCommand, { kind: "runtimeTick" }>
-  ): Promise<unknown> {
-    const beforeRoom = this.games.snapshot(command.gameRoomId);
-    const myPlayer = beforeRoom.players.find(
-      (player) => player.userId === command.actorUserId && !player.leftAt
-    );
-    const isCreator = beforeRoom.creatorUserId === command.actorUserId;
-    if (!myPlayer && !isCreator) {
-      throw new AppError("not_found", "You are not in this room", 404);
-    }
-    const myPrivateState = beforeRoom.privateStates.find(
-      (state) => state.playerId === myPlayer?.id
-    );
-    const beforeSeq = beforeRoom.events.length;
-
-    await this.games.scheduleAdvance(command.gameRoomId);
-
-    const room = this.games.snapshot(command.gameRoomId);
-    const revealAll = room.status === "ended" || room.projection?.status === "ended";
-    const isWolf = myPrivateState?.team === "wolf" && myPrivateState.alive;
-    const events = filterEventsForUser(
-      room.events.slice(beforeSeq),
-      myPlayer?.id,
-      Boolean(isWolf),
-      revealAll
-    );
-    return {
-      status: room.status,
-      done: room.status === "ended",
-      projection: room.projection,
-      events,
-    };
-  }
 }
 
 function filterEventsForUser(

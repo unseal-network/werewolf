@@ -50,23 +50,6 @@ export interface GameEventDto {
   createdAt: string;
 }
 
-export interface RuntimeTickDto {
-  status: string;
-  done: boolean;
-  projection: {
-    gameRoomId: string;
-    status: RoomStatus;
-    phase: string;
-    day: number;
-    deadlineAt: string | null;
-    currentSpeakerPlayerId: string | null;
-    winner: "wolf" | "good" | null;
-    alivePlayerIds: string[];
-    version: number;
-  };
-  events: GameEventDto[];
-}
-
 export interface RoomPlayer {
   id: string;
   userId?: string;
@@ -316,12 +299,6 @@ export function createApiClient(options: ApiClientOptions) {
       }>(`/games/${gameRoomId}/start`, {
         method: "POST",
         headers: idempotentHeaders("start"),
-      });
-    },
-    runRuntimeTick(gameRoomId: string) {
-      return request<RuntimeTickDto>(`/games/${gameRoomId}/runtime/tick`, {
-        method: "POST",
-        headers: idempotentHeaders("runtimeTick"),
       });
     },
     getGame(gameRoomId: string) {

@@ -17,13 +17,8 @@ function loadRemoteSecrets() {
   )
     .split("\n")
     .filter(Boolean);
-  const agentApiKey = ssh(
-    "unseal-agent-dev",
-    `cd /home/ubuntu/unseal-agents && set -a && . apps/server/.env && set +a && printf %s "$ADMIN_TOKEN"`
-  );
   if (tokens.length !== 6) throw new Error(`Expected 6 tokens, got ${tokens.length}`);
-  if (!agentApiKey) throw new Error("Missing agent API key");
-  return { tokens, agentApiKey };
+  return { tokens };
 }
 
 async function request(path, token, init = {}) {
@@ -43,7 +38,11 @@ async function request(path, token, init = {}) {
   return body;
 }
 
-const { tokens, agentApiKey } = loadRemoteSecrets();
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const { tokens } = loadRemoteSecrets();
 const whoami = await fetch("https://keepsecret.io/_matrix/client/v3/account/whoami", {
   headers: { authorization: `Bearer ${tokens[0]}` },
 });
@@ -78,33 +77,39 @@ console.log("start", started.status, started.projection.phase);
 const eventTypes = [];
 const nightActionKinds = [];
 const agentToolNames = [];
+let timelineAfter = started.events?.at(-1)?.id ?? "";
 let finalProjection = started.projection;
-for (let index = 0; index < 30; index += 1) {
-  const tick = await request(`/games/${create.gameRoomId}/runtime/tick`, tokens[0], {
-    method: "POST",
-    body: JSON.stringify({
-      agentApiKey,
-      agentApiBaseUrl:
-        process.env.UNSEAL_AGENT_API_BASE_URL ??
-        "https://un-server.dev-excel-alt.pagepeek.org/api",
-    }),
-  });
-  finalProjection = tick.projection;
-  eventTypes.push(...tick.events.map((event) => event.type));
+eventTypes.push(...(started.events ?? []).map((event) => event.type));
+for (let index = 0; index < 180; index += 1) {
+  await sleep(1000);
+  const snapshot = await request(`/games/${create.gameRoomId}`, tokens[0]);
+  finalProjection = snapshot.snapshot.displayState.projection;
+  const page = await request(
+    `/games/${create.gameRoomId}/timeline?after=${encodeURIComponent(timelineAfter)}&limit=500`,
+    tokens[0]
+  );
+  const events = page.events ?? [];
+  if (page.cursor?.after) timelineAfter = page.cursor.after;
+  eventTypes.push(...events.map((event) => event.type));
   nightActionKinds.push(
-    ...tick.events
+    ...events
       .filter((event) => event.type === "night_action_submitted")
       .map((event) => event.payload?.action?.kind)
       .filter(Boolean)
   );
   agentToolNames.push(
-    ...tick.events
+    ...events
       .filter((event) => event.type === "agent_llm_completed")
       .map((event) => event.payload?.toolName)
       .filter(Boolean)
   );
-  console.log("tick", index + 1, tick.projection.phase, tick.events.map((event) => event.type).join(","));
-  if (tick.done) break;
+  console.log(
+    "poll",
+    index + 1,
+    finalProjection?.phase,
+    events.map((event) => event.type).join(",")
+  );
+  if (finalProjection?.phase === "post_game" || finalProjection?.status === "ended") break;
 }
 
 if (finalProjection.phase !== "post_game" || !finalProjection.winner) {

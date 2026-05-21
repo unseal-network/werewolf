@@ -280,10 +280,6 @@ export class InMemoryGameService {
     this.runAgentTurnImpl = impl;
   }
 
-  hasRunAgentTurn(): boolean {
-    return Boolean(this.runAgentTurnImpl);
-  }
-
   createGame(
     input: unknown,
     creatorUserId: string

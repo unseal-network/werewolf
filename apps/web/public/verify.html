@@ -238,32 +238,30 @@
         log("Proof chain: AgentRuntime tool-call -> GameRuntime accepted event -> GameRuntime resolution");
 
         let finalProjection = started.projection;
+        let timelineAfter = started.events?.at(-1)?.id ?? "";
         for (let index = 0; index < (config.maxTicks ?? 80); index += 1) {
-          const tick = await request(
-            `/games/${created.gameRoomId}/runtime/tick`,
-            config.tokens[0],
-            {
-              method: "POST",
-              body: JSON.stringify({
-                agentApiKey: config.agentApiKey,
-                agentTimeoutMs: config.agentTimeoutMs ?? 15000,
-                agentApiBaseUrl:
-                  "https://un-server.dev-excel-alt.pagepeek.org/api",
-              }),
-            }
+          await sleep(1000);
+          const snapshot = await request(
+            `/games/${created.gameRoomId}`,
+            config.tokens[0]
           );
-          finalProjection = tick.projection;
-          if (tick.events.length === 0) {
+          finalProjection = snapshot.snapshot.displayState.projection;
+          const page = await request(
+            `/games/${created.gameRoomId}/timeline?after=${encodeURIComponent(timelineAfter)}&limit=500`,
+            config.tokens[0]
+          );
+          const events = page.events ?? [];
+          if (page.cursor?.after) timelineAfter = page.cursor.after;
+          if (events.length === 0) {
             appendLine(
-              `⏳ waiting: phase=${tick.projection.phase} deadlineAt=${tick.projection.deadlineAt}`,
+              `⏳ waiting: phase=${finalProjection?.phase} deadlineAt=${finalProjection?.deadlineAt}`,
               "wait"
             );
-            await sleep(1000);
             index -= 1;
             continue;
           }
-          logTick(index, tick.projection.phase, tick.events);
-          if (tick.done) break;
+          logTick(index, finalProjection?.phase, events);
+          if (finalProjection?.phase === "post_game" || finalProjection?.status === "ended") break;
         }
 
         log("verified", finalProjection.phase, finalProjection.winner);
