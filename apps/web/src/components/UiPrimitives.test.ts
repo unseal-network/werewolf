@@ -246,6 +246,8 @@ describe("new UI primitives", () => {
     expect(css).toContain("backdrop-filter: none !important");
     expect(css).toContain(".game-layout-root .action-region .action-start");
     expect(css).toContain(".game-layout-root .action-region .player-picker-action");
+    expect(css).toContain(".game-layout-root .action-region .player-picker-action-slot.is-placeholder");
+    expect(css).toContain("visibility: hidden");
     expect(css).toContain("pointer-events: none");
     expect(css).not.toContain("border-image-source: var(--ww-button-skin-image)");
     expect(css).not.toContain("border-image-slice: var(--ww-button-skin-slice) fill");
@@ -279,9 +281,11 @@ describe("new UI primitives", () => {
     expect(nonResetBackgroundLines).toEqual([]);
     expect(actionButtonCss).not.toContain("rgba(255, 255, 255");
     expect(actionButtonCss).not.toContain("backdrop-filter");
-    expect(actionButtonCss).not.toContain("linear-gradient");
-    expect(actionCss).toContain("--voice-fill-layer: transparent");
-    expect(actionCss).toContain("--voice-active-fill-layer: transparent");
+    expect(actionCss).toContain("--voice-fill-layer:");
+    expect(actionCss).toContain("--voice-active-fill-layer:");
+    expect(actionCss).toContain('url("/assets/werewolf-ui/final/button/log-fill.webp")');
+    expect(actionCss).not.toContain("--voice-fill-layer: transparent");
+    expect(actionCss).not.toContain("--voice-active-fill-layer: transparent");
   });
 
   it("removes old stage button skins from legacy styles", () => {

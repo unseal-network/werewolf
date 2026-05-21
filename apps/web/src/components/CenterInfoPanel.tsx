@@ -351,7 +351,7 @@ export function CenterInfoPanel({
             </div>
             <div className="center-vote-result-player">
               <MiniAvatar player={voteResult.exiled} />
-              <div>
+              <div className="center-vote-result-text">
                 <strong>
                   {seatNoLabel(voteResult.exiled?.seatNo, t("centerInfo.seatSuffix"))}
                   {" "}

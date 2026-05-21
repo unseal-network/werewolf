@@ -191,7 +191,7 @@
   font-size: 12px;
 }
 
-.game-layout-root .center-vote-result-player div {
+.game-layout-root .center-vote-result-player .center-vote-result-text {
   min-width: 0;
 }
 
@@ -207,7 +207,7 @@
   white-space: nowrap;
 }
 
-.game-layout-root .center-vote-result-player span {
+.game-layout-root .center-vote-result-player .center-vote-result-text span {
   display: block;
   margin-top: 3px;
   color: rgba(255, 111, 111, 0.9);

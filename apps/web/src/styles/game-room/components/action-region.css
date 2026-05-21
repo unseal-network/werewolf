@@ -116,8 +116,13 @@
     url("/assets/werewolf-ui/final/button/log-corner-br.webp") right bottom / var(--voice-corner-size) var(--voice-corner-size) no-repeat,
     url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") top center / var(--voice-edge-span) var(--voice-edge-width) repeat-x,
     url("/assets/werewolf-ui/final/button/log-edge-horizontal.webp") bottom center / var(--voice-edge-span) var(--voice-edge-width) repeat-x;
-  --voice-fill-layer: transparent;
-  --voice-active-fill-layer: transparent;
+  --voice-fill-layer:
+    linear-gradient(180deg, rgba(20, 19, 16, 0.68), rgba(4, 5, 6, 0.78)),
+    url("/assets/werewolf-ui/final/button/log-fill.webp") center / var(--voice-fill-span-x) var(--voice-fill-span-y) no-repeat;
+  --voice-active-fill-layer:
+    radial-gradient(circle at 50% 10%, rgba(255, 231, 174, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(96, 34, 36, 0.82), rgba(18, 7, 9, 0.90)),
+    url("/assets/werewolf-ui/final/button/log-fill.webp") center / var(--voice-fill-span-x) var(--voice-fill-span-y) no-repeat;
 }
 
 .game-layout-root .action-region .voice-bubble {
@@ -289,6 +294,11 @@
 .game-layout-root .action-region .player-picker-control-slot {
   display: grid;
   place-items: center;
+}
+
+.game-layout-root .action-region .player-picker-action-slot.is-placeholder {
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .game-layout-root .action-region .ww-segmented-control {

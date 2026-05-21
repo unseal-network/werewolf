@@ -143,6 +143,10 @@ export function getLobbyPrimaryAction({
   return "join";
 }
 
+export function getClockwiseSeatTargets<T extends { seatNo: number }>(targets: T[]): T[] {
+  return [...targets].sort((left, right) => left.seatNo - right.seatNo);
+}
+
 export function shouldPinActionBubbleOpen({
   actionMode,
   canCurrentUserAct,
@@ -205,6 +209,7 @@ export function CenterStage({
   );
   const [wolfActionMode, setWolfActionMode] = useState<"target" | "speech">("target");
   const selectedTarget = legalTargets.find((s) => s.playerId === selectedTargetId);
+  const radialTargets = getClockwiseSeatTargets(legalTargets);
   const displayRole = myRoleId ? normalizeDisplayRole(myRoleId) : undefined;
   const roleImg = displayRole ? ROLE_IMG[displayRole] : LOGO_IMG;
   const roleColor = displayRole ? ROLE_COLOR[displayRole] : "var(--accent)";
@@ -406,7 +411,7 @@ export function CenterStage({
 
   const pickerControl = (
     <PlayerRadialPicker
-      targets={legalTargets}
+      targets={radialTargets}
       selectedTargetId={selectedTargetId}
       confirmLabel={t(PRIMARY_KEY[confirmMode])}
       skipLabel={t("stage.skipButton")}

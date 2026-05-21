@@ -329,10 +329,10 @@ describe("game room seat layout", () => {
     expect(legacyCss).toContain("var(--player-picker-slice-deg)");
     expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel__edge--top");
     expect(primitiveCss).toContain(".game-layout-root .ww-ui-panel__corner--tl");
-    expect(primitiveCss).toContain("--ww-panel-fill-top: calc(var(--ww-panel-edge-top-y) + var(--ww-panel-edge))");
-    expect(primitiveCss).toContain("--ww-panel-fill-right: calc(var(--ww-panel-edge-right-x) + var(--ww-panel-edge))");
-    expect(primitiveCss).toContain("--ww-panel-fill-bottom: calc(var(--ww-panel-edge-bottom-y) + var(--ww-panel-edge))");
-    expect(primitiveCss).toContain("--ww-panel-fill-left: calc(var(--ww-panel-edge-left-x) + var(--ww-panel-edge))");
+    expect(primitiveCss).toContain("--ww-panel-fill-top: var(--ww-panel-edge-top-y)");
+    expect(primitiveCss).toContain("--ww-panel-fill-right: var(--ww-panel-edge-right-x)");
+    expect(primitiveCss).toContain("--ww-panel-fill-bottom: var(--ww-panel-edge-bottom-y)");
+    expect(primitiveCss).toContain("--ww-panel-fill-left: var(--ww-panel-edge-left-x)");
     expect(primitiveCss).toContain("top: var(--ww-panel-fill-top)");
     expect(primitiveCss).toContain("right: var(--ww-panel-fill-right)");
     expect(primitiveCss).toContain("bottom: var(--ww-panel-fill-bottom)");
@@ -402,6 +402,9 @@ describe("game room seat layout", () => {
     expect(actionCss).toContain("calc(100% - (var(--layout-rail-width) * 2)");
     expect(actionCss).toContain("button/log-corner-tl.webp");
     expect(actionCss).toContain("button/log-edge-horizontal.webp");
+    expect(actionCss).toContain('url("/assets/werewolf-ui/final/button/log-fill.webp")');
+    expect(actionCss).toContain("--voice-active-fill-layer:");
+    expect(actionCss).toContain("rgba(96, 34, 36, 0.82)");
     expect(actionCss).toContain("box-shadow: none !important");
     expect(actionCss).toContain("grid-area: action");
     expect(actionCss).not.toContain(".stage-confirm.use-confirm-asset");

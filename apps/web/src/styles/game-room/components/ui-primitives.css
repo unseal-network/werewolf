@@ -8,10 +8,10 @@
   --ww-panel-edge-bottom-y: calc(29px * var(--ww-panel-scale));
   --ww-panel-edge-left-x: calc(12px * var(--ww-panel-scale));
   --ww-panel-edge-right-x: calc(15px * var(--ww-panel-scale));
-  --ww-panel-fill-top: calc(var(--ww-panel-edge-top-y) + var(--ww-panel-edge));
-  --ww-panel-fill-right: calc(var(--ww-panel-edge-right-x) + var(--ww-panel-edge));
-  --ww-panel-fill-bottom: calc(var(--ww-panel-edge-bottom-y) + var(--ww-panel-edge));
-  --ww-panel-fill-left: calc(var(--ww-panel-edge-left-x) + var(--ww-panel-edge));
+  --ww-panel-fill-top: var(--ww-panel-edge-top-y);
+  --ww-panel-fill-right: var(--ww-panel-edge-right-x);
+  --ww-panel-fill-bottom: var(--ww-panel-edge-bottom-y);
+  --ww-panel-fill-left: var(--ww-panel-edge-left-x);
   --ww-panel-content-top: calc(96px * var(--ww-panel-scale));
   --ww-panel-content-right: calc(78px * var(--ww-panel-scale));
   --ww-panel-content-bottom: calc(96px * var(--ww-panel-scale));

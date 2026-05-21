@@ -548,6 +548,7 @@ export function PlayerRadialPicker({
       ) : null}
     </div>
   );
+  const actionSlotClassName = `player-picker-action-slot${wheelOpen ? " is-placeholder" : ""}`;
 
   if (selectedTarget) {
     return (
@@ -555,15 +556,19 @@ export function PlayerRadialPicker({
         <div className="player-picker-control-slot">
           {wheel}
         </div>
-        {showActionButton && !wheelOpen ? <div className="player-picker-action-slot">
-          <StageActionButton
-            className="player-picker-action"
-            label={confirmLabel}
-            variant="primary"
-            onClick={onConfirm}
-            loading={Boolean(actionLoading)}
-          />
-        </div> : null}
+        {showActionButton ? (
+          <div className={actionSlotClassName} aria-hidden={wheelOpen ? "true" : undefined}>
+            {!wheelOpen ? (
+              <StageActionButton
+                className="player-picker-action"
+                label={confirmLabel}
+                variant="primary"
+                onClick={onConfirm}
+                loading={Boolean(actionLoading)}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -573,15 +578,17 @@ export function PlayerRadialPicker({
       <div className="player-picker-control-slot">
         {wheel}
       </div>
-      {showActionButton && !wheelOpen && skipLabel && onSkip ? (
-        <div className="player-picker-action-slot">
-          <StageActionButton
-            className="player-picker-action"
-            label={skipLabel}
-            variant="secondary"
-            onClick={onSkip}
-            loading={Boolean(actionLoading)}
-          />
+      {showActionButton && skipLabel && onSkip ? (
+        <div className={actionSlotClassName} aria-hidden={wheelOpen ? "true" : undefined}>
+          {!wheelOpen ? (
+            <StageActionButton
+              className="player-picker-action"
+              label={skipLabel}
+              variant="secondary"
+              onClick={onSkip}
+              loading={Boolean(actionLoading)}
+            />
+          ) : null}
         </div>
       ) : null}
     </div>

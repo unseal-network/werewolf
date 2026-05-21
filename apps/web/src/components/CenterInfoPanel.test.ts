@@ -1,4 +1,6 @@
 import { createElement } from "react";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { GameEventDto, RoomPlayer } from "../api/client";
@@ -333,10 +335,22 @@ describe("CenterInfoPanel", () => {
     const text = visibleText(html);
 
     expect(text).toContain("投票结果");
+    expect(html).toContain('class="center-mini-avatar"');
+    expect(html).toContain('class="center-vote-result-text"');
     expect(text).toContain("3号 3号玩家");
     expect(text).toContain("被放逐");
     expect(text).toContain("2 票出局");
     expect(text).toContain("投票人: 1号，2号");
     expect(text).not.toContain("等待玩家投票");
+  });
+
+  it("keeps vote result text styling scoped away from the mini avatar", () => {
+    const css = readFileSync(
+      resolve(process.cwd(), "apps/web/src/styles/game-room/components/center-info.css"),
+      "utf8"
+    );
+
+    expect(css).toContain(".center-vote-result-player .center-vote-result-text span");
+    expect(css).not.toContain(".center-vote-result-player span {");
   });
 });

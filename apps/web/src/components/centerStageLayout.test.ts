@@ -8,6 +8,7 @@ import {
   shouldStartActionBubbleCollapsed,
   shouldShowCenterPhaseSummary,
   getLobbyPrimaryAction,
+  getClockwiseSeatTargets,
 } from "./CenterStage";
 
 describe("center stage layout", () => {
@@ -123,6 +124,17 @@ describe("center stage layout", () => {
         isCreator: false,
       })
     ).toBe("join");
+  });
+
+  it("orders radial picker targets clockwise by seat number", () => {
+    expect(
+      getClockwiseSeatTargets([
+        { seatNo: 7, playerId: "p7" },
+        { seatNo: 2, playerId: "p2" },
+        { seatNo: 10, playerId: "p10" },
+        { seatNo: 3, playerId: "p3" },
+      ]).map((target) => target.seatNo)
+    ).toEqual([2, 3, 7, 10]);
   });
 
 });
