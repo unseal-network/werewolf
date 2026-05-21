@@ -60,6 +60,16 @@ function visibleText(html: string): string {
 }
 
 describe("CenterInfoPanel", () => {
+  it("renders live speech updates directly instead of replaying them with a typewriter loop", () => {
+    const source = readFileSync(
+      resolve(process.cwd(), "apps/web/src/components/CenterInfoPanel.tsx"),
+      "utf8"
+    );
+
+    expect(source).not.toContain("setInterval");
+    expect(source).not.toContain("current.length + 1");
+  });
+
   it("keeps phase, day, and alive counts out of the center live panel", () => {
     const speaker = player({ id: "p1", displayName: "阿青", seatNo: 1 });
     const html = renderPanel({
@@ -82,7 +92,7 @@ describe("CenterInfoPanel", () => {
     expect(html).toContain("我觉得三号需要解释。");
   });
 
-  it("labels agent speech as stream output and human speech as live captions", () => {
+  it("labels agent and human speech with the same live captions heading", () => {
     const agent = player({
       id: "agent-1",
       agentId: "@agent:local",
@@ -92,33 +102,34 @@ describe("CenterInfoPanel", () => {
     });
     const human = player({ id: "human-1", displayName: "真人玩家", seatNo: 3 });
 
-    expect(
-      renderPanel({
-        players: [agent],
-        events: [
-          event({
-            type: "stream",
-            actorId: agent.id,
-            payload: { delta: "这轮我先看四号的票型。" },
-          }),
-        ],
-        currentSpeakerPlayerId: agent.id,
-      })
-    ).toContain("Agent 输出");
+    const agentHtml = renderPanel({
+      players: [agent],
+      events: [
+        event({
+          type: "stream",
+          actorId: agent.id,
+          payload: { delta: "这轮我先看四号的票型。" },
+        }),
+      ],
+      currentSpeakerPlayerId: agent.id,
+    });
 
-    expect(
-      renderPanel({
-        players: [human],
-        events: [
-          event({
-            type: "stream",
-            actorId: human.id,
-            payload: { day: 2, phase: "day_speak", text: "我是好人，先不要归我。" },
-          }),
-        ],
-        currentSpeakerPlayerId: human.id,
-      })
-    ).toContain("实时字幕");
+    const humanHtml = renderPanel({
+      players: [human],
+      events: [
+        event({
+          type: "stream",
+          actorId: human.id,
+          payload: { day: 2, phase: "day_speak", text: "我是好人，先不要归我。" },
+        }),
+      ],
+      currentSpeakerPlayerId: human.id,
+    });
+
+    expect(agentHtml).toContain("实时字幕");
+    expect(agentHtml).not.toContain("Agent 输出");
+    expect(humanHtml).toContain("实时字幕");
+    expect(humanHtml).not.toContain("Agent 输出");
   });
 
   it("shows only the current speech turn stream in the center panel", () => {

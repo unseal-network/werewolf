@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import type { GameEventDto, RoomPlayer } from "../api/client";
 import { useT } from "../i18n/I18nProvider";
 import { avatarPalette, firstReadableInitial } from "./SeatAvatar";
@@ -234,31 +234,10 @@ export function CenterInfoPanel({
   const latestSpeechPlayer = playersById.get(latestSpeech?.actorId ?? "");
   const currentSpeaker = playersById.get(currentSpeakerPlayerId ?? "");
   const speechPlayer = currentSpeaker ?? latestSpeechPlayer;
-  const speechHeading =
-    speechPlayer?.kind === "agent"
-      ? t("centerInfo.agentStream")
-      : t("centerInfo.liveCaptions");
+  const speechHeading = t("centerInfo.liveCaptions");
   const text = speechText(latestSpeech);
-  const [displayText, setDisplayText] = useState(text);
+  const displayText = text;
   const speechTextRef = useRef<HTMLParagraphElement | null>(null);
-
-  useEffect(() => {
-    if (!text) {
-      setDisplayText("");
-      return undefined;
-    }
-    setDisplayText((current) => (text.startsWith(current) ? current : ""));
-    const id = window.setInterval(() => {
-      setDisplayText((current) => {
-        if (current === text) {
-          window.clearInterval(id);
-          return current;
-        }
-        return text.slice(0, current.length + 1);
-      });
-    }, 18);
-    return () => window.clearInterval(id);
-  }, [text]);
 
   useEffect(() => {
     const node = speechTextRef.current;
