@@ -41,7 +41,12 @@ export function visibleSeatNumbersForRoom({
     playerCount: occupied.length,
     occupiedSeatCount: occupied.length,
   });
-  return Array.from({ length: visibleCount }, (_, index) => index + 1);
+  const highestOccupiedSeatNo = occupied.at(-1) ?? 0;
+  const count = Math.min(
+    targetPlayerCount,
+    Math.max(visibleCount, highestOccupiedSeatNo)
+  );
+  return Array.from({ length: count }, (_, index) => index + 1);
 }
 
 export function splitSeatsIntoRails<T>(seats: readonly T[]): { left: T[]; right: T[] } {

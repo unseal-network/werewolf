@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n/I18nProvider";
 import type { AgentCandidate } from "../api/client";
 import { GameButton } from "./GameButton";
@@ -41,19 +41,34 @@ export function AgentPicker({
 }: AgentPickerProps) {
   const t = useT();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [fillTargetCount, setFillTargetCount] = useState(targetPlayerCount);
+  const [fillTargetCount, setFillTargetCount] = useState(() =>
+    Math.max(6, activePlayerCount + 1)
+  );
   const [filling, setFilling] = useState(false);
+  const [fillMenuOpen, setFillMenuOpen] = useState(false);
+  const fillOptions = useMemo(() => {
+    const firstTarget = Math.max(6, activePlayerCount + 1);
+    if (firstTarget > targetPlayerCount) return [];
+    return Array.from(
+      { length: targetPlayerCount - firstTarget + 1 },
+      (_, index) => firstTarget + index
+    );
+  }, [activePlayerCount, targetPlayerCount]);
 
   useEffect(() => {
     if (!open) {
       setPendingId(null);
       setFilling(false);
+      setFillMenuOpen(false);
     }
   }, [open]);
 
   useEffect(() => {
-    if (open) setFillTargetCount(targetPlayerCount);
-  }, [open, targetPlayerCount]);
+    if (open) {
+      setFillTargetCount(fillOptions[0] ?? targetPlayerCount);
+      setFillMenuOpen(false);
+    }
+  }, [fillOptions, open, targetPlayerCount]);
 
   const handleAdd = useCallback(
     async (agent: AgentCandidate) => {
@@ -81,20 +96,19 @@ export function AgentPicker({
 
   if (!open) return null;
 
-  const minFillTarget = Math.max(activePlayerCount, 1);
-  const normalizedFillTarget = Math.min(
-    targetPlayerCount,
-    Math.max(minFillTarget, fillTargetCount)
-  );
+  const normalizedFillTarget = fillOptions.includes(fillTargetCount)
+    ? fillTargetCount
+    : fillOptions[0] ?? targetPlayerCount;
   const fillMissingCount = Math.max(normalizedFillTarget - activePlayerCount, 0);
 
   const handleFill = async () => {
-    if (!onFill) return;
+    if (!onFill || fillOptions.length === 0) return;
     setFilling(true);
     try {
       await onFill(normalizedFillTarget);
     } finally {
       setFilling(false);
+      setFillMenuOpen(false);
     }
   };
 
@@ -131,35 +145,6 @@ export function AgentPicker({
         {errorMessage ? (
           <div className="agent-picker-error-toast" role="alert" aria-live="polite">
             {t("agentPicker.error", { message: errorMessage })}
-          </div>
-        ) : null}
-
-        {onFill ? (
-          <div className="agent-fill-control">
-            <label className="agent-fill-label" htmlFor="agent-fill-target">
-              {t("agentPicker.fillTarget")}
-            </label>
-            <input
-              id="agent-fill-target"
-              className="agent-fill-input"
-              type="number"
-              min={minFillTarget}
-              max={targetPlayerCount}
-              value={normalizedFillTarget}
-              onChange={(event) => {
-                const next = Number(event.currentTarget.value);
-                if (Number.isFinite(next)) setFillTargetCount(Math.trunc(next));
-              }}
-            />
-            <GameButton
-              className="agent-fill-button"
-              variant="confirm"
-              size="sm"
-              label={t("agentPicker.fillNow", { count: fillMissingCount })}
-              loading={filling}
-              disabled={filling || fillMissingCount <= 0}
-              onClick={handleFill}
-            />
           </div>
         ) : null}
 
@@ -220,6 +205,63 @@ export function AgentPicker({
               onClick={onStartNow}
               disabled={!canStartNow}
             />
+          ) : null}
+          {onFill && fillOptions.length > 0 ? (
+            <div className="agent-fill-control">
+              <label className="agent-fill-label" htmlFor="agent-fill-target">
+                {t("agentPicker.fillTo")}
+              </label>
+              <div className="agent-fill-select-wrap">
+                <button
+                  id="agent-fill-target"
+                  type="button"
+                  className="agent-fill-select"
+                  aria-haspopup="listbox"
+                  aria-expanded={fillMenuOpen}
+                  onClick={() => setFillMenuOpen((value) => !value)}
+                >
+                  <span>{normalizedFillTarget}</span>
+                  <span className="agent-fill-select-caret" aria-hidden>
+                    ▾
+                  </span>
+                </button>
+                {fillMenuOpen ? (
+                  <div className="agent-fill-menu" role="listbox" aria-label={t("agentPicker.fillTo")}>
+                    {fillOptions.map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        className={`agent-fill-option ${
+                          count === normalizedFillTarget ? "selected" : ""
+                        }`}
+                        role="option"
+                        aria-selected={count === normalizedFillTarget}
+                        onClick={() => {
+                          setFillTargetCount(count);
+                          setFillMenuOpen(false);
+                        }}
+                      >
+                        {count === normalizedFillTarget ? (
+                          <span className="agent-fill-option-check" aria-hidden>
+                            ✓
+                          </span>
+                        ) : null}
+                        <span>{count}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              <div className="agent-fill-unit">{t("agentPicker.fillUnit")}</div>
+              <GameIconButton
+                className="agent-fill-submit"
+                label={filling ? "..." : "+"}
+                size="md"
+                aria-label={t("agentPicker.fillNow", { count: fillMissingCount })}
+                disabled={filling || fillMissingCount <= 0}
+                onClick={handleFill}
+              />
+            </div>
           ) : null}
         </div>
       </UiPanelFrame>

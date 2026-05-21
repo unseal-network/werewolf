@@ -48,6 +48,8 @@ export const dictionaries: Record<Locale, Dict> = {
     "agentPicker.error": "拉取 agent 列表失败：{message}",
     "agentPicker.startNow": "立刻开始",
     "agentPicker.fillTarget": "目标人数",
+    "agentPicker.fillTo": "补齐到",
+    "agentPicker.fillUnit": "人",
     "agentPicker.fillNow": "一键补齐 {count} 人",
     "agentPicker.empty.help": "源房间 id：{room}",
 
@@ -266,6 +268,8 @@ export const dictionaries: Record<Locale, Dict> = {
     "agentPicker.error": "Failed to load agents: {message}",
     "agentPicker.startNow": "Start now",
     "agentPicker.fillTarget": "Target players",
+    "agentPicker.fillTo": "Fill to",
+    "agentPicker.fillUnit": "players",
     "agentPicker.fillNow": "Fill {count}",
     "agentPicker.empty.help": "Source room id: {room}",
 

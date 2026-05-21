@@ -20,11 +20,13 @@ function renderPicker({
   candidates = agents,
   canStart = true,
   onFill,
+  activePlayerCount = 5,
 }: {
   errorMessage?: string;
   candidates?: AgentCandidate[];
   canStart?: boolean;
   onFill?: (targetPlayerCount: number) => Promise<void>;
+  activePlayerCount?: number;
 } = {}) {
   return renderToStaticMarkup(
     createElement(
@@ -37,8 +39,8 @@ function renderPicker({
         errorMessage,
         sourceRoomId: "!source:keepsecret.io",
         remainingSeats: 1,
-        activePlayerCount: 5,
-        targetPlayerCount: 6,
+        activePlayerCount,
+        targetPlayerCount: 12,
         canStartNow: true,
         onAdd: async () => undefined,
         onRemove: async () => undefined,
@@ -98,11 +100,39 @@ describe("AgentPicker", () => {
     expect(html).not.toContain("立刻开始");
   });
 
-  it("renders a target count control and one-click fill button when fill is available", () => {
+  it("renders generated target count options and one-click fill button when fill is available", () => {
     const html = renderPicker({ onFill: async () => undefined });
 
-    expect(html).toContain("目标人数");
-    expect(html).toContain('value="6"');
-    expect(html).toContain("一键补齐");
+    expect(html).toContain("补齐到");
+    expect(html).toContain("人");
+    expect(html).toContain('aria-haspopup="listbox"');
+    expect(html).toContain("<span>6</span>");
+    expect(html).toContain('aria-label="一键补齐 1 人"');
+    expect(html).not.toContain("目标人数");
+    expect(html.indexOf("agent-picker-actions")).toBeLessThan(
+      html.indexOf("补齐到")
+    );
+  });
+
+  it("starts fill options at one above the active player count once six players are seated", () => {
+    const html = renderPicker({
+      activePlayerCount: 6,
+      onFill: async () => undefined,
+    });
+
+    expect(html).not.toContain('<option value="6"');
+    expect(html).toContain("<span>7</span>");
+    expect(html).toContain('aria-label="一键补齐 1 人"');
+  });
+
+  it("hides the fill control when the room is already at the target player count", () => {
+    const html = renderPicker({
+      activePlayerCount: 12,
+      onFill: async () => undefined,
+    });
+
+    expect(html).not.toContain("补齐到");
+    expect(html).not.toContain("agent-fill-control");
+    expect(html).not.toContain('aria-label="一键补齐');
   });
 });

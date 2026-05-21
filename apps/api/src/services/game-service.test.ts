@@ -478,6 +478,69 @@ describe("InMemoryGameService rules", () => {
     expect(room.players.find((player) => player.id === "player_4")).toBeUndefined();
   });
 
+  it("rejoins a previously-left human into the smallest empty seat when no seat is clicked", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    games.join(room.id, players[0][0], players[0][1], undefined, 5);
+    games.leave(room.id, players[0][0]);
+    games.join(room.id, players[1][0], players[1][1], undefined, 1);
+    games.join(room.id, players[2][0], players[2][1], undefined, 3);
+
+    const rejoined = games.join(room.id, players[0][0], players[0][1]);
+
+    expect(rejoined.seatNo).toBe(2);
+    expect(rejoined.id).toBe("player_2");
+    expect(room.players.find((player) => player.id === "player_5")).toBeUndefined();
+  });
+
+  it("re-adds a previously-removed agent into the smallest empty seat instead of its old seat", () => {
+    const games = new InMemoryGameService();
+    const { room } = games.createGame(
+      {
+        sourceMatrixRoomId: "!source:example.com",
+        title: "Seats",
+        targetPlayerCount: 6,
+        timing: { nightActionSeconds: 45, speechSeconds: 60, voteSeconds: 30 },
+      },
+      players[0][0]
+    );
+    games.addAgentPlayer(room.id, players[0][0], "@agent-1:example.com", "Agent 1");
+    const lowSeatAgent = games.addAgentPlayer(
+      room.id,
+      players[0][0],
+      "@agent-2:example.com",
+      "Agent 2"
+    );
+    games.addAgentPlayer(room.id, players[0][0], "@agent-3:example.com", "Agent 3");
+    const highSeatAgent = games.addAgentPlayer(
+      room.id,
+      players[0][0],
+      "@agent-4:example.com",
+      "Agent 4"
+    );
+    games.removePlayer(room.id, players[0][0], highSeatAgent.id);
+    games.removePlayer(room.id, players[0][0], lowSeatAgent.id);
+
+    const readded = games.addAgentPlayer(
+      room.id,
+      players[0][0],
+      "@agent-4:example.com",
+      "Agent 4"
+    );
+
+    expect(readded.seatNo).toBe(2);
+    expect(readded.id).toBe("player_2");
+    expect(room.players.find((player) => player.id === "player_4")).toBeUndefined();
+  });
+
   it("reveals the wolf kill target to the witch before the heal phase action", async () => {
     const { games, gameRoomId } = createStartedServiceGame();
     const room = games.snapshot(gameRoomId);

@@ -367,36 +367,7 @@ export class InMemoryGameService {
     }
     const existing = room.players.find((player) => player.userId === userId);
     if (existing) {
-      if (existing.leftAt && preferredSeatNo !== undefined) {
-        const seatNo = this.resolveJoinSeatNo(room, preferredSeatNo);
-        room.players = room.players.filter(
-          (player) =>
-            player.id !== existing.id &&
-            !(player.leftAt && player.seatNo === seatNo)
-        );
-        const player: StoredPlayer = {
-          id: `player_${seatNo}`,
-          kind: "user",
-          userId,
-          displayName,
-          ...(avatarUrl ? { avatarUrl } : {}),
-          seatNo,
-          ready: true,
-          onlineState: "online",
-          leftAt: null,
-          joinedAt: new Date().toISOString(),
-        };
-        room.players.push(player);
-        this.emitPlayerJoinedEvent(room, player, userId);
-        return player;
-      }
-      const activeAtOldSeat = room.players.some(
-        (player) =>
-          player.id !== existing.id &&
-          !player.leftAt &&
-          player.seatNo === existing.seatNo
-      );
-      if (!activeAtOldSeat) {
+      if (!existing.leftAt) {
         existing.leftAt = null;
         existing.onlineState = "online";
         existing.displayName = displayName;
@@ -478,13 +449,7 @@ export class InMemoryGameService {
       (candidate) => candidate.agentId === agentUserId
     );
     if (existing) {
-      const activeAtOldSeat = room.players.some(
-        (player) =>
-          player.id !== existing.id &&
-          !player.leftAt &&
-          player.seatNo === existing.seatNo
-      );
-      if (!existing.leftAt || !activeAtOldSeat) {
+      if (!existing.leftAt) {
         existing.leftAt = null;
         existing.onlineState = "online";
         existing.displayName = displayName || agentUserId;

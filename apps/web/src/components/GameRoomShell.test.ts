@@ -41,6 +41,16 @@ describe("game room seat layout", () => {
     ).toEqual([1, 3, 5, 7, 9, 12]);
   });
 
+  it("keeps high occupied lobby seats visible after fill or removal leaves seat gaps", () => {
+    expect(
+      visibleSeatNumbersForRoom({
+        targetPlayerCount: 12,
+        occupiedSeatNos: [1, 2, 3, 4, 5, 11, 12],
+        isGameStarted: false,
+      })
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
   it("splits visible seats into left and right player rails by visual order", () => {
     const rails = splitSeatsIntoRails([1, 2, 3, 4, 5, 6, 7]);
 

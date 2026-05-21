@@ -4,7 +4,7 @@ import { SeatAvatar } from "./SeatAvatar";
 import type { SeatData } from "./SeatAvatar";
 import { GameEngine, type EngineGameState } from "../engine/GameEngine";
 import { RoleRevealEngine } from "./RoleRevealEngine";
-import { computeVisibleSeatCount, splitSeatsIntoRails } from "../game/seatLayout";
+import { splitSeatsIntoRails } from "../game/seatLayout";
 import { co } from "@unseal-network/mobile-sdk";
 import { MobileHeader } from "./MobileHeader";
 import { GameIconButton } from "./GameIconButton";
@@ -261,12 +261,7 @@ export function GameRoomShell({
     () => seats.filter((seat) => seat.seatNo <= seatCount),
     [seatCount, seats]
   );
-  const visibleSeatCount = computeVisibleSeatCount({
-    seatCount,
-    playerCount,
-    occupiedSeatCount: activeSeats.filter((seat) => !seat.isEmpty).length,
-  });
-  const boardSeats = activeSeats.slice(0, visibleSeatCount);
+  const boardSeats = activeSeats;
   const rails = splitSeatsIntoRails(boardSeats);
   const railSlotCount = Math.max(rails.left.length, rails.right.length);
   const responsiveLayoutVars = useResponsiveGameLayoutVars(railSlotCount);
