@@ -9,10 +9,8 @@ import { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  Users,
   Globe,
-  Mic2,
-  MicOff,
+  Gauge,
   Check,
 } from "lucide-react";
 import { BottomSheet } from "../components/BottomSheet";
@@ -26,13 +24,26 @@ import {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PLAYER_COUNTS = [6, 8, 12] as const;
 const LANGUAGES = [
   { code: "zh-CN" as const, name: "中文" },
   { code: "en" as const, name: "EN" },
 ];
 
-type ActiveSheet = "players" | "language" | "voice" | null;
+type ActiveSheet = "language" | "speechRate" | null;
+
+const SPEECH_RATE_OPTIONS = [
+  { value: 1,    label: "1x",    desc: "正常" },
+  { value: 1.25, label: "1.25x", desc: "稍快" },
+  { value: 1.5,  label: "1.5x",  desc: "快速" },
+  { value: 1.75, label: "1.75x", desc: "较快" },
+  { value: 2,    label: "2x",    desc: "极速" },
+] as const;
+
+function speechRateLabel(rate: number): string {
+  if (rate === 1) return "正常";
+  if (rate === 2) return "极速";
+  return `${rate}x`;
+}
 
 const base = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}`;
 const assetBase = `${base}assets/werewolf-ui/final`;
@@ -55,8 +66,8 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
   const {
     language,
     setLanguage,
-    targetPlayerCount,
-    setTargetPlayerCount,
+    agentSpeechRate,
+    setAgentSpeechRate,
     submitting,
     error,
     setError,
@@ -64,7 +75,6 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
   } = useCreateGame({ onGameCreated });
 
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
-  const [meetingRequired, setMeetingRequired] = useState(false);
 
   const userId      = readStoredMatrixUserId() ?? "";
   const displayName = readStoredMatrixDisplayName() ?? userId;
@@ -91,22 +101,16 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
   // ── Config row definitions ──────────────────────────────────────────────
   const configRows = [
     {
-      key: "players" as ActiveSheet,
-      Icon: Users,
-      label: "玩家人数",
-      value: `${targetPlayerCount} 人`,
-    },
-    {
       key: "language" as ActiveSheet,
       Icon: Globe,
       label: "游戏语言",
       value: selectedLang.name,
     },
     {
-      key: "voice" as ActiveSheet,
-      Icon: meetingRequired ? Mic2 : MicOff,
-      label: "语音模式",
-      value: meetingRequired ? "已开启" : "已关闭",
+      key: "speechRate" as ActiveSheet,
+      Icon: Gauge,
+      label: "语音倍速",
+      value: speechRateLabel(agentSpeechRate),
     },
   ];
 
@@ -342,39 +346,6 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
 
       {/* ── BottomSheets ─────────────────────────────────────────────── */}
 
-      {/* Player count */}
-      <BottomSheet open={activeSheet === "players"} onClose={() => setActiveSheet(null)} title="玩家人数">
-        <div className="flex gap-3">
-          {PLAYER_COUNTS.map((n) => (
-            <button
-              key={n}
-              onClick={() => { setTargetPlayerCount(n); setActiveSheet(null); }}
-              className="flex-1 py-5 rounded-2xl cursor-pointer transition-all active:scale-[0.97] flex flex-col items-center gap-0.5"
-              style={{
-                background: targetPlayerCount === n ? "rgba(212,177,92,0.14)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${targetPlayerCount === n ? "rgba(207,176,91,0.55)" : "rgba(255,255,255,0.08)"}`,
-              }}
-            >
-              <span
-                className="text-2xl font-black"
-                style={{ color: targetPlayerCount === n ? "#d4b15c" : "rgba(255,247,216,0.35)" }}
-              >
-                {n}
-              </span>
-              <span
-                className="text-[11px]"
-                style={{ color: targetPlayerCount === n ? "rgba(212,177,92,0.65)" : "rgba(255,247,216,0.22)" }}
-              >
-                人局
-              </span>
-              {targetPlayerCount === n && (
-                <Check size={12} color="#d4b15c" strokeWidth={3} className="mt-0.5" />
-              )}
-            </button>
-          ))}
-        </div>
-      </BottomSheet>
-
       {/* Language */}
       <BottomSheet open={activeSheet === "language"} onClose={() => setActiveSheet(null)} title="游戏语言">
         <div className="grid grid-cols-2 gap-2.5">
@@ -397,49 +368,37 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
         </div>
       </BottomSheet>
 
-      {/* Voice */}
-      <BottomSheet open={activeSheet === "voice"} onClose={() => setActiveSheet(null)} title="语音模式">
-        <div className="flex flex-col gap-2.5">
-          {(
-            [
-              { value: true,  Icon: Mic2,   label: "开启语音", desc: "玩家可使用麦克风通话" },
-              { value: false, Icon: MicOff, label: "关闭语音", desc: "仅文字交流模式"       },
-            ] as const
-          ).map(({ value, Icon: RowIcon, label, desc }) => (
-            <button
-              key={String(value)}
-              onClick={() => { setMeetingRequired(value); setActiveSheet(null); }}
-              className="flex items-center gap-3.5 p-4 rounded-2xl cursor-pointer text-left w-full transition-all active:scale-[0.98]"
-              style={{
-                background: meetingRequired === value ? "rgba(212,177,92,0.12)" : "rgba(255,255,255,0.04)",
-                border: `1px solid ${meetingRequired === value ? "rgba(207,176,91,0.55)" : "rgba(255,255,255,0.08)"}`,
-              }}
-            >
-              <div
-                className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0"
+      {/* Speech rate */}
+      <BottomSheet open={activeSheet === "speechRate"} onClose={() => setActiveSheet(null)} title="语音倍速">
+        <div className="flex gap-2">
+          {SPEECH_RATE_OPTIONS.map(({ value, label, desc }) => {
+            const selected = agentSpeechRate === value;
+            return (
+              <button
+                key={value}
+                onClick={() => { setAgentSpeechRate(value); setActiveSheet(null); }}
+                className="flex-1 py-4 rounded-2xl cursor-pointer transition-all active:scale-[0.97] flex flex-col items-center gap-0.5"
                 style={{
-                  background: meetingRequired === value ? "rgba(212,177,92,0.15)" : "rgba(255,255,255,0.05)",
-                  border: `1px solid ${meetingRequired === value ? "rgba(207,176,91,0.35)" : "rgba(255,255,255,0.08)"}`,
+                  background: selected ? "rgba(212,177,92,0.14)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${selected ? "rgba(207,176,91,0.55)" : "rgba(255,255,255,0.08)"}`,
                 }}
               >
-                <RowIcon size={17} color={meetingRequired === value ? "#d4b15c" : "rgba(255,247,216,0.40)"} />
-              </div>
-              <div className="flex-1">
-                <div
-                  className="text-sm font-bold"
-                  style={{ color: meetingRequired === value ? "#fff7d8" : "rgba(255,247,216,0.50)" }}
+                <span
+                  className="text-base font-black"
+                  style={{ color: selected ? "#d4b15c" : "rgba(255,247,216,0.35)" }}
                 >
                   {label}
-                </div>
-                <div className="text-[11px] mt-0.5" style={{ color: "rgba(255,247,216,0.30)" }}>
+                </span>
+                <span
+                  className="text-[10px]"
+                  style={{ color: selected ? "rgba(212,177,92,0.65)" : "rgba(255,247,216,0.22)" }}
+                >
                   {desc}
-                </div>
-              </div>
-              {meetingRequired === value && (
-                <Check size={16} color="#d4b15c" strokeWidth={2.5} className="shrink-0" />
-              )}
-            </button>
-          ))}
+                </span>
+                {selected && <Check size={11} color="#d4b15c" strokeWidth={3} className="mt-0.5" />}
+              </button>
+            );
+          })}
         </div>
       </BottomSheet>
     </div>
