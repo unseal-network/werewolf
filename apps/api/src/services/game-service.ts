@@ -300,8 +300,7 @@ export class InMemoryGameService {
       language: parsed.language,
       timing: parsed.timing,
       createdFromMatrixRoomId: parsed.sourceMatrixRoomId,
-      agentSourceMatrixRoomId:
-        parsed.agentSourceMatrixRoomId ?? parsed.sourceMatrixRoomId,
+      agentSourceMatrixRoomId: parsed.sourceMatrixRoomId,
       players: [],
       projection: null,
       privateStates: [],

@@ -261,7 +261,7 @@ describe("games API", () => {
     expect(phaseStarted.snapshot).toBeUndefined();
   });
 
-  it("creates a game and defaults agent source room to source room", async () => {
+  it("creates a game from a Matrix source room", async () => {
     const app = createApp(createTestDeps());
     const response = await app.request("/games", {
       method: "POST",
@@ -603,7 +603,7 @@ describe("games API", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.total).toBe(17);
-    expect(body.roomId).toBe("!source:example.com");
+    expect(body.roomId).toBeUndefined();
     expect(body.agents.map((agent: { userId: string }) => agent.userId)).toEqual([
       "@game-10:keepsecret.io",
       "@game-12:keepsecret.io",

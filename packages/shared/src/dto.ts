@@ -12,7 +12,6 @@ export const createGameRequestSchema = z.object({
     voteSeconds: z.number().int().min(10).max(300).default(30),
     agentSpeechRate: z.number().min(0.75).max(2).default(1),
   }),
-  agentSourceMatrixRoomId: z.string().min(1).optional(),
 });
 export type CreateGameRequest = z.infer<typeof createGameRequestSchema>;
 
@@ -22,7 +21,6 @@ export const gameRoomSnapshotSchema = z.object({
   status: roomStatusSchema,
   targetPlayerCount: z.number().int().min(6).max(12),
   sourceMatrixRoomId: z.string().optional(),
-  agentSourceMatrixRoomId: z.string(),
   currentUserId: z.string(),
   creatorUserId: z.string(),
   players: z.array(

@@ -523,7 +523,6 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       return c.json({
         agents,
         total: agents.length,
-        roomId: room.agentSourceMatrixRoomId,
       });
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
@@ -810,8 +809,12 @@ function buildGameReadView(room: StoredGameRoom, userId: string) {
   const revealAll = room.status === "ended" || room.projection?.status === "ended";
   const events = filterEventsForUser(room.events, myPlayerId, isWolf, revealAll);
   const privateStates = myPrivateState ? [myPrivateState] : [];
-  const { events: _events, privateStates: _privateStates, ...roomWithoutTimeline } =
-    room;
+  const {
+    events: _events,
+    privateStates: _privateStates,
+    agentSourceMatrixRoomId: _agentSourceMatrixRoomId,
+    ...roomWithoutTimeline
+  } = room;
   return {
     room: { ...roomWithoutTimeline, privateStates },
     events,
