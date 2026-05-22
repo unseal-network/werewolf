@@ -43,6 +43,7 @@ import { resolveAvatarUrl } from "../matrix/media";
 import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
 import { isHostRuntime } from "../runtime/hostBridge";
 import { useIframeAuth } from "../hooks/useIframeAuth";
+import type { MemberInfo } from "@unseal-network/game-sdk";
 
 interface UserSeatState {
   seatNo: number;
@@ -187,6 +188,7 @@ function parseCurrentSpeakerSeat(
 export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLeave?: (() => void) | undefined }) {
   const t = useT();
   const { iframeMessage } = useIframeAuth();
+  const [memberCache, setMemberCache] = useState<Map<string, MemberInfo>>(() => new Map());
   const [matrixToken] = useState(() => readMatrixToken());
   const [matrixHomeserver] = useState(() => readMatrixHomeserver());
   const [matrixUserId, setMatrixUserId] = useState(
@@ -255,7 +257,20 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     [matrixToken]
   );
 
+  // 获取当前用户身份：host 模式从 iframeMessage.getInfo() 取，避免调 /profile；
+  // 非 host 模式走原有的 whoAmIAgainstApi 路径。
   useEffect(() => {
+    if (isHostRuntime()) {
+      void iframeMessage
+        .getInfo()
+        .then((info) => {
+          writeMatrixIdentity(info.userId, info.displayName);
+          setMatrixUserId(info.userId);
+          setMatrixDisplayName(info.displayName);
+        })
+        .catch(() => {});
+      return;
+    }
     let cancelled = false;
     void client
       .whoAmIAgainstApi()
@@ -272,7 +287,19 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     return () => {
       cancelled = true;
     };
-  }, [client, matrixToken]);
+  }, [client, matrixToken, iframeMessage]);
+
+  // host 模式：初始化时拉取一次 Matrix 房间成员列表并缓存，
+  // 用于 displayName/avatarUrl 展示，避免后续重复调 /profile 接口。
+  useEffect(() => {
+    if (!isHostRuntime()) return;
+    void iframeMessage
+      .getMembers()
+      .then((members) => {
+        setMemberCache(new Map(members.map((m) => [m.userId, m])));
+      })
+      .catch(() => {});
+  }, [iframeMessage]);
 
   useEffect(() => {
     if (!errorMessage) return undefined;
@@ -689,7 +716,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     return out;
   }, [knownTeammateIds, myPlayer?.id, myPrivateState?.role]);
 
-  const seatView = useMemo(
+  const rawSeatView = useMemo(
     () =>
       buildSeatView(
         room,
@@ -715,6 +742,22 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       matrixToken,
     ]
   );
+
+  // host 模式下，用 memberCache 补充/覆盖座位的 displayName 和 avatarUrl，
+  // memberCache 中的 avatarUrl 已经是宿主 App 直接解析好的 HTTPS URL，无需 mxc:// 转换。
+  const seatView = useMemo(() => {
+    if (!isHostRuntime() || memberCache.size === 0) return rawSeatView;
+    return rawSeatView.map((seat) => {
+      if (!seat.userId) return seat;
+      const cached = memberCache.get(seat.userId);
+      if (!cached) return seat;
+      return {
+        ...seat,
+        displayName: cached.displayName || seat.displayName,
+        avatarUrl: cached.avatarUrl ?? seat.avatarUrl,
+      };
+    });
+  }, [rawSeatView, memberCache]);
   const viewingSeat = useMemo(
     () => seatView.find((seat) => seat.seatNo === viewingSeatNo) ?? null,
     [seatView, viewingSeatNo]
@@ -748,16 +791,19 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       Array.from(centerActionTargetIds)
         .map((playerId) => room?.players.find((player) => player.id === playerId))
         .filter((player): player is RoomPlayer => Boolean(player))
-        .map((player) => ({
-          seatNo: player.seatNo,
-          playerId: player.id,
-          userId: player.userId,
-          agentId: player.agentId,
-          displayName: player.displayName,
-          avatarUrl: resolveAvatarUrl(player.avatarUrl, matrixHomeserver, matrixToken),
-          visibleRole: visibleRolesByPlayerId.get(player.id),
-        })),
-    [centerActionTargetIds, room?.players, visibleRolesByPlayerId, matrixHomeserver, matrixToken]
+        .map((player) => {
+          const cached = player.userId ? memberCache.get(player.userId) : undefined;
+          return {
+            seatNo: player.seatNo,
+            playerId: player.id,
+            userId: player.userId,
+            agentId: player.agentId,
+            displayName: cached?.displayName || player.displayName,
+            avatarUrl: cached?.avatarUrl ?? resolveAvatarUrl(player.avatarUrl, matrixHomeserver, matrixToken),
+            visibleRole: visibleRolesByPlayerId.get(player.id),
+          };
+        }),
+    [centerActionTargetIds, room?.players, visibleRolesByPlayerId, matrixHomeserver, matrixToken, memberCache]
   );
 
   const actionCanRun = isCreator && uiProjection.canProgress;
@@ -934,7 +980,12 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   async function joinGame(seatNo?: number) {
     setErrorMessage("");
     try {
-      const joined = await client.joinGame(gameRoomId, seatNo);
+      // host 模式：从 memberCache 拿自己的 displayName/avatarUrl 随 join 请求一起传给后端，
+      // 让后端直接用这里的值写入 player 记录，无需服务端再发起 /profile 请求。
+      const selfCached = isHostRuntime() ? memberCache.get(matrixUserId) : undefined;
+      const joinDisplayName = selfCached?.displayName ?? matrixDisplayName;
+      const joinAvatarUrl = selfCached?.avatarUrl;
+      const joined = await client.joinGame(gameRoomId, seatNo, joinDisplayName, joinAvatarUrl);
       setRoomSnapshot((current) => upsertRoomPlayers(current, [joined.player]));
       return joined;
     } catch (error) {

@@ -50,7 +50,9 @@
       "Bash(grep -n \"export function GameRoomPage\\\\|interface GameRoomPage\\\\|GameRoomPageProps\\\\|function GameRoom\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -10)",
       "Bash(grep -n \"profile\\\\|displayName\\\\|avatarUrl\\\\|matrixUserId\\\\|getMembers\\\\|MemberInfo\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -60)",
       "Bash(grep -n \"joinRoom\\\\|join\\\\b\\\\|handleJoin\\\\|onJoin\\\\|seatClick\\\\|onSeatClick\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -30)",
-      "Bash(grep -n \"joinGame\\\\|async function joinGame\\\\|const joinGame\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -10)"
+      "Bash(grep -n \"joinGame\\\\|async function joinGame\\\\|const joinGame\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -10)",
+      "Bash(grep -n \"^import\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | tail -10)",
+      "Bash(pnpm --filter api exec tsc --noEmit)"
     ]
   }
 }

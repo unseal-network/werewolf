@@ -239,14 +239,20 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = await readOptionalJson(c.req.raw);
       const seatNo = numberValue(body.seatNo);
+      // 前端（host/iframe 模式）会随 join body 传来 displayName / avatarUrl，
+      // 优先使用 body 中的值，避免服务端再发起 Matrix /profile 请求。
+      const bodyDisplayName = stringField(body.displayName);
+      const bodyAvatarUrl = stringField(body.avatarUrl);
+      const resolvedDisplayName = bodyDisplayName ?? user.displayName;
+      const resolvedAvatarUrl = bodyAvatarUrl ?? user.avatarUrl;
       return c.json(
         await dispatchActorCommand(deps, c.req.raw, {
           commandId: commandId(c.req.raw),
           gameRoomId: c.req.param("gameRoomId"),
           actorUserId: user.id,
           kind: "join",
-          displayName: user.displayName,
-          ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+          displayName: resolvedDisplayName,
+          ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
           ...(seatNo ? { seatNo } : {}),
         })
       );

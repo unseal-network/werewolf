@@ -267,11 +267,15 @@ export function createApiClient(options: ApiClientOptions) {
     whoAmIAgainstApi() {
       return request<MatrixWhoAmI>("/games/me");
     },
-    joinGame(gameRoomId: string, seatNo?: number) {
+    joinGame(gameRoomId: string, seatNo?: number, displayName?: string, avatarUrl?: string) {
       return request<JoinedPlayer>(`/games/${gameRoomId}/join`, {
         method: "POST",
         headers: idempotentHeaders("join"),
-        body: JSON.stringify(seatNo ? { seatNo } : {}),
+        body: JSON.stringify({
+          ...(seatNo ? { seatNo } : {}),
+          ...(displayName ? { displayName } : {}),
+          ...(avatarUrl ? { avatarUrl } : {}),
+        }),
       });
     },
     leaveGame(gameRoomId: string) {
