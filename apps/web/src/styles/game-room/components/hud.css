@@ -30,10 +30,11 @@
   pointer-events: none;
 }
 
+
 .game-layout-root .hud-region::before {
   background:
-    url("/assets/werewolf-ui/final/hud/rail-top-line.webp") top center / 100% 16px repeat-x,
-    url("/assets/werewolf-ui/final/hud/rail-bottom-line.webp") bottom center / 100% 16px repeat-x,
+    /* url("/assets/werewolf-ui/final/hud/rail-top-line.webp") top center / 100% 16px repeat-x, */
+    /* url("/assets/werewolf-ui/final/hud/rail-bottom-line.webp") bottom center / 100% 16px repeat-x, */
     url("/assets/werewolf-ui/final/hud/rail-fill.webp") center / 100% 100% no-repeat;
   opacity: 0.92;
 }

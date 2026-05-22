@@ -36,8 +36,10 @@ import {
   readStoredMatrixDisplayName,
   readStoredMatrixUserId,
   readMatrixToken,
+  readMatrixHomeserver,
   writeMatrixIdentity,
 } from "../matrix/session";
+import { resolveAvatarUrl } from "../matrix/media";
 import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
 
 interface UserSeatState {
@@ -106,7 +108,8 @@ function buildSeatView(
   legalTargetIds: Set<string>,
   currentSpeakerPlayerId: string | undefined,
   knownTeammatePlayerIds: Set<string> = new Set(),
-  visibleRolesByPlayerId: Map<string, string> = new Map()
+  visibleRolesByPlayerId: Map<string, string> = new Map(),
+  resolveUrl: (url: string | undefined) => string | undefined = (u) => u
 ): UserSeatState[] {
   if (!room) {
     return Array.from({ length: targetPlayerCount }, (_, index) => ({
@@ -153,7 +156,7 @@ function buildSeatView(
       agentId: player?.agentId,
       invitedByUserId: player?.invitedByUserId,
       displayName: player?.displayName,
-      avatarUrl: player?.avatarUrl,
+      avatarUrl: resolveUrl(player?.avatarUrl),
       kind: player?.kind,
       isEmpty: !player,
       isDead: isGameActive && player ? !alive.has(player.id) : false,
@@ -182,6 +185,7 @@ function parseCurrentSpeakerSeat(
 export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLeave?: (() => void) | undefined }) {
   const t = useT();
   const [matrixToken] = useState(() => readMatrixToken());
+  const [matrixHomeserver] = useState(() => readMatrixHomeserver());
   const [matrixUserId, setMatrixUserId] = useState(
     () => readStoredMatrixUserId() ?? DEMO_USER_ID
   );
@@ -692,7 +696,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         legalTargetIds,
         projection?.currentSpeakerPlayerId ?? undefined,
         knownTeammateIds,
-        visibleRolesByPlayerId
+        visibleRolesByPlayerId,
+        (url) => resolveAvatarUrl(url, matrixHomeserver, matrixToken)
       ),
     [
       myPlayer?.id,
@@ -703,6 +708,8 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       projection?.currentSpeakerPlayerId,
       knownTeammateIds,
       visibleRolesByPlayerId,
+      matrixHomeserver,
+      matrixToken,
     ]
   );
   const viewingSeat = useMemo(
@@ -744,10 +751,10 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
           userId: player.userId,
           agentId: player.agentId,
           displayName: player.displayName,
-          avatarUrl: player.avatarUrl,
+          avatarUrl: resolveAvatarUrl(player.avatarUrl, matrixHomeserver, matrixToken),
           visibleRole: visibleRolesByPlayerId.get(player.id),
         })),
-    [centerActionTargetIds, room?.players, visibleRolesByPlayerId]
+    [centerActionTargetIds, room?.players, visibleRolesByPlayerId, matrixHomeserver, matrixToken]
   );
 
   const actionCanRun = isCreator && uiProjection.canProgress;

@@ -26,7 +26,13 @@
       "Bash(echo \"exit: $?\")",
       "Bash(curl -v --max-time 8 -H \"Upgrade: websocket\" -H \"Connection: Upgrade\" -H \"Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\" -H \"Sec-WebSocket-Version: 13\" \"https://werewolf-y4vro0s1.livekit.cloud/rtc\")",
       "Bash(pnpm build *)",
-      "Bash(pnpm build:app)"
+      "Bash(pnpm build:app)",
+      "Bash(grep -n \"avatarUrl\\\\|SeatData\\\\|SeatAvatar\\\\|mxc://\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -40)",
+      "Bash(grep -n \"gameInfo\\\\|streamURL\\\\|\\\\.config\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -40)",
+      "Bash(grep -n \"buildSeatView\\\\|candidateSeats\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -20)",
+      "Bash(grep -n \"resolveAvatarUrl\\\\|readMatrixHomeserver\\\\|matrixHomeserver\\\\|media\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -20)",
+      "Bash(grep -n \"resolveAvatarUrl\\\\|matrixToken\\\\|matrixHomeserver\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | grep -v \"^.*//.*resolveAvatarUrl\")",
+      "Bash(grep -n \"resolveAvatarUrl\\\\|matrixToken\\\\|matrixHomeserver\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | grep -E \"resolveAvatarUrl|matrixHomeserver\")"
     ]
   }
 }

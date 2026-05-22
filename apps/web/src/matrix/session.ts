@@ -7,6 +7,7 @@ export const MATRIX_TOKEN_STORAGE_KEY = "matrixAccessToken";
 export const MATRIX_USER_ID_STORAGE_KEY = "matrixUserId";
 export const MATRIX_DISPLAY_NAME_STORAGE_KEY = "matrixDisplayName";
 export const SOURCE_ROOM_STORAGE_KEY = "lastSourceMatrixRoomId";
+export const MATRIX_HOMESERVER_STORAGE_KEY = "matrixHomeserver";
 const MATRIX_TOKEN_COOKIE_KEY = "werewolf_matrix_access_token";
 const MATRIX_USER_ID_COOKIE_KEY = "werewolf_matrix_user_id";
 const MATRIX_DISPLAY_NAME_COOKIE_KEY = "werewolf_matrix_display_name";
@@ -122,6 +123,14 @@ export function clearMatrixSession(): void {
   localStorage.removeItem(MATRIX_TOKEN_STORAGE_KEY);
   localStorage.removeItem(MATRIX_USER_ID_STORAGE_KEY);
   localStorage.removeItem(MATRIX_DISPLAY_NAME_STORAGE_KEY);
+}
+
+export function writeMatrixHomeserver(homeserver: string): void {
+  localStorage.setItem(MATRIX_HOMESERVER_STORAGE_KEY, homeserver);
+}
+
+export function readMatrixHomeserver(): string {
+  return localStorage.getItem(MATRIX_HOMESERVER_STORAGE_KEY) ?? "https://keepsecret.io";
 }
 
 export function matrixServerBaseFromToken(token: string): string {

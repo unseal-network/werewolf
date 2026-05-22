@@ -13,6 +13,7 @@ import {
   SOURCE_ROOM_STORAGE_KEY,
   hasStoredMatrixSession,
   setMatrixTokenRefresher,
+  writeMatrixHomeserver,
   writeMatrixIdentity,
   writeMatrixToken,
 } from "./matrix/session";
@@ -145,6 +146,15 @@ function App() {
         let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
         const unsealBase = unsealBaseFromStreamUrl(gameInfo.config?.streamURL);
+        // Persist homeserver origin for mxc:// avatar URL resolution
+        const streamUrl = gameInfo.config?.streamURL;
+        if (streamUrl) {
+          try {
+            writeMatrixHomeserver(new URL(streamUrl).origin);
+          } catch {
+            // malformed URL — skip, readMatrixHomeserver() will fall back to default
+          }
+        }
 
         if (unsealBase && hostToken) {
           let unsealClientForRefresh: UnsealClient;
