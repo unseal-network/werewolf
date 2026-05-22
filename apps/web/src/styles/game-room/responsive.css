@@ -37,44 +37,36 @@
     padding-bottom: calc(var(--layout-safe-bottom) + 10px);
   }
 
+  /* HUD: compact overrides for narrow viewports */
   .game-layout-root .hud-region {
     grid-template-columns:
-      calc(44px * var(--layout-hud-scale, 1))
+      calc(40px * var(--layout-hud-scale, 1))
       minmax(0, 1fr)
       auto;
-    gap: calc(7px * var(--layout-hud-scale, 1));
-  }
-
-  .game-layout-root .hud-back-button,
-  .game-layout-root .hud-countdown,
-  .game-layout-root .hud-alive-count {
-    height: calc(38px * var(--layout-hud-scale, 1));
+    gap: calc(8px * var(--layout-hud-scale, 1));
+    min-height: calc(66px * var(--layout-hud-scale, 1));
   }
 
   .game-layout-root .hud-back-button {
-    width: calc(44px * var(--layout-hud-scale, 1));
+    width:  calc(40px * var(--layout-hud-scale, 1)) !important;
+    height: calc(40px * var(--layout-hud-scale, 1)) !important;
+    min-width:  calc(40px * var(--layout-hud-scale, 1)) !important;
+    min-height: calc(40px * var(--layout-hud-scale, 1)) !important;
+    border-radius: 10px !important;
   }
 
   .game-layout-root .hud-phase-line {
-    font-size: calc(20px * var(--layout-hud-scale, 1));
+    font-size: calc(17px * var(--layout-hud-scale, 1));
   }
 
-  .game-layout-root .hud-room-title,
-  .game-layout-root .hud-room-source {
-    font-size: calc(12px * var(--layout-hud-scale, 1));
+  .game-layout-root .hud-stats-panel {
+    min-width: calc(46px * var(--layout-hud-scale, 1));
+    padding: calc(5px * var(--layout-hud-scale, 1)) calc(8px * var(--layout-hud-scale, 1));
+    border-radius: calc(10px * var(--layout-hud-scale, 1));
   }
 
-  .game-layout-root .hud-metrics {
-    grid-auto-flow: row;
-    gap: calc(4px * var(--layout-hud-scale, 1));
-  }
-
-  .game-layout-root .hud-countdown,
-  .game-layout-root .hud-alive-count {
-    min-width: calc(42px * var(--layout-hud-scale, 1));
-    height: calc(28px * var(--layout-hud-scale, 1));
-    padding: 0 calc(8px * var(--layout-hud-scale, 1));
-    font-size: calc(13px * var(--layout-hud-scale, 1));
+  .game-layout-root .hud-countdown {
+    font-size: calc(14px * var(--layout-hud-scale, 1));
   }
 
   .game-layout-root .table-region {

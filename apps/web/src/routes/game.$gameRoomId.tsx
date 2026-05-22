@@ -41,6 +41,8 @@ import {
 } from "../matrix/session";
 import { resolveAvatarUrl } from "../matrix/media";
 import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
+import { isHostRuntime } from "../runtime/hostBridge";
+import { useIframeAuth } from "../hooks/useIframeAuth";
 
 interface UserSeatState {
   seatNo: number;
@@ -184,6 +186,7 @@ function parseCurrentSpeakerSeat(
 
 export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLeave?: (() => void) | undefined }) {
   const t = useT();
+  const { iframeMessage } = useIframeAuth();
   const [matrixToken] = useState(() => readMatrixToken());
   const [matrixHomeserver] = useState(() => readMatrixHomeserver());
   const [matrixUserId, setMatrixUserId] = useState(
@@ -1027,15 +1030,30 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setAgentLoading(true);
     setAgentError(undefined);
     try {
-      const result = await client.listAgentCandidates(gameRoomId);
-      setAgentCandidates(result.agents);
-      setAgentSourceRoomId(result.roomId);
+      if (isHostRuntime()) {
+        const members = await iframeMessage.getMembers();
+        const candidates: AgentCandidate[] = members.map((m) => ({
+          userId: m.userId,
+          displayName: m.displayName,
+          ...(m.avatarUrl ? { avatarUrl: m.avatarUrl } : {}),
+          userType: m.isAgent ? "agent" : "user",
+          membership: "join",
+          alreadyJoined: false,
+        }));
+        setAgentCandidates(candidates);
+        const info = await iframeMessage.getInfo();
+        setAgentSourceRoomId(info.roomId ?? info.linkRoomId ?? undefined);
+      } else {
+        const result = await client.listAgentCandidates(gameRoomId);
+        setAgentCandidates(result.agents);
+        setAgentSourceRoomId(result.roomId);
+      }
     } catch (error) {
       setAgentError(error instanceof Error ? error.message : String(error));
     } finally {
       setAgentLoading(false);
     }
-  }, [client, gameRoomId]);
+  }, [client, gameRoomId, iframeMessage]);
 
   async function addAgentToSeat(agent: AgentCandidate) {
     try {

@@ -1,25 +1,25 @@
-/* Component: top HUD. */
+/* ─── Top HUD ─────────────────────────────────────────────────────────────── */
+
 .game-layout-root .hud-region {
   grid-area: hud;
   z-index: 5;
   position: relative;
   width: calc(100% + var(--layout-edge) * 2);
-  min-height: calc(58px * var(--layout-hud-scale, 1));
   margin-inline: calc(var(--layout-edge) * -1);
-  padding:
-    calc(10px * var(--layout-hud-scale, 1))
-    calc(var(--layout-edge) + 12px * var(--layout-hud-scale, 1));
-  justify-self: center;
+  padding-inline: calc(var(--layout-edge) + 4px);
+  padding-block: calc(10px * var(--layout-hud-scale, 1)) calc(12px * var(--layout-hud-scale, 1));
+  min-height: calc(72px * var(--layout-hud-scale, 1));
   display: grid;
   grid-template-columns:
-    calc(44px * var(--layout-hud-scale, 1))
+    calc(42px * var(--layout-hud-scale, 1))
     minmax(0, 1fr)
     auto;
   align-items: center;
-  gap: calc(8px * var(--layout-hud-scale, 1));
+  gap: calc(10px * var(--layout-hud-scale, 1));
   color: #fff7d8;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
 }
+
+/* ── Background ───────────────────────────────────────────────── */
 
 .game-layout-root .hud-region::before,
 .game-layout-root .hud-region::after {
@@ -30,90 +30,165 @@
   pointer-events: none;
 }
 
-
 .game-layout-root .hud-region::before {
   background:
-    /* url("/assets/werewolf-ui/final/hud/rail-top-line.webp") top center / 100% 16px repeat-x, */
-    /* url("/assets/werewolf-ui/final/hud/rail-bottom-line.webp") bottom center / 100% 16px repeat-x, */
-    url("/assets/werewolf-ui/final/hud/rail-fill.webp") center / 100% 100% no-repeat;
-  opacity: 0.92;
+    url("/assets/werewolf-ui/final/hud/rail-top-line.webp")    top    center / 100% 12px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-bottom-line.webp") bottom center / 100% 12px repeat-x,
+    url("/assets/werewolf-ui/final/hud/rail-fill2.png")        center / 100% 100%  no-repeat;
+  opacity: 0.90;
 }
 
 .game-layout-root .hud-region::after {
-  display: none;
+  background: radial-gradient(
+    ellipse 80% 100% at 50% 0%,
+    rgba(212, 177, 92, 0.04) 0%,
+    transparent 70%
+  );
 }
 
-.game-layout-root .hud-countdown,
-.game-layout-root .hud-alive-count {
-  min-width: 0;
-  height: calc(38px * var(--layout-hud-scale, 1));
-  border: 1px solid rgba(224, 216, 185, 0.22);
-  border-radius: 999px;
-  background: rgba(2, 8, 10, 0.08);
-  color: #fff7d8;
-  box-shadow: none;
-  backdrop-filter: none;
-}
+/* ── Back button ──────────────────────────────────────────────── */
 
 .game-layout-root .hud-back-button {
-  width: calc(44px * var(--layout-hud-scale, 1));
-  height: calc(38px * var(--layout-hud-scale, 1));
+  width:  calc(42px * var(--layout-hud-scale, 1)) !important;
+  height: calc(42px * var(--layout-hud-scale, 1)) !important;
+  min-width:  calc(42px * var(--layout-hud-scale, 1)) !important;
+  min-height: calc(42px * var(--layout-hud-scale, 1)) !important;
+  border-radius: 11px !important;
+  border: 1px solid rgba(207, 176, 91, 0.42) !important;
+  background: rgba(4, 6, 10, 0.62) !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,247,216,0.06) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  color: rgba(255, 247, 216, 0.88) !important;
+  transition: border-color 120ms, background 120ms !important;
 }
 
-.game-layout-root .hud-status {
-  min-width: 0;
+.game-layout-root .hud-back-button:active {
+  background: rgba(212, 177, 92, 0.10) !important;
+  border-color: rgba(207, 176, 91, 0.65) !important;
 }
+
+/* ── Phase line: hero text ────────────────────────────────────── */
 
 .game-layout-root .hud-phase-line {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: clamp(16px, calc(26px * var(--layout-hud-scale, 1)), 26px);
+  font-size: clamp(16px, calc(21px * var(--layout-hud-scale, 1)), 21px);
   font-weight: 950;
-  line-height: 1.06;
+  letter-spacing: 0.02em;
+  line-height: 1.15;
+  color: #fff7d8;
+  text-shadow:
+    0 0 28px rgba(212, 177, 92, 0.22),
+    0 2px 12px rgba(0, 0, 0, 0.90);
 }
+
+/* ── Meta strip: room title + separator ───────────────────────── */
 
 .game-layout-root .hud-room-title,
 .game-layout-root .hud-room-source {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: rgba(255, 247, 216, 0.78);
-  font-size: calc(12px * var(--layout-hud-scale, 1));
-  font-weight: 800;
-  line-height: 1.15;
+  font-size: calc(10px * var(--layout-hud-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  line-height: 1.2;
+  color: rgba(212, 177, 92, 0.60);
+  text-shadow: none;
 }
 
-.game-layout-root .hud-metrics {
-  display: inline-grid;
-  grid-auto-flow: column;
-  align-items: center;
-  gap: calc(6px * var(--layout-hud-scale, 1));
+.game-layout-root .hud-meta-sep {
+  font-size: calc(9px * var(--layout-hud-scale, 1));
+  color: rgba(212, 177, 92, 0.30);
+  line-height: 1;
+  flex-shrink: 0;
 }
 
-.game-layout-root .hud-countdown,
+/* Alive count — inline badge in meta strip */
 .game-layout-root .hud-alive-count {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: calc(46px * var(--layout-hud-scale, 1));
-  padding: 0 calc(10px * var(--layout-hud-scale, 1));
-  font-size: calc(14px * var(--layout-hud-scale, 1));
-  font-weight: 950;
+  gap: calc(3px * var(--layout-hud-scale, 1));
+  font-size: calc(10px * var(--layout-hud-scale, 1));
+  font-weight: 800;
+  color: rgba(212, 177, 92, 0.75);
+  line-height: 1.2;
 }
 
 .game-layout-root .hud-alive-count::before {
   content: "";
-  width: calc(15px * var(--layout-hud-scale, 1));
-  height: calc(15px * var(--layout-hud-scale, 1));
-  margin-right: calc(3px * var(--layout-hud-scale, 1));
+  width: calc(11px * var(--layout-hud-scale, 1));
+  height: calc(11px * var(--layout-hud-scale, 1));
   display: inline-block;
   background: url("/assets/werewolf-ui/final/hud/icon-people.webp") center / contain no-repeat;
-  opacity: 0.68;
+  opacity: 0.65;
+  flex-shrink: 0;
 }
 
-.game-layout-root .hud-countdown.danger {
-  color: #ffc1b5;
-  border-color: rgba(255, 118, 91, 0.45);
+/* ── Right stats panel ────────────────────────────────────────── */
+
+.game-layout-root .hud-stats-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: calc(6px * var(--layout-hud-scale, 1)) calc(10px * var(--layout-hud-scale, 1));
+  min-width: calc(52px * var(--layout-hud-scale, 1));
+  border-radius: calc(12px * var(--layout-hud-scale, 1));
+  border: 1px solid rgba(207, 176, 91, 0.28);
+  background: rgba(4, 6, 10, 0.52);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,247,216,0.05);
+  transition: border-color 200ms, box-shadow 200ms;
+}
+
+.game-layout-root .hud-stats-panel.danger {
+  border-color: rgba(255, 100, 70, 0.50);
+  box-shadow:
+    0 0 12px rgba(255, 80, 50, 0.20),
+    inset 0 1px 0 rgba(255,140,120,0.07);
+}
+
+/* Alive row */
+.game-layout-root .hud-alive-count {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(3px * var(--layout-hud-scale, 1));
+  font-size: calc(10px * var(--layout-hud-scale, 1));
+  font-weight: 800;
+  color: rgba(212, 177, 92, 0.78);
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+}
+
+.game-layout-root .hud-alive-count::before {
+  content: "";
+  width: calc(11px * var(--layout-hud-scale, 1));
+  height: calc(11px * var(--layout-hud-scale, 1));
+  display: inline-block;
+  background: url("/assets/werewolf-ui/final/hud/icon-people.webp") center / contain no-repeat;
+  opacity: 0.65;
+  flex-shrink: 0;
+}
+
+/* Thin gold divider between rows */
+.game-layout-root .hud-stats-divider {
+  width: 72%;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(207,176,91,0.22), transparent);
+  margin-block: calc(4px * var(--layout-hud-scale, 1));
+  flex-shrink: 0;
+}
+
+/* Countdown row */
+.game-layout-root .hud-countdown {
+  font-size: calc(16px * var(--layout-hud-scale, 1));
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  color: #fff7d8;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.80);
+  transition: color 200ms;
+}
+
+.game-layout-root .hud-stats-panel.danger .hud-countdown {
+  color: #ffbdad;
+  text-shadow: 0 0 10px rgba(255, 90, 60, 0.35), 0 1px 6px rgba(0,0,0,0.80);
 }

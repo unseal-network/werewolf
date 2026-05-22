@@ -302,6 +302,7 @@ export function GameRoomShell({
         ) : null}
 
         <header className="hud-region" aria-label="room-meta">
+          {/* Back button */}
           <GameIconButton
             className="hud-back-button"
             onClick={onHomeClick}
@@ -309,21 +310,37 @@ export function GameRoomShell({
             label="←"
             size="lg"
           />
-          <div className="hud-status">
-            <div className="hud-phase-line">
-              {phaseLabel}
-              {day ? ` · 第 ${day} 天` : ""}
+
+          {/* Center: phase hero + meta strip below */}
+          <div className="min-w-0 flex flex-col justify-center gap-[3px]">
+            {/* Primary: phase text */}
+            <div className="hud-phase-line truncate">
+              {phaseLabel}{day ? ` · 第 ${day} 天` : ""}
             </div>
-            <div className="hud-room-title">{title}</div>
-            {sourceMatrixRoomId ? (
-              <div className="hud-room-source">{roomCode}</div>
-            ) : null}
+            {/* Secondary meta strip: room code + alive count inline */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="hud-room-title truncate flex-1">
+                {roomCode || title}
+              </span>
+              <span className="hud-meta-sep" aria-hidden>·</span>
+              <span className="hud-alive-count shrink-0">
+                {living}&thinsp;/&thinsp;{targetPlayerCount || playerCount}
+              </span>
+            </div>
           </div>
-          <div className="hud-metrics">
-            <span className={`hud-countdown ${danger ? "danger" : ""}`}>
-              {deadlineAt ? (countdown > 0 ? countdown : "✓") : "--"}
+
+          {/* Right: unified stats panel */}
+          <div className={`hud-stats-panel shrink-0${danger ? " danger" : ""}`}>
+            {/* Alive count row */}
+            <span className="hud-alive-count">
+              {living}&thinsp;/&thinsp;{targetPlayerCount || playerCount}
             </span>
-            <span className="hud-alive-count">{living}/{targetPlayerCount || playerCount}</span>
+            {/* Divider */}
+            <div className="hud-stats-divider" aria-hidden />
+            {/* Countdown row */}
+            <span className="hud-countdown">
+              {deadlineAt ? (countdown > 0 ? `${countdown}s` : "✓") : "—"}
+            </span>
           </div>
         </header>
 

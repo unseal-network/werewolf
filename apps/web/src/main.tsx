@@ -225,6 +225,12 @@ function App() {
           }
           return;
         }
+        // decision.kind === "create": admin sees create page, but still poll so
+        // that if a linked room appears (e.g. created by someone else or by this
+        // admin on another device) we navigate automatically.
+        if (unsealClient && unsealJwt && hostRoomId) {
+          void pollForLink(unsealClient, hostRoomId, unsealJwt);
+        }
         setHostBootstrap({ status: "ready", session });
       } catch (error) {
         if (!cancelled) {
