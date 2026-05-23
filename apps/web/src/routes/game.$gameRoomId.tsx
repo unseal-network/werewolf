@@ -261,6 +261,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   // 非 host 模式走原有的 whoAmIAgainstApi 路径。
   useEffect(() => {
     if (isHostRuntime()) {
+      console.log("[wolf] kkkk");
       void iframeMessage
         .getInfo()
         .then((info) => {
@@ -287,19 +288,20 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     return () => {
       cancelled = true;
     };
-  }, [client, matrixToken, iframeMessage]);
+  }, [client, matrixToken]);
 
   // host 模式：初始化时拉取一次 Matrix 房间成员列表并缓存，
   // 用于 displayName/avatarUrl 展示，避免后续重复调 /profile 接口。
   useEffect(() => {
     if (!isHostRuntime()) return;
+    console.log('[wolf] 222222')
     void iframeMessage
       .getMembers()
       .then((members) => {
         setMemberCache(new Map(members.map((m) => [m.userId, m])));
       })
       .catch(() => {});
-  }, [iframeMessage]);
+  }, []);
 
   useEffect(() => {
     if (!errorMessage) return undefined;
@@ -1082,6 +1084,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setAgentError(undefined);
     try {
       if (isHostRuntime()) {
+        console.log('[wolf] 11111')
         const members = await iframeMessage.getMembers();
         const candidates: AgentCandidate[] = members.map((m) => ({
           userId: m.userId,
@@ -1104,7 +1107,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     } finally {
       setAgentLoading(false);
     }
-  }, [client, gameRoomId, iframeMessage]);
+  }, [client, gameRoomId]);
 
   async function addAgentToSeat(agent: AgentCandidate) {
     try {

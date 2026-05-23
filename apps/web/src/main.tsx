@@ -215,11 +215,11 @@ function App() {
 
         if (decision.kind === "resume") {
           setGameUrl(decision.gameRoomId);
-          setHostBootstrap({ status: "ready", session });
+          // setHostBootstrap({ status: "ready", session });
           return;
         }
         if (decision.kind === "wait-for-host-link") {
-          setHostBootstrap({ status: "waiting", hostRoomId: decision.hostRoomId });
+          // setHostBootstrap({ status: "waiting", hostRoomId: decision.hostRoomId });
           if (unsealClient && unsealJwt) {
             void pollForLink(unsealClient, decision.hostRoomId, unsealJwt);
           }
