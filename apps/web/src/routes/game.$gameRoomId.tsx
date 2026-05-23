@@ -1354,6 +1354,61 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       ? t("stage.winnerWolf")
       : t("stage.winnerVillage")
     : "";
+
+  // HUD 副标题（方案 C）：根据阶段显示最有价值的上下文信息
+  const hudSubtitle = useMemo(() => {
+    const roomLabel = gameRoomId || room?.title || "";
+
+    // 大厅 / 等待 / 发牌 → 房间号
+    if (!projection || dressing.scene === "lobby" || dressing.scene === "waiting" || dressing.scene === "deal") {
+      return roomLabel;
+    }
+
+    // 结束 → 胜负
+    if (dressing.scene === "end" || projection.winner) {
+      if (projection.winner === "wolf") return "🐺 狼人获胜";
+      if (projection.winner === "good") return "☀️ 好人获胜";
+      return roomLabel;
+    }
+
+    // 投票 / 平票 → 已投票数 / 存活总数
+    if (dressing.scene === "vote" || dressing.scene === "tie") {
+      const day = projection.day ?? 1;
+      const submitted = projection.alivePlayerIds.filter((id) =>
+        timelineDisplayState.facts.voteSubmittedByActorDay.has(actorDayKey(id, day))
+      ).length;
+      const total = projection.alivePlayerIds.length;
+      return `🗳 已投 ${submitted} / ${total}`;
+    }
+
+    // 白天有发言者 → 当前发言玩家
+    if (dressing.scene === "day" && currentSpeakerName) {
+      return `💬 ${currentSpeakerName} 发言中`;
+    }
+
+    // 夜晚 / 白天无发言者 → 最近消亡事件摘要
+    const lastEliminated = [...events].reverse().find((e) => e.type === "player_eliminated");
+    if (lastEliminated) {
+      const subjectId = String(lastEliminated.subjectId ?? lastEliminated.payload?.playerId ?? "");
+      const playerName = room?.players.find((p) => p.id === subjectId)?.displayName;
+      if (playerName) return `${playerName} 出局`;
+    }
+
+    // 白天且第 2 天以后无消亡 → 昨晚平安夜
+    if (dressing.scene === "day" && (projection.day ?? 1) > 1) {
+      return "昨晚平安夜";
+    }
+
+    return roomLabel;
+  }, [
+    dressing.scene,
+    projection,
+    currentSpeakerName,
+    events,
+    room,
+    gameRoomId,
+    timelineDisplayState.facts,
+  ]);
   const roleId = normalizeRoleId(myPrivateState?.role);
   const roleLabel = t(`role.${roleId}`);
   const roleDescription = t(`roleCard.description.${roleId}`);
@@ -1421,6 +1476,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         playerCount={activeSeatCount}
         targetPlayerCount={participantCount}
         phaseLabel={uiProjection.label}
+        hudSubtitle={hudSubtitle}
         day={projection?.day}
         rawPhase={projection?.phase ?? null}
         deadlineAt={projection?.deadlineAt}

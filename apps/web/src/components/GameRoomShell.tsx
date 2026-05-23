@@ -18,6 +18,7 @@ interface GameRoomShellProps {
   playerCount: number;
   targetPlayerCount: number;
   phaseLabel: string;
+  hudSubtitle?: string | undefined;
   day?: number | undefined;
   rawPhase?: string | null | undefined;
   deadlineAt?: string | null | undefined;
@@ -231,6 +232,7 @@ export function GameRoomShell({
   playerCount,
   targetPlayerCount,
   phaseLabel,
+  hudSubtitle,
   day,
   rawPhase,
   deadlineAt,
@@ -317,14 +319,10 @@ export function GameRoomShell({
             <div className="hud-phase-line truncate">
               {phaseLabel}{day ? ` · 第 ${day} 天` : ""}
             </div>
-            {/* Secondary meta strip: room code + alive count inline */}
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="hud-room-title truncate flex-1">
-                {roomCode || title}
-              </span>
-              <span className="hud-meta-sep" aria-hidden>·</span>
-              <span className="hud-alive-count shrink-0">
-                {living}&thinsp;/&thinsp;{targetPlayerCount || playerCount}
+            {/* Secondary meta strip: 阶段上下文 or 房间号 */}
+            <div className="flex items-center min-w-0">
+              <span className="hud-room-title truncate">
+                {hudSubtitle ?? roomCode ?? title}
               </span>
             </div>
           </div>
