@@ -261,7 +261,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   // 非 host 模式走原有的 whoAmIAgainstApi 路径。
   useEffect(() => {
     if (isHostRuntime()) {
-      console.log("[wolf] kkkk");
       void iframeMessage
         .getInfo()
         .then((info) => {
@@ -294,7 +293,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   // 用于 displayName/avatarUrl 展示，避免后续重复调 /profile 接口。
   useEffect(() => {
     if (!isHostRuntime()) return;
-    console.log('[wolf] 222222')
     void iframeMessage
       .getMembers()
       .then((members) => {
@@ -1084,7 +1082,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setAgentError(undefined);
     try {
       if (isHostRuntime()) {
-        console.log('[wolf] 11111')
         const members = await iframeMessage.getMembers();
         const candidates: AgentCandidate[] = members.map((m) => ({
           userId: m.userId,
