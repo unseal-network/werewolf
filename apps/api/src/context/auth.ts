@@ -41,8 +41,8 @@ export interface MatrixProfileCache {
   touch?(matrixUserId: string): Promise<void>;
 }
 
-const profileRefreshMs = 3 * 24 * 60 * 60 * 1000;
-const authTokenCacheTtlMs = 60 * 1000;
+// 内存缓存延长到 5 分钟，减少 whoami 调用频率
+const authTokenCacheTtlMs = 5 * 60 * 1000;
 
 const authTokenCache = new Map<
   string,
@@ -95,13 +95,12 @@ export async function authenticateRequest(
 
   try {
     const whoami = await _matrix.whoami(token);
+
+    // DB 有行（不论 profileSyncedAt 是否存在）→ 直接用，不调 /profile
     const cached = profileCache
       ? await profileCache.get(whoami.user_id).catch(() => null)
       : null;
-    if (
-      cached?.profileSyncedAt &&
-      Date.now() - cached.profileSyncedAt.getTime() < profileRefreshMs
-    ) {
+    if (cached) {
       void Promise.resolve(profileCache?.touch?.(whoami.user_id)).catch(
         () => undefined
       );
@@ -112,30 +111,15 @@ export async function authenticateRequest(
         ...(cached.avatarUrl ? { avatarUrl: cached.avatarUrl } : {}),
       });
     }
-    const profile = _matrix.profile
-      ? await _matrix.profile(whoami.user_id, token).catch(() => undefined)
-      : undefined;
+
+    // DB 无行：用 whoami 自带的信息兜底，不发起 /profile 请求。
+    // displayName/avatarUrl 会在用户 join 游戏时由前端传入并写入 DB，
+    // 之后的所有请求都走上面的 DB 缓存路径。
     const displayName =
-      profile?.displayname ??
-      profile?.display_name ??
-      cached?.displayName ??
       whoami.displayname ??
       whoami.display_name ??
       whoami.user_id;
-    const avatarUrl =
-      profile?.avatarUrl ??
-      profile?.avatar_url ??
-      cached?.avatarUrl ??
-      whoami.avatarUrl ??
-      whoami.avatar_url;
-    void Promise.resolve(
-      profileCache?.upsert({
-        matrixUserId: whoami.user_id,
-        displayName,
-        ...(avatarUrl ? { avatarUrl } : {}),
-        profileSyncedAt: new Date(),
-      })
-    ).catch(() => undefined);
+    const avatarUrl = whoami.avatarUrl ?? whoami.avatar_url;
     return cacheAndReturn({
       id: whoami.user_id,
       matrixUserId: whoami.user_id,

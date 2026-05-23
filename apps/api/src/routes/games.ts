@@ -245,17 +245,31 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
       const bodyAvatarUrl = stringField(body.avatarUrl);
       const resolvedDisplayName = bodyDisplayName ?? user.displayName;
       const resolvedAvatarUrl = bodyAvatarUrl ?? user.avatarUrl;
-      return c.json(
-        await dispatchActorCommand(deps, c.req.raw, {
-          commandId: commandId(c.req.raw),
-          gameRoomId: c.req.param("gameRoomId"),
-          actorUserId: user.id,
-          kind: "join",
-          displayName: resolvedDisplayName,
-          ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
-          ...(seatNo ? { seatNo } : {}),
-        })
-      );
+
+      const result = await dispatchActorCommand(deps, c.req.raw, {
+        commandId: commandId(c.req.raw),
+        gameRoomId: c.req.param("gameRoomId"),
+        actorUserId: user.id,
+        kind: "join",
+        displayName: resolvedDisplayName,
+        ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
+        ...(seatNo ? { seatNo } : {}),
+      });
+
+      // 将前端传来的 displayName/avatarUrl 同步写入 game_users，
+      // 保证后续 authenticateRequest 内存缓存过期后直接走 DB，不再发起 /profile 请求。
+      if (deps.profileCache && bodyDisplayName) {
+        await deps.profileCache
+          .upsert({
+            matrixUserId: user.id,
+            displayName: resolvedDisplayName,
+            ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
+            profileSyncedAt: new Date(),
+          })
+          .catch(() => undefined);
+      }
+
+      return c.json(result);
     } catch (error) {
       if (error instanceof AppError) return appErrorResponse(error);
       return c.json(

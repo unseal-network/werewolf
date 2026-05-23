@@ -38,8 +38,6 @@ export function isInIframe(): boolean {
 
 export function isHostRuntime(): boolean {
   return Boolean(
-    window.__WEREWOLF_HOST_BRIDGE__ ||
-      window.iframeMessage ||
       co.isMobile ||
       isInIframe() ||
       import.meta.env.VITE_HOST_RUNTIME === "1"

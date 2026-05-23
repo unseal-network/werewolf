@@ -52,7 +52,8 @@
       "Bash(grep -n \"joinRoom\\\\|join\\\\b\\\\|handleJoin\\\\|onJoin\\\\|seatClick\\\\|onSeatClick\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -30)",
       "Bash(grep -n \"joinGame\\\\|async function joinGame\\\\|const joinGame\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -10)",
       "Bash(grep -n \"^import\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | tail -10)",
-      "Bash(pnpm --filter api exec tsc --noEmit)"
+      "Bash(pnpm --filter api exec tsc --noEmit)",
+      "Bash(grep -n \"subscribeUrl\\\\|subscribe\\\\|EventSource\\\\|SSE\\\\|access_token\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -20)"
     ]
   }
 }
