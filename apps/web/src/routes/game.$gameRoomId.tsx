@@ -1083,13 +1083,18 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     try {
       if (isHostRuntime()) {
         const members = await iframeMessage.getMembers();
+        const activePlayers = room?.players.filter((p) => !p.leftAt) ?? [];
+        const joinedUserIds = new Set<string>([
+          ...activePlayers.map((p) => p.userId).filter((id): id is string => Boolean(id)),
+          ...activePlayers.map((p) => p.agentId).filter((id): id is string => Boolean(id)),
+        ]);
         const candidates: AgentCandidate[] = members.map((m) => ({
           userId: m.userId,
           displayName: m.displayName,
           ...(m.avatarUrl ? { avatarUrl: m.avatarUrl } : {}),
           userType: m.isAgent ? "agent" : "user",
           membership: "join",
-          alreadyJoined: false,
+          alreadyJoined: joinedUserIds.has(m.userId),
         }));
         setAgentCandidates(candidates);
         const info = await iframeMessage.getInfo();
@@ -1104,7 +1109,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     } finally {
       setAgentLoading(false);
     }
-  }, [client, gameRoomId]);
+  }, [client, gameRoomId, iframeMessage, room]);
 
   async function addAgentToSeat(agent: AgentCandidate) {
     try {
@@ -1115,7 +1120,12 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         agent.avatarUrl
       );
       setRoomSnapshot((current) => upsertRoomPlayers(current, [added.player]));
-      await refreshAgentCandidates();
+      const addedId = added.player.agentId ?? added.player.userId;
+      if (addedId) {
+        setAgentCandidates((current) =>
+          current.map((c) => (c.userId === addedId ? { ...c, alreadyJoined: true } : c))
+        );
+      }
     } catch (error) {
       setAgentError(error instanceof Error ? error.message : String(error));
     }
@@ -1125,7 +1135,14 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     try {
       const filled = await client.fillAgentPlayers(gameRoomId, targetPlayerCount);
       setRoomSnapshot((current) => upsertRoomPlayers(current, filled.addedPlayers));
-      await refreshAgentCandidates();
+      const addedIds = new Set<string>(
+        filled.addedPlayers
+          .map((p) => p.agentId ?? p.userId)
+          .filter((id): id is string => Boolean(id))
+      );
+      setAgentCandidates((current) =>
+        current.map((c) => (addedIds.has(c.userId) ? { ...c, alreadyJoined: true } : c))
+      );
     } catch (error) {
       setAgentError(error instanceof Error ? error.message : String(error));
     }

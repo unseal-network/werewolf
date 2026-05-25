@@ -57,7 +57,9 @@
       "Bash(grep -n \"player_eliminated\\\\|game_ended\\\\|night_resolved\\\\|currentSpeaker\\\\|alivePlayerIds\\\\|winner\\\\|voteCount\\\\|votes\\\\b\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -20)",
       "Bash(grep -n \"voteCount\\\\|vote_submitted\\\\|aliveCount\\\\|voteSubmitted\\\\|votes\\\\b\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -15)",
       "Bash(grep -n \"night_resolved\\\\|voteCount\\\\|vote_submitted\\\\|aliveCount\\\\|voteSubmitted\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -20)",
-      "Bash(grep -n \"actorDayKey\\\\b\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -5)"
+      "Bash(grep -n \"actorDayKey\\\\b\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -5)",
+      "Bash(grep -n \"const room\\\\b\\\\|timelineDisplayState\\\\.room\\\\|\\\\.room\\\\b\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -20)",
+      "Bash(grep -n \"onFill\\\\|fillAgent\\\\|handleFill\\\\|fill\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -30)"
     ]
   }
 }

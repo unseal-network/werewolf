@@ -17,7 +17,7 @@ function readDevLogFlag(): boolean {
 export const un = {
   log(...args: unknown[]): void {
     if (!readDevLogFlag()) return;
-    mobileLog.log(...args);
+    // mobileLog.log(...args);
   },
 };
 

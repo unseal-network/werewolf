@@ -10,7 +10,7 @@ import {
   computeTimelineBaseEventId,
   computeTimelineBaseSeq,
 } from "../game/timelineState";
-import { un } from "@unseal-network/mobile-log";
+import { un } from "./devLog";
 
 export interface SubscribeSnapshot {
   room: GameRoom;

@@ -149,12 +149,14 @@ export function AgentPicker({
         ) : null}
 
         <div className="agent-picker-list">
-          {loading && agents.length === 0 ? (
-            <div className="agent-picker-empty">{t("common.loadingRoom")}</div>
-          ) : agents.length === 0 ? (
-            <div className="agent-picker-empty">{t("agentPicker.empty")}</div>
-          ) : (
-            agents.map((agent) => (
+          {(() => {
+            const displayAgents = agents.filter((a) => !a.alreadyJoined);
+            return loading && displayAgents.length === 0 ? (
+              <div className="agent-picker-empty">{t("common.loadingRoom")}</div>
+            ) : displayAgents.length === 0 ? (
+              <div className="agent-picker-empty">{t("agentPicker.empty")}</div>
+            ) : (
+              displayAgents.map((agent) => (
               <div className="agent-row" key={agent.userId}>
                 <div className="agent-avatar">
                   {agent.avatarUrl ? (
@@ -186,8 +188,9 @@ export function AgentPicker({
                   size="lg"
                 />
               </div>
-            ))
-          )}
+              ))
+            );
+          })()}
         </div>
 
         <div className="agent-picker-actions">
