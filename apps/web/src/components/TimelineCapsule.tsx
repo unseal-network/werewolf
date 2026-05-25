@@ -258,6 +258,7 @@ export function TimelineCapsule({
   );
   const [open, setOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [lastSeenCount, setLastSeenCount] = useState(0);
 
   const visibleEvents = useMemo(
     () =>
@@ -267,6 +268,8 @@ export function TimelineCapsule({
         .reverse(),
     [events, myPlayerId, revealAll]
   );
+
+  const hasUnread = visibleEvents.length > lastSeenCount && !open;
 
   const groupedEvents = useMemo(() => {
     const groups: { phase?: string; day?: number; events: typeof visibleEvents }[] = [];
@@ -288,7 +291,10 @@ export function TimelineCapsule({
   }, [visibleEvents]);
 
   useEffect(() => {
-    if (!enabled) setOpen(false);
+    if (!enabled) {
+      setOpen(false);
+      setLastSeenCount(0);
+    }
   }, [enabled]);
 
   const toggleExpand = useCallback((id: string) => {
@@ -306,8 +312,11 @@ export function TimelineCapsule({
     <>
       <button
         type="button"
-        className={`log-peek ${open ? "is-hidden" : ""}`}
-        onClick={() => setOpen(true)}
+        className={`log-peek${open ? " is-hidden" : ""}${hasUnread ? " has-unread" : ""}`}
+        onClick={() => {
+          setOpen(true);
+          setLastSeenCount(visibleEvents.length);
+        }}
         aria-label={t("timeline.capsule")}
         title={t("timeline.title")}
       >
@@ -318,6 +327,7 @@ export function TimelineCapsule({
           aria-hidden="true"
           draggable={false}
         />
+        <span className="log-peek-unread" aria-hidden />
       </button>
 
       <div

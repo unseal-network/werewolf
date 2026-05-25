@@ -127,8 +127,35 @@
     min-height: 64px;
   }
 
-  .game-layout-root .utility-region .role-card-entry {
-    width: 48px !important;
-    height: 68px !important;
+  .game-layout-root .utility-region .role-badge-avatar {
+    width: 40px;
+    height: 40px;
+  }
+
+  .game-layout-root .utility-region .role-badge-shimmer {
+    width: 40px;
+    height: 40px;
+  }
+
+  .game-layout-root .utility-region .role-badge-name {
+    width: auto;
+    padding: 0 4px;
+    height: 18px;
+    font-size: 10px;
+    border-radius: 9px;
+  }
+
+  .game-layout-root .utility-region .log-peek,
+  .game-layout-root[data-scene="night"] .utility-region .log-peek {
+    width: 42px !important;
+    min-width: 42px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    border-radius: 11px !important;
+  }
+
+  .game-layout-root .utility-region .log-peek-icon {
+    width: 22px;
+    height: 22px;
   }
 }

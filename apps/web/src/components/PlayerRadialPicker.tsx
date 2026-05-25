@@ -29,6 +29,7 @@ export interface PlayerRadialTarget {
   agentId?: string | undefined;
   avatarUrl?: string | undefined;
   visibleRole?: string | undefined;
+  isWolfTeammate?: boolean | undefined;
 }
 
 export interface PlayerRadialPickerProps {
@@ -66,6 +67,9 @@ function renderTargetAvatar(target: PlayerRadialTarget) {
         <span className="player-picker-initial">{initialForName(target.displayName)}</span>
       )}
       <strong className="player-picker-seat-ribbon">{target.seatNo}</strong>
+      {target.isWolfTeammate ? (
+        <span className="player-picker-wolf-badge" aria-label="狼队友" aria-hidden>🐾</span>
+      ) : null}
     </>
   );
 }
@@ -84,11 +88,12 @@ function getTargetAvatarStyle(target: PlayerRadialTarget): CSSProperties {
 function getTargetAvatarClass(target: PlayerRadialTarget) {
   const hasRoleAvatar = Boolean(target.visibleRole);
   const hasImageAvatar = Boolean(!hasRoleAvatar && target.avatarUrl);
-  return hasRoleAvatar
+  const avatarClass = hasRoleAvatar
     ? "has-role-avatar"
     : hasImageAvatar
       ? "has-image-avatar"
       : "has-letter-avatar";
+  return target.isWolfTeammate ? `${avatarClass} has-wolf-teammate` : avatarClass;
 }
 
 function isInsideOpenWheel(event: globalThis.PointerEvent, wheel: HTMLDivElement) {

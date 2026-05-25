@@ -45,6 +45,15 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
       const stream = new ReadableStream({
         async start(controller) {
           const encoder = new TextEncoder();
+          let closed = false;
+          const safeEnqueue = (chunk: Uint8Array) => {
+            if (closed) return;
+            try {
+              controller.enqueue(chunk);
+            } catch {
+              closed = true;
+            }
+          };
           const perspective = () => buildPerspective(games, gameRoomId, user.id);
           const serializeSnapshot = (eventId?: string) => {
             const view = perspective();
@@ -61,6 +70,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
             return eventId ? `id: ${snapshotEventId}\n${data}` : data;
           };
           const pushVisible = (payload: string) => {
+            if (closed) return;
             const event = eventFromSsePayload(payload);
             if (!event) return;
             const view = perspective();
@@ -73,14 +83,14 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
               ).length
             );
             if (eventRefreshesPerspectiveSnapshot(event, visible)) {
-              controller.enqueue(encoder.encode(serializeSnapshot(event.id)));
+              safeEnqueue(encoder.encode(serializeSnapshot(event.id)));
               return;
             }
             if (!visible) return;
-            controller.enqueue(encoder.encode(payload));
+            safeEnqueue(encoder.encode(payload));
           };
 
-          controller.enqueue(encoder.encode(serializeSnapshot()));
+          safeEnqueue(encoder.encode(serializeSnapshot()));
 
           const liveBuffer: Array<{ id: string; payload: string }> = [];
           let initialReplayComplete = false;
@@ -134,9 +144,10 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
           liveBuffer.length = 0;
           initialReplayComplete = true;
 
-          c.req.raw.signal.addEventListener("abort", () => unsubscribe(), {
-            once: true,
-          });
+          c.req.raw.signal.addEventListener("abort", () => {
+            closed = true;
+            unsubscribe();
+          }, { once: true });
         },
       });
 
