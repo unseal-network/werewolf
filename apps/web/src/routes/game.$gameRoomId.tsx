@@ -746,7 +746,6 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   // host 模式下，用 memberCache 补充/覆盖座位的 displayName 和 avatarUrl，
   // memberCache 中的 avatarUrl 已经是宿主 App 直接解析好的 HTTPS URL，无需 mxc:// 转换。
   const seatView = useMemo(() => {
-    console.log('[wolf] rawSeatView', rawSeatView)
     if (!isHostRuntime() || memberCache.size === 0) return rawSeatView;
     return rawSeatView.map((seat) => {
       if (!seat.userId) return seat;
