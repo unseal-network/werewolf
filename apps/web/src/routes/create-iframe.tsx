@@ -32,16 +32,49 @@ const LANGUAGES = [
 type ActiveSheet = "language" | "speechRate" | null;
 
 const SPEECH_RATE_OPTIONS = [
-  { value: 1,    label: "1x",    desc: "正常" },
-  { value: 1.25, label: "1.25x", desc: "稍快" },
-  { value: 1.5,  label: "1.5x",  desc: "快速" },
-  { value: 1.75, label: "1.75x", desc: "较快" },
-  { value: 2,    label: "2x",    desc: "极速" },
+  { value: 1,    label: "1x",    desc: { "zh-CN": "正常", en: "Normal" } },
+  { value: 1.25, label: "1.25x", desc: { "zh-CN": "稍快", en: "Faster" } },
+  { value: 1.5,  label: "1.5x",  desc: { "zh-CN": "快速", en: "Fast"   } },
+  { value: 1.75, label: "1.75x", desc: { "zh-CN": "较快", en: "Quick"  } },
+  { value: 2,    label: "2x",    desc: { "zh-CN": "极速", en: "Turbo"  } },
 ] as const;
 
-function speechRateLabel(rate: number): string {
-  if (rate === 1) return "正常";
-  if (rate === 2) return "极速";
+const I18N = {
+  "zh-CN": {
+    gameTitle:       "狼人杀",
+    createRoom:      "CREATE ROOM",
+    settings:        "游戏设置",
+    language:        "游戏语言",
+    speechRate:      "语音倍速",
+    createButton:    "创建游戏",
+    backLabel:       "返回",
+    noRoomError:     "未获取到来源房间 ID，请重新打开应用",
+    languageSheet:   "游戏语言",
+    speechRateSheet: "语音倍速",
+    speechRateNormal: "正常",
+    speechRateTurbo:  "极速",
+  },
+  en: {
+    gameTitle:       "Werewolf",
+    createRoom:      "CREATE ROOM",
+    settings:        "SETTINGS",
+    language:        "Language",
+    speechRate:      "Speech Speed",
+    createButton:    "Create Game",
+    backLabel:       "Back",
+    noRoomError:     "Source room ID not found, please reopen the app",
+    languageSheet:   "Game Language",
+    speechRateSheet: "Speech Speed",
+    speechRateNormal: "Normal",
+    speechRateTurbo:  "Turbo",
+  },
+} as const;
+
+type Lang = keyof typeof I18N;
+
+function speechRateLabel(rate: number, lang: Lang): string {
+  if (rate === 1) return I18N[lang].speechRateNormal;
+  if (rate === 2) return I18N[lang].speechRateTurbo;
   return `${rate}x`;
 }
 
@@ -79,12 +112,13 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
   const userId      = readStoredMatrixUserId() ?? "";
   const displayName = readStoredMatrixDisplayName() ?? userId;
   const selectedLang = LANGUAGES.find((l) => l.code === language) ?? LANGUAGES[0]!;
+  const t = I18N[language as Lang] ?? I18N["zh-CN"];
 
   async function handleCreate() {
     setError("");
     const token  = readMatrixToken().trim();
     const roomId = (localStorage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? "").trim();
-    if (!roomId) { setError("未获取到来源房间 ID，请重新打开应用"); return; }
+    if (!roomId) { setError(t.noRoomError); return; }
     await submit({ sourceMatrixRoomId: roomId, matrixToken: token });
   }
 
@@ -103,14 +137,14 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
     {
       key: "language" as ActiveSheet,
       Icon: Globe,
-      label: "游戏语言",
+      label: t.language,
       value: selectedLang.name,
     },
     {
       key: "speechRate" as ActiveSheet,
       Icon: Gauge,
-      label: "语音倍速",
-      value: speechRateLabel(agentSpeechRate),
+      label: t.speechRate,
+      value: speechRateLabel(agentSpeechRate, language as Lang),
     },
   ];
 
@@ -148,7 +182,7 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
         {/* Back button */}
         <button
           onClick={handleLeave}
-          aria-label="返回"
+          aria-label={t.backLabel}
           className="absolute z-10 w-[40px] h-[40px] rounded-[10px] flex items-center justify-center transition-all duration-150 active:scale-90 cursor-pointer"
           style={{
             top: "calc(var(--web-safe-area-top, 0px) + 12px)",
@@ -178,13 +212,13 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
               letterSpacing: "0.08em",
             }}
           >
-            狼人杀
+            {t.gameTitle}
           </h1>
           <p
             className="m-0 font-semibold"
             style={{ fontSize: 11, color: "rgba(212,177,92,0.80)", letterSpacing: "0.3em" }}
           >
-            CREATE ROOM
+            {t.createRoom}
           </p>
         </div>
       </div>
@@ -204,7 +238,7 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
               className="text-[10px] font-bold tracking-[0.22em]"
               style={{ color: "rgba(212,177,92,0.55)" }}
             >
-              游戏设置
+              {t.settings}
             </span>
             <div className="flex-1 h-px" style={{ background: "rgba(207,176,91,0.18)" }} />
           </div>
@@ -337,7 +371,7 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
             ) : (
               <>
                 <span>🐺</span>
-                <span>创建游戏</span>
+                <span>{t.createButton}</span>
               </>
             )}
           </button>
@@ -347,7 +381,7 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
       {/* ── BottomSheets ─────────────────────────────────────────────── */}
 
       {/* Language */}
-      <BottomSheet open={activeSheet === "language"} onClose={() => setActiveSheet(null)} title="游戏语言">
+      <BottomSheet open={activeSheet === "language"} onClose={() => setActiveSheet(null)} title={t.languageSheet}>
         <div className="grid grid-cols-2 gap-2.5">
           {LANGUAGES.map((lang) => (
             <button
@@ -369,9 +403,10 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
       </BottomSheet>
 
       {/* Speech rate */}
-      <BottomSheet open={activeSheet === "speechRate"} onClose={() => setActiveSheet(null)} title="语音倍速">
+      <BottomSheet open={activeSheet === "speechRate"} onClose={() => setActiveSheet(null)} title={t.speechRateSheet}>
         <div className="flex gap-2">
-          {SPEECH_RATE_OPTIONS.map(({ value, label, desc }) => {
+          {SPEECH_RATE_OPTIONS.map(({ value, label, desc: descMap }) => {
+            const desc = descMap[language as Lang] ?? descMap["zh-CN"];
             const selected = agentSpeechRate === value;
             return (
               <button

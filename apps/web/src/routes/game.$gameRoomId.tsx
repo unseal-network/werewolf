@@ -1496,6 +1496,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       <GameRoomShell
         engineGameState={engineGameState}
         onRoleCardClose={() => setRoleRevealOpen(false)}
+        gameId={gameRoomId}
         title={room?.title ?? t("app.title")}
         roomCode={gameRoomId}
         sourceMatrixRoomId={room?.createdFromMatrixRoomId}

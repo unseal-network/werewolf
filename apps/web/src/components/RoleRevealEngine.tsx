@@ -8,12 +8,31 @@ import {
 interface RoleRevealEngineProps {
   roleCard?: EngineRoleCardState | undefined;
   onClose?: (() => void) | undefined;
+  gameId?: string | undefined;
 }
 
-export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
+export function RoleRevealEngine({ roleCard, onClose, gameId }: RoleRevealEngineProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const closeBlockedRef = useRef(false);
+
+  // 仅第一次显示：已看过则直接关闭
+  useEffect(() => {
+    if (!roleCard?.visible || roleCard.nonce <= 0) return;
+    if (!gameId) return;
+    const key = `role-reveal-seen:${gameId}`;
+    if (localStorage.getItem(key) === String(roleCard.nonce)) {
+      onClose?.();
+    }
+  }, [roleCard?.visible, roleCard?.nonce, gameId, onClose]);
+
+  function handleClose() {
+    if (closeBlockedRef.current) return;
+    if (gameId && roleCard?.nonce) {
+      localStorage.setItem(`role-reveal-seen:${gameId}`, String(roleCard.nonce));
+    }
+    onClose?.();
+  }
 
   useEffect(() => {
     if (!roleCard?.visible || roleCard.nonce <= 0) return;
@@ -95,6 +114,7 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
     <div
       ref={hostRef}
       className="role-reveal-engine"
+      onClick={handleClose}
     >
       <div
         ref={cardRef}
@@ -105,14 +125,14 @@ export function RoleRevealEngine({ roleCard, onClose }: RoleRevealEngineProps) {
         onPointerDown={() => {
           void requestGyroPermissionIfNeeded();
         }}
-        onClick={() => {
-          if (closeBlockedRef.current) return;
-          onClose?.();
+        onClick={(e) => {
+          e.stopPropagation();
+          handleClose();
         }}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
-            onClose?.();
+            handleClose();
           }
         }}
       >

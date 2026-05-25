@@ -106,7 +106,7 @@
 
   .game-layout-root .center-info-surface {
     min-height: 82px;
-    padding: 12px 14px;
+    padding: 12px 0;
   }
 
   .game-layout-root .action-region .phase-card,

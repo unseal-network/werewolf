@@ -34,6 +34,7 @@ interface GameRoomShellProps {
   overlays?: ReactNode;
   engineGameState: EngineGameState;
   onRoleCardClose?: () => void;
+  gameId?: string | undefined;
   onHomeClick?: () => void;
   isLoading?: boolean;
   errorMessage?: string | undefined;
@@ -248,6 +249,7 @@ export function GameRoomShell({
   overlays,
   engineGameState,
   onRoleCardClose,
+  gameId,
   onHomeClick,
   isLoading,
   errorMessage,
@@ -384,6 +386,7 @@ export function GameRoomShell({
         <RoleRevealEngine
           roleCard={engineGameState.roleCard}
           onClose={onRoleCardClose}
+          gameId={gameId}
         />
         {overlays}
       </section>
