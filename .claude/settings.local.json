@@ -68,7 +68,8 @@
       "Bash(grep -n \"privateStates\\\\|knownTeammatePlayerIds\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -30)",
       "Bash(grep -n \"centerActionTargetIds\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)",
       "Bash(grep -n \"seatView\\\\|seats=\\\\|seatCount=\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -30)",
-      "Bash(grep -n \"seats=\\\\|seatCount=\\\\|seatView\\\\|maxSeatCount\\\\|activeSeat\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)"
+      "Bash(grep -n \"seats=\\\\|seatCount=\\\\|seatView\\\\|maxSeatCount\\\\|activeSeat\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)",
+      "Bash(grep -n \"isWolfTeammate\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -10)"
     ]
   }
 }

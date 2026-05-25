@@ -2,8 +2,6 @@ import { memo } from "react";
 import { type DisplayRole, normalizeDisplayRole, ROLE_COLOR } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
 
-const ROLE_AVATAR_BASE = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/roles-avatar`;
-
 export interface SeatData {
   seatNo: number;
   playerId: string | undefined;
@@ -92,9 +90,9 @@ export function avatarInitial(seat: SeatData, fullName: string): string {
 function seatBadgeId(seat: SeatData, roleId: DisplayRole | undefined): SeatBadgeId | undefined {
   if (seat.isEmpty) return undefined;
   if (seat.isActionTarget) return "blade";
+  if (seat.isWolfTeammate) return "moon"; // wolf teammate: moon badge (distinct from blade)
   if (roleId) return ROLE_BADGE[roleId];
   if (seat.isCurrentUser) return "star";
-  if (seat.isWolfTeammate) return "moon";
   return seat.kind === "agent" ? "people" : undefined;
 }
 
@@ -128,6 +126,7 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
     seat.isSelected ? "seat-state-selected" : "",
     seat.isActionTarget ? "seat-state-target" : "",
     seat.isCurrentSpeaker ? "seat-state-speaking" : "",
+    seat.isWolfTeammate ? "seat-state-wolf-teammate" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -147,6 +146,7 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
           hasImageAvatar ? "avatar-mode-image" : "",
           hasLetterAvatar ? "avatar-mode-letter" : "",
           hasHoodedAvatar ? "avatar-mode-hooded" : "",
+          seat.isWolfTeammate ? "avatar-wolf-teammate" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -163,14 +163,6 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
         ) : (
           <>
             {hasHoodedAvatar ? <span className="seat-hooded-portrait" /> : null}
-            {hasHoodedAvatar && seat.isWolfTeammate ? (
-              <img
-                className="seat-wolf-phantom"
-                src={`${ROLE_AVATAR_BASE}/werewolf.png`}
-                alt=""
-                draggable={false}
-              />
-            ) : null}
             {seat.isEmpty || hasLetterAvatar ? (
               <span className="seat-avatar-initial">
                 {seat.isEmpty ? "+" : avatarInitial(seat, fullName)}

@@ -342,50 +342,46 @@
 }
 
 /* ─────────────────────────────────────────────
-   Wolf Phantom Overlay
-   狼人幻影：斗篷保留，叠一层半透明狼人图
+   Wolf Teammate — 红色边框 + 扩散红晕
    ───────────────────────────────────────────── */
 
-.game-layout-root .player-rail .seat-wolf-phantom {
-  position: absolute;
-  inset: -4%;
-  z-index: 2;
-  width: 108%;
-  height: 108%;
-  border-radius: inherit;
-  object-fit: cover;
-  object-position: top center;
-  opacity: 0.46;
-  mix-blend-mode: screen;
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
-  animation: seatWolfPhantomBreath 3600ms ease-in-out infinite;
+/* 红色边框环（outline 不受 box-shadow: none !important 干扰） */
+.game-layout-root .player-rail .avatar-wolf-teammate {
+  outline: calc(2px * var(--layout-ui-scale, 1)) solid rgba(210, 40, 55, 0.82) !important;
+  outline-offset: calc(4px * var(--layout-ui-scale, 1));
 }
 
-/* 死亡状态保持灰度 */
-.game-layout-root .player-rail .seat-state-dead .seat-wolf-phantom {
-  filter: grayscale(1) saturate(0) brightness(0.55) !important;
-  animation: none;
+/* 扩散红色光晕（复用 ::after 伪元素） */
+.game-layout-root .player-rail .seat-state-wolf-teammate .avatar-wolf-teammate::after {
+  background-image: radial-gradient(
+    circle,
+    transparent 38%,
+    rgba(200, 30, 45, 0.55) 56%,
+    rgba(160, 10, 20, 0.0) 76%
+  ) !important;
+  opacity: 1 !important;
+  animation: wolfTeammateGlowPulse 2600ms ease-in-out infinite !important;
 }
 
-/* 幻影呼吸光效 */
-@keyframes seatWolfPhantomBreath {
-  0%, 100% {
-    opacity: 0.38;
-    filter: brightness(0.85) saturate(1.1);
-  }
-  50% {
-    opacity: 0.54;
-    filter: brightness(1.08) saturate(1.3);
-  }
+/* 死亡后降低强度，停止动画 */
+.game-layout-root .player-rail .seat-state-dead.seat-state-wolf-teammate .avatar-wolf-teammate {
+  outline-color: rgba(140, 30, 40, 0.45) !important;
+}
+.game-layout-root .player-rail .seat-state-dead .avatar-wolf-teammate::after {
+  opacity: 0.3 !important;
+  animation: none !important;
 }
 
-/* 减少动效模式：直接显示静止幻影 */
+/* 红晕呼吸动画 */
+@keyframes wolfTeammateGlowPulse {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 1.0;  }
+}
+
+/* 减少动效：静止显示 */
 @media (prefers-reduced-motion: reduce) {
-  .game-layout-root .player-rail .seat-wolf-phantom {
-    animation: none;
-    opacity: 0.44;
+  .game-layout-root .player-rail .seat-state-wolf-teammate .avatar-wolf-teammate::after {
+    animation: none !important;
+    opacity: 0.7 !important;
   }
 }
