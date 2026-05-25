@@ -73,7 +73,8 @@
       "Bash(grep -n \"GameRoomShell\\\\|gameRoomId\\\\|onRoleCardClose\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -30)",
       "Bash(grep -n \"GameRoomShell\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -10)",
       "Bash(grep -n \"seatCount\\\\|maxSeatCount\\\\|seatView\\\\|isEmpty\\\\|rail-seat-spacer\\\\|player-rail\\\\|seats\\\\b\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -40)",
-      "Bash(grep -n \"splitSeatsIntoRails\\\\|buildSeatView\\\\|rawSeatView\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)"
+      "Bash(grep -n \"splitSeatsIntoRails\\\\|buildSeatView\\\\|rawSeatView\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)",
+      "Bash(grep -n \"phaseLabel\\\\|phase\\\\.label\\\\|labelKey\\\\|mapServerPhase\\\\|t\\(.*phase\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -30)"
     ]
   }
 }

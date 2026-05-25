@@ -1422,10 +1422,24 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
 
     // 白天且第 2 天以后无消亡 → 昨晚平安夜
     if (dressing.scene === "day" && (projection.day ?? 1) > 1) {
-      return "Last night was Christmas Eve";//"昨晚平安夜";
+      return "Last night was Christmas Eve";
     }
 
-    return "......";
+    // 夜晚阶段 → 显示当前行动角色，轮到自己时加「· 你」
+    const phase = projection.phase ?? "";
+    const myRole = myPrivateState?.role;
+    const isMine = (role: string) => myRole === role;
+    const suffix = (role: string) => (isMine(role) ? " · 你" : "");
+    if (phase === "night_wolf")         return `🐺 狼人行动中${suffix("werewolf")}`;
+    if (phase === "night_seer")         return `👁 预言家验人中${suffix("seer")}`;
+    if (phase === "night_witch_heal")   return `🧪 女巫救人中${suffix("witch")}`;
+    if (phase === "night_witch_poison") return `🧪 女巫毒人中${suffix("witch")}`;
+    if (phase === "night_guard")        return `🛡 守卫护人中${suffix("guard")}`;
+
+    // 白天第一天无发言者
+    if (dressing.scene === "day") return "💬 等待发言";
+
+    return "行动中...";
   }, [
     dressing.scene,
     projection,
@@ -1434,6 +1448,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     room,
     gameRoomId,
     timelineDisplayState.facts,
+    myPrivateState?.role,
   ]);
   const roleId = normalizeRoleId(myPrivateState?.role);
   const roleLabel = t(`role.${roleId}`);
