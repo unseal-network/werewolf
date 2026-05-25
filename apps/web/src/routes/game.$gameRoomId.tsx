@@ -1404,20 +1404,20 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
         timelineDisplayState.facts.voteSubmittedByActorDay.has(actorDayKey(id, day))
       ).length;
       const total = projection.alivePlayerIds.length;
-      return `🗳 已投 ${submitted} / ${total}`;
+      return `🗳 Invested ${submitted} / ${total}`;
     }
 
     // 白天有发言者 → 当前发言玩家
     if (dressing.scene === "day" && currentSpeakerName) {
-      return `💬 ${currentSpeakerName} 发言中`;
+      return `💬 In ${currentSpeakerName}'s speech`;
     }
-
+// In xx's speech
     // 夜晚 / 白天无发言者 → 最近消亡事件摘要
     const lastEliminated = [...events].reverse().find((e) => e.type === "player_eliminated");
     if (lastEliminated) {
       const subjectId = String(lastEliminated.subjectId ?? lastEliminated.payload?.playerId ?? "");
       const playerName = room?.players.find((p) => p.id === subjectId)?.displayName;
-      if (playerName) return `${playerName} 出局`;
+      if (playerName) return `${playerName}  is out`;
     }
 
     // 白天且第 2 天以后无消亡 → 昨晚平安夜
@@ -1425,7 +1425,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       return "Last night was Christmas Eve";//"昨晚平安夜";
     }
 
-    return roomLabel;
+    return "......";
   }, [
     dressing.scene,
     projection,

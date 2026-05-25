@@ -117,8 +117,7 @@ function useResponsiveGameLayoutVars(railSlotCount: number) {
       );
       const avatar = seat * (compact ? 0.72 : 0.7);
       const railWidth = avatar * (compact ? 1.72 : 1.66);
-      const naturalSlot = avatar * (compact ? 1.45 : 1.4) + (compact ? 16 : 20);
-      const seatSlot = Math.min(naturalSlot, railHeight / railRows);
+      const seatSlot = railHeight / railRows;
       const actionWidth = clampValue(
         width - railWidth * 2 - width * (compact ? 0.12 : narrow ? 0.4 : 0.22),
         compact ? 340 : narrow ? 260 : 260,
@@ -267,7 +266,7 @@ export function GameRoomShell({
   );
   const boardSeats = activeSeats;
   const rails = splitSeatsIntoRails(boardSeats);
-  const railSlotCount = Math.max(rails.left.length, rails.right.length);
+  const railSlotCount = Math.ceil(seatCount / 2);
   const responsiveLayoutVars = useResponsiveGameLayoutVars(railSlotCount);
   const centerBelongsToModal = scene === "end";
   const avatarMode = scene === "lobby" ? "identity" : "hooded";
@@ -324,8 +323,7 @@ export function GameRoomShell({
             {/* Secondary meta strip: 阶段上下文 or 房间号 */}
             <div className="flex items-center min-w-0">
               <span className="hud-room-title truncate">
-                
-                {hudSubtitle ?? roomCode ?? title}
+                {hudSubtitle ?? title}
               </span>
             </div>
           </div>

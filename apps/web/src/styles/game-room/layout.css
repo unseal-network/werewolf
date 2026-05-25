@@ -165,7 +165,7 @@
   grid-auto-rows: var(--layout-seat-slot);
   align-content: space-between;
   justify-items: center;
-  gap: 0;
+  gap: 4px;
   overflow: visible;
   pointer-events: none;
 }

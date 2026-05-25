@@ -36,17 +36,9 @@ export function visibleSeatNumbersForRoom({
     return occupied;
   }
 
-  const visibleCount = computeVisibleSeatCount({
-    seatCount: targetPlayerCount,
-    playerCount: occupied.length,
-    occupiedSeatCount: occupied.length,
-  });
-  const highestOccupiedSeatNo = occupied.at(-1) ?? 0;
-  const count = Math.min(
-    targetPlayerCount,
-    Math.max(visibleCount, highestOccupiedSeatNo)
-  );
-  return Array.from({ length: count }, (_, index) => index + 1);
+  // 大厅阶段：始终展示全部 targetPlayerCount 个座位
+  // 让玩家看到完整的座位布局，与创建时选择的人数一致
+  return Array.from({ length: targetPlayerCount }, (_, index) => index + 1);
 }
 
 export function splitSeatsIntoRails<T>(seats: readonly T[]): { left: T[]; right: T[] } {

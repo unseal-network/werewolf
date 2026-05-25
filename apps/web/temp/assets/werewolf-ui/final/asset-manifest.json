@@ -1,0 +1,834 @@
+{
+  "version": "werewolf-ui-usable-assets-v1",
+  "assets": [
+    {
+      "id": "avatar/dead-overlay",
+      "path": "public/assets/werewolf-ui/final/avatar/dead-overlay.png",
+      "width": 512,
+      "height": 512,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/frame-dead",
+      "path": "public/assets/werewolf-ui/final/avatar/frame-dead.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/frame-default",
+      "path": "public/assets/werewolf-ui/final/avatar/frame-default.png",
+      "width": 960,
+      "height": 981,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/frame-selected",
+      "path": "public/assets/werewolf-ui/final/avatar/frame-selected.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/frame-speaking",
+      "path": "public/assets/werewolf-ui/final/avatar/frame-speaking.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/glow-selected",
+      "path": "public/assets/werewolf-ui/final/avatar/glow-selected.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/name-line",
+      "path": "public/assets/werewolf-ui/final/avatar/name-line.png",
+      "width": 320,
+      "height": 32,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/portrait-hooded",
+      "path": "public/assets/werewolf-ui/final/avatar/portrait-hooded.png",
+      "width": 1160,
+      "height": 1148,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "avatar/status-dot",
+      "path": "public/assets/werewolf-ui/final/avatar/status-dot.png",
+      "width": 64,
+      "height": 64,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "background/night-village",
+      "path": "public/assets/werewolf-ui/final/background/night-village.png",
+      "width": 941,
+      "height": 1672,
+      "hasAlpha": false,
+      "status": "usable for interactive design draft",
+      "scaleMode": "cover",
+      "nineSlice": null
+    },
+    {
+      "id": "background/vignette-overlay",
+      "path": "public/assets/werewolf-ui/final/background/vignette-overlay.png",
+      "width": 1080,
+      "height": 1920,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "cover",
+      "nineSlice": null
+    },
+    {
+      "id": "badge/blade",
+      "path": "public/assets/werewolf-ui/final/badge/blade.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "badge/eye",
+      "path": "public/assets/werewolf-ui/final/badge/eye.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "badge/moon",
+      "path": "public/assets/werewolf-ui/final/badge/moon.png",
+      "width": 755,
+      "height": 774,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "badge/people",
+      "path": "public/assets/werewolf-ui/final/badge/people.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "badge/shield",
+      "path": "public/assets/werewolf-ui/final/badge/shield.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "badge/star",
+      "path": "public/assets/werewolf-ui/final/badge/star.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "button/log-corner-bl",
+      "path": "public/assets/werewolf-ui/final/button/log-corner-bl.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "button/log-corner-br",
+      "path": "public/assets/werewolf-ui/final/button/log-corner-br.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "button/log-corner-tl",
+      "path": "public/assets/werewolf-ui/final/button/log-corner-tl.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "button/log-corner-tr",
+      "path": "public/assets/werewolf-ui/final/button/log-corner-tr.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "button/log-edge-horizontal",
+      "path": "public/assets/werewolf-ui/final/button/log-edge-horizontal.png",
+      "width": 2172,
+      "height": 724,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-x",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "button/log-edge-vertical",
+      "path": "public/assets/werewolf-ui/final/button/log-edge-vertical.png",
+      "width": 724,
+      "height": 2172,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-y",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "button/log-fill",
+      "path": "public/assets/werewolf-ui/final/button/log-fill.png",
+      "width": 1921,
+      "height": 819,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch/tile",
+      "nineSlice": {
+        "cornerDisplay": 96,
+        "edgeThickness": 24,
+        "fillInset": 48
+      }
+    },
+    {
+      "id": "card/role-card-back",
+      "path": "public/assets/werewolf-ui/final/card/role-card-back.png",
+      "width": 1024,
+      "height": 1536,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "effect/avatar-selected-glow",
+      "path": "public/assets/werewolf-ui/final/effect/avatar-selected-glow.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "effect/avatar-speaking-pulse",
+      "path": "public/assets/werewolf-ui/final/effect/avatar-speaking-pulse.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "effect/radial-picker-ring",
+      "path": "public/assets/werewolf-ui/final/effect/radial-picker-ring.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "effect/vote-target-ring",
+      "path": "public/assets/werewolf-ui/final/effect/vote-target-ring.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/icon-moon",
+      "path": "public/assets/werewolf-ui/final/hud/icon-moon.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/icon-people",
+      "path": "public/assets/werewolf-ui/final/hud/icon-people.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/moon-medallion",
+      "path": "public/assets/werewolf-ui/final/hud/moon-medallion.png",
+      "width": 1085,
+      "height": 1115,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/rail-bottom-line",
+      "path": "public/assets/werewolf-ui/final/hud/rail-bottom-line.png",
+      "width": 2172,
+      "height": 724,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-x",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/rail-fill",
+      "path": "public/assets/werewolf-ui/final/hud/rail-fill.png",
+      "width": 2106,
+      "height": 316,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-x/fill",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/rail-top-line",
+      "path": "public/assets/werewolf-ui/final/hud/rail-top-line.png",
+      "width": 2172,
+      "height": 724,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-x",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/socket-left",
+      "path": "public/assets/werewolf-ui/final/hud/socket-left.png",
+      "width": 1053,
+      "height": 1062,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "hud/socket-right",
+      "path": "public/assets/werewolf-ui/final/hud/socket-right.png",
+      "width": 1053,
+      "height": 1062,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "icon/book",
+      "path": "public/assets/werewolf-ui/final/icon/book.png",
+      "width": 1254,
+      "height": 1254,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/arrow-point-down",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/arrow-point-down.png",
+      "width": 96,
+      "height": 128,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/arrow-point-left",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/arrow-point-left.png",
+      "width": 128,
+      "height": 96,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/arrow-point-right",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/arrow-point-right.png",
+      "width": 128,
+      "height": 96,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/arrow-point-up",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/arrow-point-up.png",
+      "width": 96,
+      "height": 128,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/corner-bl",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/corner-bl.png",
+      "width": 192,
+      "height": 192,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/corner-br",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/corner-br.png",
+      "width": 192,
+      "height": 192,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/corner-tl",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/corner-tl.png",
+      "width": 192,
+      "height": 192,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/corner-tr",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/corner-tr.png",
+      "width": 192,
+      "height": 192,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/divider",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/divider.png",
+      "width": 512,
+      "height": 48,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/edge-bottom",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/edge-bottom.png",
+      "width": 512,
+      "height": 32,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-x",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/edge-left",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/edge-left.png",
+      "width": 32,
+      "height": 512,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-y",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/edge-right",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/edge-right.png",
+      "width": 32,
+      "height": 512,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-y",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/edge-top",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/edge-top.png",
+      "width": 512,
+      "height": 32,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch-x",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/fill",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/fill.png",
+      "width": 256,
+      "height": 256,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "stretch/tile",
+      "nineSlice": {
+        "cornerDisplay": 192,
+        "edgeThickness": 32,
+        "fillInset": 32,
+        "edgeOverlap": 12,
+        "edgePlacement": {
+          "topY": 33,
+          "bottomInset": 29,
+          "leftX": 12,
+          "rightInset": 15
+        },
+        "contentSafeInset": {
+          "top": 96,
+          "right": 78,
+          "bottom": 96,
+          "left": 78
+        },
+        "source": "panel-9slice-regenerated/source-full-frame-alpha",
+        "ornamentPlacement": {
+          "topOffset": -17,
+          "bottomOffset": -16,
+          "align": "ornament gem center overlays edge visual centerline"
+        }
+      }
+    },
+    {
+      "id": "panel-9slice/ornament-bottom",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/ornament-bottom.png",
+      "width": 96,
+      "height": 128,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "panel-9slice/ornament-top",
+      "path": "public/assets/werewolf-ui/final/panel-9slice/ornament-top.png",
+      "width": 96,
+      "height": 128,
+      "hasAlpha": true,
+      "status": "usable for interactive design draft",
+      "scaleMode": "fixed",
+      "nineSlice": null
+    },
+    {
+      "id": "button/decision/submit-button-9slice",
+      "path": "public/assets/werewolf-ui/final/button/decision/submit-button-9slice.png",
+      "metadata": "public/assets/werewolf-ui/final/button/decision/submit-button-9slice.json",
+      "width": 1024,
+      "height": 192,
+      "hasAlpha": true,
+      "status": "verified",
+      "scaleMode": "9-slice",
+      "nineSlice": {
+        "left": 168,
+        "right": 168,
+        "top": 76,
+        "bottom": 76,
+        "repeat": "stretch",
+        "fillCenter": true
+      }
+    },
+    {
+      "id": "button/decision/confirm-button-9slice",
+      "path": "public/assets/werewolf-ui/final/button/decision/confirm-button-9slice.png",
+      "metadata": "public/assets/werewolf-ui/final/button/decision/confirm-button-9slice.json",
+      "width": 384,
+      "height": 128,
+      "hasAlpha": true,
+      "status": "verified",
+      "scaleMode": "9-slice",
+      "nineSlice": {
+        "left": 64,
+        "right": 64,
+        "top": 40,
+        "bottom": 40,
+        "repeat": "stretch",
+        "fillCenter": true
+      }
+    },
+    {
+      "id": "button/decision/cancel-button-9slice",
+      "path": "public/assets/werewolf-ui/final/button/decision/cancel-button-9slice.png",
+      "metadata": "public/assets/werewolf-ui/final/button/decision/cancel-button-9slice.json",
+      "width": 1024,
+      "height": 192,
+      "hasAlpha": true,
+      "status": "verified",
+      "scaleMode": "9-slice",
+      "nineSlice": {
+        "left": 168,
+        "right": 168,
+        "top": 76,
+        "bottom": 76,
+        "repeat": "stretch",
+        "fillCenter": true
+      }
+    }
+  ]
+}

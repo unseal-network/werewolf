@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Globe,
   Gauge,
+  Users,
   Check,
 } from "lucide-react";
 import { BottomSheet } from "../components/BottomSheet";
@@ -29,7 +30,7 @@ const LANGUAGES = [
   { code: "en" as const, name: "EN" },
 ];
 
-type ActiveSheet = "language" | "speechRate" | null;
+type ActiveSheet = "language" | "speechRate" | "playerCount" | null;
 
 const SPEECH_RATE_OPTIONS = [
   { value: 1,    label: "1x",    desc: { "zh-CN": "正常", en: "Normal" } },
@@ -41,30 +42,36 @@ const SPEECH_RATE_OPTIONS = [
 
 const I18N = {
   "zh-CN": {
-    gameTitle:       "狼人杀",
-    createRoom:      "CREATE ROOM",
-    settings:        "游戏设置",
-    language:        "游戏语言",
-    speechRate:      "语音倍速",
-    createButton:    "创建游戏",
-    backLabel:       "返回",
-    noRoomError:     "未获取到来源房间 ID，请重新打开应用",
-    languageSheet:   "游戏语言",
-    speechRateSheet: "语音倍速",
+    gameTitle:        "狼人杀",
+    createRoom:       "CREATE ROOM",
+    settings:         "游戏设置",
+    language:         "游戏语言",
+    speechRate:       "语音倍速",
+    playerCount:      "游戏人数",
+    playerCountUnit:  "人",
+    createButton:     "创建游戏",
+    backLabel:        "返回",
+    noRoomError:      "未获取到来源房间 ID，请重新打开应用",
+    languageSheet:    "游戏语言",
+    speechRateSheet:  "语音倍速",
+    playerCountSheet: "游戏人数",
     speechRateNormal: "正常",
     speechRateTurbo:  "极速",
   },
   en: {
-    gameTitle:       "Werewolf",
-    createRoom:      "CREATE ROOM",
-    settings:        "SETTINGS",
-    language:        "Language",
-    speechRate:      "Speech Speed",
-    createButton:    "Create Game",
-    backLabel:       "Back",
-    noRoomError:     "Source room ID not found, please reopen the app",
-    languageSheet:   "Game Language",
-    speechRateSheet: "Speech Speed",
+    gameTitle:        "Werewolf",
+    createRoom:       "CREATE ROOM",
+    settings:         "SETTINGS",
+    language:         "Language",
+    speechRate:       "Speech Speed",
+    playerCount:      "Players",
+    playerCountUnit:  "",
+    createButton:     "Create Game",
+    backLabel:        "Back",
+    noRoomError:      "Source room ID not found, please reopen the app",
+    languageSheet:    "Game Language",
+    speechRateSheet:  "Speech Speed",
+    playerCountSheet: "Players",
     speechRateNormal: "Normal",
     speechRateTurbo:  "Turbo",
   },
@@ -95,12 +102,16 @@ export interface IframeCreatePageProps {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+const PLAYER_COUNT_OPTIONS = [6, 7, 8, 9, 10, 11, 12] as const;
+
 export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePageProps) {
   const {
     language,
     setLanguage,
     agentSpeechRate,
     setAgentSpeechRate,
+    targetPlayerCount,
+    setTargetPlayerCount,
     submitting,
     error,
     setError,
@@ -145,6 +156,12 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
       Icon: Gauge,
       label: t.speechRate,
       value: speechRateLabel(agentSpeechRate, language as Lang),
+    },
+    {
+      key: "playerCount" as ActiveSheet,
+      Icon: Users,
+      label: t.playerCount,
+      value: `${targetPlayerCount}${t.playerCountUnit}`,
     },
   ];
 
@@ -399,6 +416,31 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
               {language === lang.code && <Check size={13} color="#d4b15c" strokeWidth={3} />}
             </button>
           ))}
+        </div>
+      </BottomSheet>
+
+      {/* Player count */}
+      <BottomSheet open={activeSheet === "playerCount"} onClose={() => setActiveSheet(null)} title={t.playerCountSheet}>
+        <div className="grid grid-cols-4 gap-2.5">
+          {PLAYER_COUNT_OPTIONS.map((count) => {
+            const selected = targetPlayerCount === count;
+            return (
+              <button
+                key={count}
+                onClick={() => { setTargetPlayerCount(count); setActiveSheet(null); }}
+                className="py-4 rounded-[14px] cursor-pointer font-bold text-center transition-all active:scale-[0.97] flex flex-col items-center gap-1"
+                style={{
+                  background: selected ? "rgba(212,177,92,0.14)" : "rgba(255,255,255,0.04)",
+                  border: `1px solid ${selected ? "rgba(207,176,91,0.55)" : "rgba(255,255,255,0.08)"}`,
+                  color: selected ? "#d4b15c" : "rgba(255,247,216,0.40)",
+                  fontSize: 18,
+                }}
+              >
+                {count}
+                {selected && <Check size={12} color="#d4b15c" strokeWidth={3} />}
+              </button>
+            );
+          })}
         </div>
       </BottomSheet>
 
