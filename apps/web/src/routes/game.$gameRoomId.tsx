@@ -746,6 +746,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   // host 模式下，用 memberCache 补充/覆盖座位的 displayName 和 avatarUrl，
   // memberCache 中的 avatarUrl 已经是宿主 App 直接解析好的 HTTPS URL，无需 mxc:// 转换。
   const seatView = useMemo(() => {
+    console.log('[wolf] rawSeatView', rawSeatView)
     if (!isHostRuntime() || memberCache.size === 0) return rawSeatView;
     return rawSeatView.map((seat) => {
       if (!seat.userId) return seat;
@@ -787,8 +788,15 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   const hasEnoughPlayers = activeSeatCount >= 6;
 
   const candidateSeats = useMemo(
-    () =>
-      Array.from(centerActionTargetIds)
+    () => {
+      // Include legal targets + wolf teammates not already in the legal set.
+      // Wolf teammates are shown in the picker as non-selectable so the wolf
+      // player can identify their allies during the night kill phase.
+      const allIds = [
+        ...Array.from(centerActionTargetIds),
+        ...Array.from(knownTeammateIds).filter((id) => !centerActionTargetIds.has(id)),
+      ];
+      return allIds
         .map((playerId) => room?.players.find((player) => player.id === playerId))
         .filter((player): player is RoomPlayer => Boolean(player))
         .map((player) => {
@@ -801,9 +809,11 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
             displayName: cached?.displayName || player.displayName,
             avatarUrl: cached?.avatarUrl ?? resolveAvatarUrl(player.avatarUrl, matrixHomeserver, matrixToken),
             visibleRole: visibleRolesByPlayerId.get(player.id),
+            isWolfTeammate: knownTeammateIds.has(player.id),
           };
-        }),
-    [centerActionTargetIds, room?.players, visibleRolesByPlayerId, matrixHomeserver, matrixToken, memberCache]
+        });
+    },
+    [centerActionTargetIds, room?.players, visibleRolesByPlayerId, knownTeammateIds, matrixHomeserver, matrixToken, memberCache]
   );
 
   const actionCanRun = isCreator && uiProjection.canProgress;

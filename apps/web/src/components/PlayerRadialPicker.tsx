@@ -313,7 +313,10 @@ export function PlayerRadialPicker({
   function commitHover() {
     const targetId = hoveredIdRef.current;
     if (targetId) {
-      onSelect(targetId);
+      const target = targets.find((t) => t.playerId === targetId);
+      if (!target?.isWolfTeammate) {
+        onSelect(targetId);
+      }
       setWheelOpen(false);
       setHoveredIdIfChanged(null);
       wheelGeometryRef.current = null;
@@ -366,7 +369,10 @@ export function PlayerRadialPicker({
             }
             break;
           }
-          onSelect(targetId);
+          const kbTarget = targets.find((t) => t.playerId === targetId);
+          if (!kbTarget?.isWolfTeammate) {
+            onSelect(targetId);
+          }
           setWheelOpen(false);
           setHoveredIdIfChanged(null);
           wheelGeometryRef.current = null;
@@ -443,7 +449,10 @@ export function PlayerRadialPicker({
       true
     );
     if (targetId) {
-      onSelect(targetId);
+      const target = targets.find((t) => t.playerId === targetId);
+      if (!target?.isWolfTeammate) {
+        onSelect(targetId);
+      }
       setWheelOpen(false);
       setHoveredIdIfChanged(null);
       wheelGeometryRef.current = null;
@@ -491,7 +500,9 @@ export function PlayerRadialPicker({
               data-player-picker-target={target.playerId}
               style={{ ...getRadialItemStyle(index, targets.length), ...getTargetAvatarStyle(target) }}
               onClick={() => {
-                onSelect(target.playerId);
+                if (!target.isWolfTeammate) {
+                  onSelect(target.playerId);
+                }
                 setWheelOpen(false);
                 setHoveredIdIfChanged(null);
                 wheelGeometryRef.current = null;

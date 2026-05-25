@@ -16,6 +16,7 @@ export interface StageSeat {
   agentId?: string | undefined;
   avatarUrl?: string | undefined;
   visibleRole?: string | undefined;
+  isWolfTeammate?: boolean | undefined;
 }
 
 export type ActionMode =

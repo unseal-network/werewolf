@@ -2,6 +2,8 @@ import { memo } from "react";
 import { type DisplayRole, normalizeDisplayRole, ROLE_COLOR } from "../constants/roles";
 import { useT } from "../i18n/I18nProvider";
 
+const ROLE_AVATAR_BASE = `${(import.meta.env.BASE_URL ?? "/").replace(/\/?$/, "/")}assets/roles-avatar`;
+
 export interface SeatData {
   seatNo: number;
   playerId: string | undefined;
@@ -161,6 +163,14 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
         ) : (
           <>
             {hasHoodedAvatar ? <span className="seat-hooded-portrait" /> : null}
+            {hasHoodedAvatar && seat.isWolfTeammate ? (
+              <img
+                className="seat-wolf-phantom"
+                src={`${ROLE_AVATAR_BASE}/werewolf.png`}
+                alt=""
+                draggable={false}
+              />
+            ) : null}
             {seat.isEmpty || hasLetterAvatar ? (
               <span className="seat-avatar-initial">
                 {seat.isEmpty ? "+" : avatarInitial(seat, fullName)}
