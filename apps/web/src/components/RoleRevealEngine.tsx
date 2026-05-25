@@ -16,16 +16,6 @@ export function RoleRevealEngine({ roleCard, onClose, gameId }: RoleRevealEngine
   const cardRef = useRef<HTMLDivElement>(null);
   const closeBlockedRef = useRef(false);
 
-  // 仅第一次显示：已看过则直接关闭
-  useEffect(() => {
-    if (!roleCard?.visible || roleCard.nonce <= 0) return;
-    if (!gameId) return;
-    const key = `role-reveal-seen:${gameId}`;
-    if (localStorage.getItem(key) === String(roleCard.nonce)) {
-      onClose?.();
-    }
-  }, [roleCard?.visible, roleCard?.nonce, gameId, onClose]);
-
   function handleClose() {
     if (closeBlockedRef.current) return;
     if (gameId && roleCard?.nonce) {
@@ -110,6 +100,12 @@ export function RoleRevealEngine({ roleCard, onClose, gameId }: RoleRevealEngine
   }
 
   if (!roleCard?.visible || roleCard.nonce <= 0) return null;
+
+  // 已看过：同步返回 null，不渲染，避免闪屏
+  if (gameId && localStorage.getItem(`role-reveal-seen:${gameId}`) === String(roleCard.nonce)) {
+    return null;
+  }
+
   return (
     <div
       ref={hostRef}
