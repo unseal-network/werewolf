@@ -342,6 +342,56 @@
 }
 
 /* ─────────────────────────────────────────────
+   Self — 金色边框 + ME 标签
+   ───────────────────────────────────────────── */
+
+/* 金色边框 */
+.game-layout-root .player-rail .avatar-self {
+  outline: calc(2px * var(--layout-ui-scale, 1)) solid rgba(212, 177, 92, 0.90) !important;
+  outline-offset: calc(4px * var(--layout-ui-scale, 1));
+}
+
+/* 死亡后降低强度 */
+.game-layout-root .player-rail .seat-state-dead .avatar-self {
+  outline-color: rgba(140, 120, 60, 0.40) !important;
+}
+
+/* ME 标签 — 左上角，与右下号码徽章对角对称 */
+.game-layout-root .player-rail .seat-self-badge {
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  z-index: 6;
+  min-width: 14px !important;
+  height: 14px !important;
+  padding: 0 3px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(80, 60, 10, 0.98), rgba(30, 22, 4, 0.96) 72%),
+    rgba(30, 22, 4, 0.96);
+  border: 1px solid rgba(212, 177, 92, 0.55);
+  color: #d4b15c;
+  font-size: 8px !important;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  box-shadow:
+    0 2px 5px rgba(0, 0, 0, 0.72),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+
+/* 死亡后淡化 */
+.game-layout-root .player-rail .seat-state-dead .seat-self-badge {
+  opacity: 0.35;
+}
+
+/* ─────────────────────────────────────────────
    Wolf Teammate — 红色边框 + 扩散红晕
    ───────────────────────────────────────────── */
 

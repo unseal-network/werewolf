@@ -127,6 +127,7 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
     seat.isActionTarget ? "seat-state-target" : "",
     seat.isCurrentSpeaker ? "seat-state-speaking" : "",
     seat.isWolfTeammate ? "seat-state-wolf-teammate" : "",
+    seat.isCurrentUser ? "seat-state-self" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -147,6 +148,7 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
           hasLetterAvatar ? "avatar-mode-letter" : "",
           hasHoodedAvatar ? "avatar-mode-hooded" : "",
           seat.isWolfTeammate ? "avatar-wolf-teammate" : "",
+          seat.isCurrentUser ? "avatar-self" : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -181,6 +183,9 @@ export const SeatAvatar = memo(function SeatAvatar({ seat, avatarMode, onClick }
           </span>
         ) : null}
         {!seat.isEmpty ? <span className="seat-number-badge">{seat.seatNo}</span> : null}
+        {seat.isCurrentUser && !seat.isEmpty ? (
+          <span className="seat-self-badge" aria-hidden>ME</span>
+        ) : null}
       </div>
     </button>
   );
