@@ -1387,14 +1387,14 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
 
     // 大厅 / 等待 / 发牌 → 房间号
     if (!projection || dressing.scene === "lobby" || dressing.scene === "waiting" || dressing.scene === "deal") {
-      return roomLabel;
+      return "Waiting to join the room";
     }
 
     // 结束 → 胜负
     if (dressing.scene === "end" || projection.winner) {
       if (projection.winner === "wolf") return "🐺 狼人获胜";
       if (projection.winner === "good") return "☀️ 好人获胜";
-      return roomLabel;
+      return "Game Over";
     }
 
     // 投票 / 平票 → 已投票数 / 存活总数
@@ -1422,7 +1422,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
 
     // 白天且第 2 天以后无消亡 → 昨晚平安夜
     if (dressing.scene === "day" && (projection.day ?? 1) > 1) {
-      return "昨晚平安夜";
+      return "Last night was Christmas Eve";//"昨晚平安夜";
     }
 
     return roomLabel;

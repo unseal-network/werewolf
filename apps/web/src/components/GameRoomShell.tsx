@@ -322,6 +322,7 @@ export function GameRoomShell({
             {/* Secondary meta strip: 阶段上下文 or 房间号 */}
             <div className="flex items-center min-w-0">
               <span className="hud-room-title truncate">
+                
                 {hudSubtitle ?? roomCode ?? title}
               </span>
             </div>
