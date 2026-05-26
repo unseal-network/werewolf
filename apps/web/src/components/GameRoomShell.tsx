@@ -318,7 +318,7 @@ export function GameRoomShell({
           <div className="min-w-0 flex flex-col justify-center gap-[3px]">
             {/* Primary: phase text */}
             <div className="hud-phase-line truncate">
-              {phaseLabel}{day ? ` · 第 ${day} ${scene === "night" ? "夜" : "天"}` : ""}
+              {day ? `${t(scene === "night" ? "phase.nightSuffix" : "phase.daySuffix", { day })} · ` : ""}{phaseLabel}
             </div>
             {/* Secondary meta strip: 阶段上下文 or 房间号 */}
             <div className="flex items-center min-w-0">
