@@ -3,814 +3,347 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>action-bubble-panel 设计草图</title>
+<title>action-bubble 新实现预览</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --layout-ui-scale: 1;
+    --layout-action-scale: 1;
+  }
   body {
-    background: #0d1117;
+    background: #0a0d14;
     color: #e6edf3;
     font-family: -apple-system, "PingFang SC", sans-serif;
-    padding: 24px 16px 48px;
+    padding: 28px 16px 60px;
     display: flex;
     flex-direction: column;
-    gap: 40px;
+    gap: 36px;
     align-items: center;
   }
 
-  h2 {
-    font-size: 11px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #8b949e;
-    text-align: center;
-    margin-bottom: -28px;
-  }
+  h1 { font-size: 13px; letter-spacing:.12em; text-transform:uppercase; color:#8b949e; }
 
-  /* ── Phone frame ── */
+  /* ─── Phone shell ─── */
   .phone {
-    width: 320px;
-    height: 580px;
-    background: #101622;
+    width: 340px;
+    background: #0f1520;
     border-radius: 28px;
-    border: 1.5px solid #30363d;
+    border: 1.5px solid #262d3d;
     overflow: hidden;
-    position: relative;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    box-shadow: 0 24px 60px rgba(0,0,0,.65);
   }
-
-  /* scene bg */
-  .scene {
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 50% 30%, #1a2240 0%, #0a0e1a 70%);
-  }
-  .scene.night { background: radial-gradient(ellipse at 50% 20%, #1a0d2e 0%, #080812 70%); }
-  .scene.day   { background: radial-gradient(ellipse at 50% 20%, #2a1a08 0%, #100c04 70%); }
-
-  /* HUD */
-  .hud {
-    position: relative;
-    z-index: 10;
+  .phone-hud {
     height: 44px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 16px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .phone-hud-phase { font-size: 12px; font-weight: 700; }
+  .phone-hud-stats { font-size: 11px; color: #8b949e; }
+  .phone-scene {
+    height: 260px;
+    background: radial-gradient(ellipse at 50% 30%, #1a0d2e, #070810);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
+    justify-content: center;
+    color: rgba(255,255,255,.08);
+    font-size: 11px;
   }
-  .hud-phase { font-size: 12px; font-weight: 700; color: #e6edf3; }
-  .hud-stats { font-size: 11px; color: #8b949e; }
+  .phone-scene.day { background: radial-gradient(ellipse at 50% 30%, #2a1a08, #100b04); }
 
-  /* rails */
-  .rails {
-    position: relative;
-    z-index: 10;
-    flex: 1;
-    display: flex;
-    gap: 0;
-    padding: 10px 4px;
-  }
-  .rail { display: flex; flex-direction: column; gap: 8px; width: 52px; }
-  .center-area { flex: 1; display: flex; align-items: center; justify-content: center; }
-  .avatar-slot {
-    width: 38px; height: 38px;
-    border-radius: 50%;
-    background: rgba(255,255,255,0.07);
-    border: 1.5px solid rgba(255,255,255,0.1);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; color: #8b949e;
-  }
-  .avatar-slot.filled {
-    background: radial-gradient(circle at 50% 35%, #1e2d3d, #0d1a26);
-    border-color: rgba(100,160,255,0.25);
-    color: #7db9ff;
-    font-weight: 700;
-  }
-  .avatar-slot.dead { filter: grayscale(1) brightness(0.5); }
-  .avatar-slot.wolf { border-color: rgba(210,40,55,0.55); }
-  .avatar-slot.target { border-color: rgba(255,200,60,0.7); box-shadow: 0 0 8px rgba(255,200,60,0.3); }
-
-  /* ── ACTION REGION ── */
+  /* ─── Simulated action region ─── */
   .action-region {
-    position: relative;
-    z-index: 20;
-    padding: 0 12px 10px;
+    padding: 0 16px 14px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 8px;
+    gap: 0;
   }
 
-  /* ── CURRENT: collapsed = completely invisible ── */
-  .bubble-invisible {
+  /* ─── GRIP HANDLE ─── */
+  .action-bubble-trigger {
+    box-sizing: border-box;
     width: 100%;
-    height: 0;
-    overflow: hidden;
-  }
-
-  /* ── DESIGN A: visible grip handle ── */
-  .bubble-grip-handle {
-    width: 100%;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 14px;
-    padding: 8px 14px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: calc(10px * var(--layout-ui-scale));
+    padding: calc(9px * var(--layout-ui-scale)) calc(14px * var(--layout-ui-scale));
+    background: rgba(255,255,255,.045);
+    border: 1px solid rgba(255,255,255,.09);
+    border-radius: calc(14px * var(--layout-ui-scale));
+    color: rgba(255,255,255,.52);
+    font-size: calc(12px * var(--layout-ui-scale));
+    font-weight: 600;
+    letter-spacing: .02em;
+    text-align: left;
     cursor: pointer;
-    transition: background 0.15s;
+    transition: background .15s, border-color .15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
   }
-  .bubble-grip-handle:hover { background: rgba(255,255,255,0.07); }
-  .grip-bar {
-    width: 28px; height: 4px;
-    border-radius: 2px;
-    background: rgba(255,255,255,0.2);
+  .action-bubble-trigger:hover { background: rgba(255,255,255,.075); border-color: rgba(255,255,255,.14); }
+  .action-bubble-trigger:active { background: rgba(255,255,255,.10); }
+
+  .action-bubble-grip {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     flex-shrink: 0;
   }
-  .grip-label {
-    font-size: 12px;
-    color: rgba(255,255,255,0.5);
-    flex: 1;
-  }
-  .grip-chevron {
-    font-size: 11px;
-    color: rgba(255,255,255,0.3);
-  }
-
-  /* ── DESIGN B: pill badge peek ── */
-  .bubble-pill {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    width: 100%;
-  }
-  .pill-notch {
-    width: 36px; height: 4px;
+  .action-bubble-grip::before,
+  .action-bubble-grip::after {
+    content: "";
+    display: block;
     border-radius: 2px;
-    background: rgba(255,255,255,0.18);
-    margin-bottom: 6px;
+    background: rgba(255,255,255,.25);
   }
-  .pill-peek {
+  .action-bubble-grip::before { width: calc(26px * var(--layout-ui-scale)); height: calc(3px * var(--layout-ui-scale)); }
+  .action-bubble-grip::after  { width: calc(16px * var(--layout-ui-scale)); height: calc(3px * var(--layout-ui-scale)); opacity:.55; }
+
+  .action-bubble-label { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .action-bubble-chevron { font-size: calc(10px * var(--layout-ui-scale)); color:rgba(255,255,255,.28); flex-shrink:0; }
+
+  /* ─── PEEK CARD ─── */
+  .action-bubble-peek {
+    box-sizing: border-box;
     width: 100%;
-    background: linear-gradient(180deg, rgba(26,34,52,0.92) 0%, rgba(16,22,34,0.98) 100%);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 14px 14px 10px 10px;
-    padding: 10px 14px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    backdrop-filter: blur(12px);
+    display: grid;
+    grid-template-rows: auto auto auto;
+    justify-items: center;
+    gap: calc(6px * var(--layout-ui-scale));
+    padding: calc(8px * var(--layout-ui-scale)) calc(14px * var(--layout-ui-scale)) calc(10px * var(--layout-ui-scale));
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: calc(14px * var(--layout-ui-scale));
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
   }
-  .pill-icon { font-size: 16px; }
-  .pill-text { font-size: 12px; color: rgba(255,255,255,0.65); flex: 1; }
-  .pill-cta {
-    font-size: 11px;
-    color: #7db9ff;
+  .action-bubble-peek:hover  { background: rgba(255,255,255,.07); }
+  .action-bubble-peek:active { background: rgba(255,255,255,.10); }
+
+  /* tints */
+  .peek-seer   { background: rgba(30,120,220,.10) !important; border-color: rgba(60,140,255,.22) !important; }
+  .peek-wolf   { background: rgba(200,35,50,.10) !important; border-color: rgba(210,60,70,.22) !important; }
+  .peek-witch  { background: rgba(200,155,20,.10) !important; border-color: rgba(220,180,60,.22) !important; }
+  .peek-guard  { background: rgba(30,130,200,.10) !important; border-color: rgba(60,160,220,.22) !important; }
+
+  .action-bubble-peek-notch {
+    width: calc(32px * var(--layout-ui-scale));
+    height: calc(3px * var(--layout-ui-scale));
+    border-radius: 2px;
+    background: rgba(255,255,255,.20);
+  }
+  .action-bubble-peek-copy {
+    width: 100%;
+    font-size: calc(12px * var(--layout-ui-scale));
     font-weight: 600;
-    white-space: nowrap;
-  }
-
-  /* ── EXPANDED panel ── */
-  .bubble-expanded {
-    width: 100%;
-    background: linear-gradient(180deg, rgba(20,28,46,0.96) 0%, rgba(12,16,28,0.99) 100%);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 16px;
-    padding: 14px 14px 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    backdrop-filter: blur(16px);
-  }
-
-  /* private result */
-  .private-result {
-    background: rgba(255,200,60,0.08);
-    border: 1px solid rgba(255,200,60,0.22);
-    border-radius: 8px;
-    padding: 8px 12px;
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  .private-result.seer {
-    background: rgba(30,150,255,0.08);
-    border-color: rgba(30,150,255,0.22);
-  }
-  .private-result.wolf {
-    background: rgba(210,40,55,0.08);
-    border-color: rgba(210,40,55,0.22);
-  }
-  .private-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
-  .private-text { font-size: 12px; color: rgba(255,255,255,0.75); line-height: 1.5; }
-  .private-text strong { color: #e6edf3; }
-
-  /* action controls */
-  .action-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-  .action-hint {
-    font-size: 11px;
-    color: rgba(255,255,255,0.35);
+    color: rgba(246,240,220,.82);
+    line-height: 1.4;
     text-align: center;
+    text-shadow: 0 1px 6px rgba(0,0,0,.5);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
-  .action-buttons {
-    display: flex;
-    gap: 8px;
-  }
-  .btn-skip {
-    flex: 1;
-    height: 38px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.5);
-    font-size: 13px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-  }
-  .btn-confirm {
-    flex: 2;
-    height: 38px;
-    border-radius: 10px;
-    background: linear-gradient(135deg, #c43d4d, #8b1a26);
-    border: none;
-    color: #fff;
-    font-size: 13px;
+  .action-bubble-peek-cta {
+    font-size: calc(11px * var(--layout-ui-scale));
     font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    box-shadow: 0 4px 12px rgba(180,40,55,0.35);
-  }
-  .btn-confirm.blue {
-    background: linear-gradient(135deg, #1e72d4, #0d4a9e);
-    box-shadow: 0 4px 12px rgba(30,100,200,0.35);
-  }
-  .btn-confirm.green {
-    background: linear-gradient(135deg, #1a9e5c, #0d6638);
-    box-shadow: 0 4px 12px rgba(20,140,80,0.3);
+    color: rgba(255,255,255,.38);
+    letter-spacing: .04em;
   }
 
-  /* target row */
-  .target-row {
-    display: flex;
-    gap: 6px;
-    justify-content: center;
+  /* ─── Labels ─── */
+  .section { display:flex; flex-direction:column; gap:8px; align-items:center; width:100%; max-width:700px; }
+  .section-title { font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#8b949e; }
+  .row { display:flex; gap:20px; flex-wrap:wrap; justify-content:center; }
+  .col { display:flex; flex-direction:column; gap:8px; align-items:center; }
+  .col-label { font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#8b949e; }
+  .note {
+    max-width:660px; width:100%;
+    background:rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.07);
+    border-radius:12px; padding:14px 18px;
+    font-size:12px; color:#8b949e; line-height:1.7;
   }
-  .target-avatar {
-    width: 36px; height: 36px;
-    border-radius: 50%;
-    background: radial-gradient(circle at 50% 35%, #1a2d40, #0d1a26);
-    border: 1.5px solid rgba(255,200,60,0.5);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; color: #ffd97a; font-weight: 700;
-    box-shadow: 0 0 8px rgba(255,200,60,0.25);
-  }
-  .target-avatar.empty {
-    border-color: rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.2);
-    background: rgba(255,255,255,0.04);
-  }
+  .note strong { color:#e6edf3; }
+  .dot-ok  { display:inline-block; width:7px; height:7px; border-radius:50%; background:#3fb950; margin-right:4px; }
+  .dot-dim { display:inline-block; width:7px; height:7px; border-radius:50%; background:#8b949e; margin-right:4px; }
+  hr { width:100%; max-width:660px; border:none; border-top:1px solid rgba(255,255,255,.07); }
 
-  /* locked overlay */
-  .locked-drawer {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 8px;
-    padding: 8px 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .locked-icon { font-size: 14px; color: rgba(255,255,255,0.25); }
-  .locked-text { font-size: 11px; color: rgba(255,255,255,0.3); }
-
-  /* utility bar */
   .utility-bar {
-    position: relative;
-    z-index: 10;
-    display: flex;
-    justify-content: space-around;
-    padding: 6px 20px 8px;
-    border-top: 1px solid rgba(255,255,255,0.05);
+    border-top:1px solid rgba(255,255,255,.05);
+    display:flex; justify-content:space-around;
+    padding: 7px 20px 9px;
   }
-  .util-btn {
-    font-size: 10px;
-    color: rgba(255,255,255,0.35);
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-  }
-  .util-icon { font-size: 16px; }
-
-  /* label annotation */
-  .annotation {
-    position: absolute;
-    font-size: 10px;
-    color: #f0c040;
-    background: rgba(240,192,64,0.12);
-    border: 1px solid rgba(240,192,64,0.3);
-    border-radius: 4px;
-    padding: 2px 5px;
-    white-space: nowrap;
-    pointer-events: none;
-  }
-
-  /* section title */
-  .section-title {
-    font-size: 11px;
-    color: #8b949e;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    align-self: flex-start;
-    margin-bottom: -6px;
-  }
-
-  .row {
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    justify-content: center;
-    width: 100%;
-    max-width: 700px;
-  }
-
-  .col { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-  .col-label {
-    font-size: 10px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #8b949e;
-  }
-
-  /* red dot — current problem marker */
-  .problem-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #f85149;
-    margin-right: 4px;
-    vertical-align: middle;
-  }
-  .ok-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #3fb950;
-    margin-right: 4px;
-    vertical-align: middle;
-  }
-
-  .legend {
-    max-width: 640px;
-    width: 100%;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 12px;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    font-size: 12px;
-    color: #8b949e;
-    line-height: 1.6;
-  }
-  .legend strong { color: #e6edf3; }
-
-  hr.divider {
-    width: 100%; max-width: 640px;
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.07);
-  }
+  .util-btn { font-size:10px; color:rgba(255,255,255,.3); display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .util-icon { font-size:16px; }
 </style>
 </head>
 <body>
 
-<h2>action-bubble-panel — UI 设计草图</h2>
+<h1>action-bubble — 折叠态新实现</h1>
 
-<!-- ══════════════ ROW 1: COLLAPSED STATE ══════════════ -->
-<div style="font-size:13px;color:#8b949e;text-align:center;margin-top:8px;">
-  ① 折叠态（collapsed）对比
+<!-- ── 方案 A: Grip handle ── -->
+<div class="section">
+  <div class="section-title">方案 A — 无私有信息 → Grip Handle</div>
+  <div class="row">
+
+    <div class="col">
+      <div class="col-label">守卫阶段（非守卫玩家）</div>
+      <div class="phone">
+        <div class="phone-hud">
+          <span class="phone-hud-phase">第 1 夜 · 守卫行动</span>
+          <span class="phone-hud-stats">6/8 — 14s</span>
+        </div>
+        <div class="phone-scene">场景背景</div>
+        <div class="action-region">
+          <button class="action-bubble-trigger">
+            <span class="action-bubble-grip"></span>
+            <span class="action-bubble-label">操作面板</span>
+            <span class="action-bubble-chevron">▲</span>
+          </button>
+        </div>
+        <div class="utility-bar">
+          <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
+          <div class="util-btn"><span class="util-icon">📜</span>日志</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="col-label">狼人阶段（普通村民）</div>
+      <div class="phone">
+        <div class="phone-hud">
+          <span class="phone-hud-phase">第 1 夜 · 狼人行动</span>
+          <span class="phone-hud-stats">6/8 — 9s</span>
+        </div>
+        <div class="phone-scene">场景背景</div>
+        <div class="action-region">
+          <button class="action-bubble-trigger">
+            <span class="action-bubble-grip"></span>
+            <span class="action-bubble-label">操作面板</span>
+            <span class="action-bubble-chevron">▲</span>
+          </button>
+        </div>
+        <div class="utility-bar">
+          <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
+          <div class="util-btn"><span class="util-icon">📜</span>日志</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="col-label">白天发言（非当前发言者）</div>
+      <div class="phone">
+        <div class="phone-hud">
+          <span class="phone-hud-phase">第 2 天 · 发言</span>
+          <span class="phone-hud-stats">6/8 — 45s</span>
+        </div>
+        <div class="phone-scene day">场景背景</div>
+        <div class="action-region">
+          <button class="action-bubble-trigger">
+            <span class="action-bubble-grip"></span>
+            <span class="action-bubble-label">发言</span>
+            <span class="action-bubble-chevron">▲</span>
+          </button>
+        </div>
+        <div class="utility-bar">
+          <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
+          <div class="util-btn"><span class="util-icon">📜</span>日志</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
 </div>
 
-<div class="row">
+<hr>
 
-  <!-- CURRENT: invisible -->
-  <div class="col">
-    <div class="col-label">现状 — 完全不可见</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 狼人行动</span>
-        <span class="hud-stats">6/8 — 12s</span>
-      </div>
-      <div class="rails">
-        <div class="rail">
-          <div class="avatar-slot filled wolf">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-          <div class="avatar-slot filled">D</div>
+<!-- ── 方案 B: Peek card ── -->
+<div class="section">
+  <div class="section-title">方案 B — 有私有信息 → Peek Card</div>
+  <div class="row">
+
+    <div class="col">
+      <div class="col-label">预言家 — 查验结果</div>
+      <div class="phone">
+        <div class="phone-hud">
+          <span class="phone-hud-phase">第 1 夜 · 预言家查验</span>
+          <span class="phone-hud-stats">6/8 — 5s</span>
         </div>
-        <div class="center-area">
-          <div style="font-size:10px;color:rgba(255,255,255,0.15);text-align:center;">场景内容</div>
+        <div class="phone-scene">场景背景</div>
+        <div class="action-region">
+          <button class="action-bubble-peek peek-seer">
+            <span class="action-bubble-peek-notch"></span>
+            <span class="action-bubble-peek-copy">👁 5号 是 <strong style="color:#f85149;">狼人</strong></span>
+            <span class="action-bubble-peek-cta">确认查验&thinsp;▲</span>
+          </button>
         </div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled target">F</div>
-          <div class="avatar-slot filled">G</div>
-          <div class="avatar-slot filled">H</div>
+        <div class="utility-bar">
+          <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
+          <div class="util-btn"><span class="util-icon">📜</span>日志</div>
         </div>
-      </div>
-      <div class="action-region">
-        <!-- nothing visible -->
-        <div style="height:6px;width:100%;border-radius:3px;background:rgba(255,0,0,0.15);border:1px dashed rgba(255,60,60,0.3);display:flex;align-items:center;justify-content:center;">
-          <span style="font-size:9px;color:rgba(255,60,60,0.5);">action-bubble 不可见</span>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
       </div>
     </div>
-    <div style="font-size:11px;color:#f85149;">
-      <span class="problem-dot"></span>用户不知道有操作面板
+
+    <div class="col">
+      <div class="col-label">女巫 — 有人被袭</div>
+      <div class="phone">
+        <div class="phone-hud">
+          <span class="phone-hud-phase">第 1 夜 · 女巫（解药）</span>
+          <span class="phone-hud-stats">6/8 — 20s</span>
+        </div>
+        <div class="phone-scene">场景背景</div>
+        <div class="action-region">
+          <button class="action-bubble-peek peek-witch">
+            <span class="action-bubble-peek-notch"></span>
+            <span class="action-bubble-peek-copy">🧪 今晚 <strong style="color:#ffd97a;">6号</strong> 遭到袭击</span>
+            <span class="action-bubble-peek-cta">确认解药&thinsp;▲</span>
+          </button>
+        </div>
+        <div class="utility-bar">
+          <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
+          <div class="util-btn"><span class="util-icon">📜</span>日志</div>
+        </div>
+      </div>
     </div>
+
+    <div class="col">
+      <div class="col-label">狼人 — 看到队友</div>
+      <div class="phone">
+        <div class="phone-hud">
+          <span class="phone-hud-phase">第 1 夜 · 狼人行动</span>
+          <span class="phone-hud-stats">6/8 — 12s</span>
+        </div>
+        <div class="phone-scene">场景背景</div>
+        <div class="action-region">
+          <button class="action-bubble-peek peek-wolf">
+            <span class="action-bubble-peek-notch"></span>
+            <span class="action-bubble-peek-copy">🐺 队友：<strong style="color:#f87171;">A (1号)</strong></span>
+            <span class="action-bubble-peek-cta">确认击杀&thinsp;▲</span>
+          </button>
+        </div>
+        <div class="utility-bar">
+          <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
+          <div class="util-btn"><span class="util-icon">📜</span>日志</div>
+        </div>
+      </div>
+    </div>
+
   </div>
-
-  <!-- DESIGN A: grip handle -->
-  <div class="col">
-    <div class="col-label">方案 A — 可见把手</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 狼人行动</span>
-        <span class="hud-stats">6/8 — 12s</span>
-      </div>
-      <div class="rails">
-        <div class="rail">
-          <div class="avatar-slot filled wolf">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-          <div class="avatar-slot filled">D</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled target">F</div>
-          <div class="avatar-slot filled">G</div>
-          <div class="avatar-slot filled">H</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-grip-handle">
-          <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0;">
-            <div class="grip-bar"></div>
-            <div class="grip-bar" style="width:18px;opacity:0.5;"></div>
-          </div>
-          <span class="grip-label">狼人行动 · 点击展开</span>
-          <span class="grip-chevron">▲</span>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:#8b949e;">低调但可发现，场景不被遮挡</div>
-  </div>
-
-  <!-- DESIGN B: pill peek -->
-  <div class="col">
-    <div class="col-label">方案 B — Peek 卡片</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 女巫行动</span>
-        <span class="hud-stats">6/8 — 18s</span>
-      </div>
-      <div class="rails">
-        <div class="rail">
-          <div class="avatar-slot filled wolf">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-          <div class="avatar-slot filled">D</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled target">F</div>
-          <div class="avatar-slot filled">G</div>
-          <div class="avatar-slot filled">H</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-pill">
-          <div class="pill-notch"></div>
-          <div class="pill-peek">
-            <span class="pill-icon">🧪</span>
-            <span class="pill-text">今晚 <strong style="color:#ffd97a;">3号</strong> 死亡</span>
-            <span class="pill-cta">行动 ▲</span>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:#3fb950;">
-      <span class="ok-dot"></span>私有信息直接可见，强引导
-    </div>
-  </div>
-
 </div>
 
-<hr class="divider">
+<hr>
 
-<!-- ══════════════ ROW 2: EXPANDED STATE ══════════════ -->
-<div style="font-size:13px;color:#8b949e;text-align:center;">
-  ② 展开态（expanded）— 各角色场景
-</div>
-
-<div class="row">
-
-  <!-- Wolf expanded -->
-  <div class="col">
-    <div class="col-label">狼人 — 选择目标</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 狼人行动</span>
-        <span class="hud-stats">6/8 — 9s</span>
-      </div>
-      <div class="rails" style="flex:1;padding:8px 4px;">
-        <div class="rail">
-          <div class="avatar-slot filled wolf">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled target">F</div>
-          <div class="avatar-slot filled">G</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-expanded">
-          <!-- private result: wolf sees teammates -->
-          <div class="private-result wolf">
-            <span class="private-icon">🐺</span>
-            <span class="private-text">队友：<strong>A (1号)</strong></span>
-          </div>
-          <!-- target row -->
-          <div class="target-row">
-            <div class="target-avatar">F</div>
-            <div class="target-avatar empty">?</div>
-            <div class="target-avatar empty">?</div>
-          </div>
-          <div class="action-hint">已选择 6号 · 点击取消选择</div>
-          <div class="action-buttons">
-            <div class="btn-skip">跳过</div>
-            <div class="btn-confirm">确认击杀</div>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Seer expanded -->
-  <div class="col">
-    <div class="col-label">预言家 — 查验结果</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 预言家查验</span>
-        <span class="hud-stats">6/8 — 5s</span>
-      </div>
-      <div class="rails" style="flex:1;padding:8px 4px;">
-        <div class="rail">
-          <div class="avatar-slot filled">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled target">E</div>
-          <div class="avatar-slot filled">F</div>
-          <div class="avatar-slot filled">G</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-expanded">
-          <!-- private result: seer result -->
-          <div class="private-result seer">
-            <span class="private-icon">👁</span>
-            <span class="private-text"><strong>5号</strong> 是 <strong style="color:#f85149;">狼人</strong></span>
-          </div>
-          <div class="action-hint">本夜已查验，等待结算</div>
-          <div class="action-buttons">
-            <div class="btn-confirm blue" style="flex:1;">确认</div>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Witch expanded -->
-  <div class="col">
-    <div class="col-label">女巫 — 解药/毒药</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 女巫（解药）</span>
-        <span class="hud-stats">6/8 — 20s</span>
-      </div>
-      <div class="rails" style="flex:1;padding:8px 4px;">
-        <div class="rail">
-          <div class="avatar-slot filled">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled target">F</div>
-          <div class="avatar-slot filled">G</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-expanded">
-          <div class="private-result" style="background:rgba(255,200,60,0.08);border-color:rgba(255,200,60,0.25);">
-            <span class="private-icon">🧪</span>
-            <span class="private-text">今晚 <strong style="color:#ffd97a;">6号</strong> 遭到袭击</span>
-          </div>
-          <div class="action-hint">你有解药 ×1 · 要救吗？</div>
-          <div class="action-buttons">
-            <div class="btn-skip">不救</div>
-            <div class="btn-confirm green">救人（用解药）</div>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Locked / not your turn -->
-  <div class="col">
-    <div class="col-label">非行动角色 — 锁定</div>
-    <div class="phone">
-      <div class="scene night"></div>
-      <div class="hud">
-        <span class="hud-phase">第 1 夜 · 守卫行动</span>
-        <span class="hud-stats">6/8 — 14s</span>
-      </div>
-      <div class="rails" style="flex:1;padding:8px 4px;">
-        <div class="rail">
-          <div class="avatar-slot filled">A</div>
-          <div class="avatar-slot filled">B</div>
-          <div class="avatar-slot filled">C</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled">F</div>
-          <div class="avatar-slot filled">G</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-expanded" style="opacity:0.65;">
-          <div class="locked-drawer">
-            <span class="locked-icon">🔒</span>
-            <span class="locked-text">守卫行动中，等待结算…</span>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<hr class="divider">
-
-<!-- ══════════════ DAY SCENE ══════════════ -->
-<div style="font-size:13px;color:#8b949e;text-align:center;">
-  ③ 白天场景
-</div>
-
-<div class="row">
-
-  <!-- day speak -->
-  <div class="col">
-    <div class="col-label">白天 — 发言阶段</div>
-    <div class="phone">
-      <div class="scene day"></div>
-      <div class="hud">
-        <span class="hud-phase">第 2 天 · 发言</span>
-        <span class="hud-stats">6/8 — 45s</span>
-      </div>
-      <div class="rails" style="flex:1;padding:8px 4px;">
-        <div class="rail">
-          <div class="avatar-slot filled">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled">F</div>
-          <div class="avatar-slot filled">G</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-expanded">
-          <textarea style="width:100%;height:52px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);border-radius:8px;color:#e6edf3;font-size:12px;padding:8px 10px;resize:none;outline:none;font-family:inherit;" placeholder="输入发言内容…"></textarea>
-          <div class="action-buttons">
-            <div class="btn-skip">跳过</div>
-            <div class="btn-confirm" style="background:linear-gradient(135deg,#d58b21,#9e5e10);box-shadow:0 4px 12px rgba(200,130,30,0.35);">提交发言</div>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- vote -->
-  <div class="col">
-    <div class="col-label">投票阶段</div>
-    <div class="phone">
-      <div class="scene day" style="background:radial-gradient(ellipse at 50% 20%, #2a0808 0%, #100404 70%);"></div>
-      <div class="hud">
-        <span class="hud-phase">第 2 天 · 投票</span>
-        <span class="hud-stats">6/8 — 30s</span>
-      </div>
-      <div class="rails" style="flex:1;padding:8px 4px;">
-        <div class="rail">
-          <div class="avatar-slot filled">A</div>
-          <div class="avatar-slot filled dead">B</div>
-          <div class="avatar-slot filled">C</div>
-        </div>
-        <div class="center-area"></div>
-        <div class="rail">
-          <div class="avatar-slot filled">E</div>
-          <div class="avatar-slot filled target">F</div>
-          <div class="avatar-slot filled">G</div>
-        </div>
-      </div>
-      <div class="action-region">
-        <div class="bubble-expanded">
-          <div class="action-hint">点击左侧头像选择放逐目标</div>
-          <div class="target-row">
-            <div class="target-avatar">F</div>
-          </div>
-          <div class="action-buttons">
-            <div class="btn-skip">弃票</div>
-            <div class="btn-confirm" style="background:linear-gradient(135deg,#d84848,#8b1a1a);box-shadow:0 4px 12px rgba(200,40,40,0.35);">确认投票</div>
-          </div>
-        </div>
-      </div>
-      <div class="utility-bar">
-        <div class="util-btn"><span class="util-icon">🃏</span>角色</div>
-        <div class="util-btn"><span class="util-icon">📜</span>日志</div>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<hr class="divider">
-
-<!-- ══════════════ LEGEND ══════════════ -->
-<div class="legend">
-  <div style="font-size:12px;color:#e6edf3;font-weight:700;margin-bottom:4px;">设计要点总结</div>
-  <div><span class="problem-dot"></span><strong>现状问题：</strong>collapsed 态 <code style="background:rgba(255,255,255,0.08);padding:1px 4px;border-radius:3px;">display:none</code>，用户无感知</div>
-  <div><span class="ok-dot"></span><strong>方案 A（把手）：</strong>一条半透明横条 + 阶段名 + ▲，低调不遮挡场景，适合不需要私有信息的阶段（守卫、狼人队友已知）</div>
-  <div><span class="ok-dot"></span><strong>方案 B（Peek）：</strong>直接露出私有信息片段，强引导，适合女巫/预言家等有关键私有信息的阶段</div>
-  <div><span class="ok-dot"></span><strong>私有结果高亮：</strong>加图标 + 色彩边框区分角色（红=狼、蓝=预言家、黄=女巫），不再是普通灰色文字</div>
-  <div><span class="ok-dot"></span><strong>Confirm 按钮颜色语义：</strong>红=击杀、蓝=查验、绿=救人、橙=投票</div>
+<!-- ── 说明 ── -->
+<div class="note">
+  <div style="font-weight:700;color:#e6edf3;margin-bottom:6px;">触发时机说明</div>
+  <div><span class="dot-ok"></span><strong>你的回合</strong>：bubble 自动展开（is-open），grip/peek 不显示 — <em>行为不变</em></div>
+  <div><span class="dot-ok"></span><strong>非你的回合</strong>：bubble 折叠（is-collapsed）→ 根据有无 copy 显示 grip or peek</div>
+  <div><span class="dot-dim"></span>测试方式：以村民身份进入狼人/守卫阶段，即可看到底部 Grip Handle；以预言家/女巫进入对应夜晚阶段，展开前先看到 Peek Card</div>
 </div>
 
 </body>

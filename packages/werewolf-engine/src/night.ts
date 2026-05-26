@@ -86,6 +86,9 @@ function assertValidNightActions(input: ResolveNightInput): NightAction[] {
   const actions = input.actions.filter(
     (action) => action.day === undefined || action.day === input.day
   );
+  // wolfKill allows multiple submissions (multi-wolf teams, wolf_team virtual actor
+  // updating its decision); resolveNight uses latestTarget() to pick the winner.
+  // All other single-actor roles are limited to one submission each.
   const counts = new Map<NightAction["kind"], number>();
 
   for (const action of actions) {
@@ -109,11 +112,14 @@ function assertValidNightActions(input: ResolveNightInput): NightAction[] {
     if (!canAct) {
       throw new Error(`${action.actorPlayerId} cannot perform ${action.kind}`);
     }
-    counts.set(action.kind, (counts.get(action.kind) ?? 0) + 1);
+
+    // wolfKill: no count limit — latest submission wins via latestTarget()
+    if (action.kind !== "wolfKill") {
+      counts.set(action.kind, (counts.get(action.kind) ?? 0) + 1);
+    }
   }
 
   for (const kind of [
-    "wolfKill",
     "guardProtect",
     "witchHeal",
     "witchPoison",

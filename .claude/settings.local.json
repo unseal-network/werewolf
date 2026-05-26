@@ -76,7 +76,12 @@
       "Bash(grep -n \"splitSeatsIntoRails\\\\|buildSeatView\\\\|rawSeatView\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -20)",
       "Bash(grep -n \"phaseLabel\\\\|phase\\\\.label\\\\|labelKey\\\\|mapServerPhase\\\\|t\\(.*phase\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -30)",
       "Bash(grep -n \"phaseLabel\\\\|uiProjection\\\\|label\\\\b\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -40)",
-      "mcp__Claude_Preview__preview_start"
+      "mcp__Claude_Preview__preview_start",
+      "Bash(grep -n \"isAdmin\\\\|isCreator\\\\|enter\\\\|getRoom\\\\|powerLevel\\\\|room\\\\.enter\\\\|room\\\\.query\\\\|UnsealClient\\\\|unsealClient\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -100)",
+      "Bash(grep -n \"useIframeAuth\\\\|iframeAuth\\\\|enter\\\\b\\\\|getRoom\\\\b\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -60)",
+      "Bash(grep -n \"powerLevel\\\\|isAdmin\\\\|creatorId\\\\|adminId\\\\|refereeId\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -40)",
+      "Bash(pnpm --filter werewolf-engine test)",
+      "Bash(npx vitest *)"
     ]
   }
 }

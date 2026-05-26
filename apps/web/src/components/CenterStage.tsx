@@ -523,6 +523,17 @@ export function CenterStage({
       actionBubbleDragStartRef.current = null;
     }
 
+    const sharedTriggerProps = {
+      type: "button" as const,
+      "aria-expanded": false as const,
+      "aria-label": actionBubbleLabel,
+      onClick: openActionBubble,
+      onPointerDown: onTriggerPointerDown,
+      onPointerMove: onTriggerPointerMove,
+      onPointerUp: onTriggerPointerEnd,
+      onPointerCancel: onTriggerPointerEnd,
+    };
+
     return (
       <article
         ref={actionBubbleRef}
@@ -531,23 +542,26 @@ export function CenterStage({
         data-voice={containsVoicePanel ? "true" : "false"}
         data-private-copy={hasPrivateCopy ? "true" : "false"}
         data-locked={showLockedDrawer ? "true" : "false"}
+        data-confirm={confirmMode}
       >
-        {triggerVisibility === "visible" && !shouldLockActionBubbleOpen ? (
-          <button
-            type="button"
-            className="action-bubble-trigger"
-            aria-expanded={false}
-            aria-label={actionBubbleLabel}
-            onClick={openActionBubble}
-            onPointerDown={onTriggerPointerDown}
-            onPointerMove={onTriggerPointerMove}
-            onPointerUp={onTriggerPointerEnd}
-            onPointerCancel={onTriggerPointerEnd}
-          >
-            <span className="action-bubble-grip" aria-hidden />
-            <span className="action-bubble-label">{actionBubbleLabel}</span>
+        {/* Collapsed: Peek card — shows private copy as a preview strip */}
+        {triggerVisibility === "visible" && !shouldLockActionBubbleOpen && hasPrivateCopy ? (
+          <button {...sharedTriggerProps} className="action-bubble-peek">
+            <span className="action-bubble-peek-notch" aria-hidden />
+            <span className="action-bubble-peek-copy">{copy}</span>
+            <span className="action-bubble-peek-cta" aria-hidden>{actionBubbleLabel}&thinsp;▲</span>
           </button>
         ) : null}
+
+        {/* Collapsed: Grip handle — no private copy, subtle pull-up bar */}
+        {triggerVisibility === "visible" && !shouldLockActionBubbleOpen && !hasPrivateCopy ? (
+          <button {...sharedTriggerProps} className="action-bubble-trigger">
+            <span className="action-bubble-grip" aria-hidden />
+            <span className="action-bubble-label">{actionBubbleLabel}</span>
+            <span className="action-bubble-chevron" aria-hidden>▲</span>
+          </button>
+        ) : null}
+
         <div className="action-bubble-panel" aria-hidden={!actionBubbleOpen}>
           {shouldShowActionBubbleCopy({ actionMode, copy }) ? (
             <div className="phase-copy phase-action-copy phase-private-result">{copy}</div>

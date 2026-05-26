@@ -293,6 +293,7 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
   // 用于 displayName/avatarUrl 展示，避免后续重复调 /profile 接口。
   useEffect(() => {
     if (!isHostRuntime()) return;
+    console.log('', iframeMessage.getInfo)
     void iframeMessage
       .getMembers()
       .then((members) => {

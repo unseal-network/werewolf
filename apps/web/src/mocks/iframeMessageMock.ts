@@ -3,7 +3,7 @@
  * 读取 .env.development.local 中的配置返回测试数据，
  * 实现完整的 IFrameMessageType 接口。
  */
-import type { IFrameMessageType } from "@unseal-network/game-sdk";
+import type { IFrameMessageType, RoomAuthResult, RoomInfo } from "@unseal-network/game-sdk";
 
 const env = import.meta.env;
 
@@ -80,6 +80,48 @@ export function createIframeMessageMock(): IFrameMessageType {
     },
     updateApp: (data) => {
       console.info("[mock] updateApp", data);
+    },
+    room: {
+      enter: (roomId?: string) => {
+        const result: RoomAuthResult = {
+          user: {
+            userId: mockInfo.userId,
+            displayName: mockInfo.displayName,
+            avatarUrl: "",
+          },
+          token: mockToken,
+        };
+        console.info("[mock] room.enter()", roomId, result);
+        return Promise.resolve(result);
+      },
+      query: (roomId?: string) => {
+        const result: RoomInfo = {
+          roomId: mockInfo.roomId,
+          meetId: mockInfo.roomId,
+          status: "active",
+          playerCount: null,
+          currentPlayers: 0,
+          mode: "werewolf",
+          lang: "zh",
+          adminId: mockInfo.userId,
+          creatorId: mockInfo.userId,
+          refereeId: null,
+          gameAppId: 1,
+          linkRoomId: mockInfo.linkRoomId ?? "",
+          isMine: true,
+          players: [],
+        };
+        console.info("[mock] room.query()", roomId, result);
+        return Promise.resolve(result);
+      },
+      link: (gameRoomId: string) => {
+        console.info("[mock] room.link()", gameRoomId);
+        return Promise.resolve();
+      },
+      getAgents: (roomId: string) => {
+        console.info("[mock] room.getAgents()", roomId);
+        return Promise.resolve([]);
+      },
     },
   };
 }

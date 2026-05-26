@@ -23,7 +23,7 @@ import {
   resolveRuntimeBootstrap,
 } from "./runtime/bootstrap";
 import { isHostRuntime } from "./runtime/hostBridge";
-import { createUnsealClient, UnsealApiError, type UnsealClient } from "./runtime/unsealClient";
+import { createUnsealClient, type UnsealClient } from "./runtime/unsealClient";
 import { un } from "./runtime/devLog";
 import "./index.css";
 import "./styles/game-room.css";
@@ -93,16 +93,12 @@ function App() {
       setSearch(window.location.search);
     };
 
-    const pollForLink = async (
-      client: UnsealClient,
-      hostRoomId: string,
-      jwt: string
-    ) => {
+    const pollForLink = async (hostRoomId: string) => {
       if (cancelled) return;
       try {
-        const room = await client.getRoom(hostRoomId, jwt);
-        if (room.linkRoomId) {
-          setGameUrl(room.linkRoomId);
+        const roomData = await iframeAuth.iframeMessage.room.query(hostRoomId);
+        if (roomData.linkRoomId) {
+          setGameUrl(roomData.linkRoomId);
           setHostBootstrap({ status: "ready", session: hostSessionRef.current });
           return;
         }
@@ -110,7 +106,7 @@ function App() {
         // Host room lookup may race creation; keep waiting.
       }
       pollTimer = window.setTimeout(() => {
-        void pollForLink(client, hostRoomId, jwt);
+        void pollForLink(hostRoomId);
       }, 1000);
     };
 
@@ -140,11 +136,9 @@ function App() {
           localStorage.setItem(SOURCE_ROOM_STORAGE_KEY, hostRoomId);
         }
 
-        const admin = (gameInfo.powerLevel ?? 0) >= 100;
-        setIsAdmin(admin);
         let linkRoomId: string | null = gameInfo.linkRoomId || null;
-        let unsealClient: UnsealClient | undefined;
         let unsealJwt: string | undefined;
+        let admin = false;
         const unsealBase = unsealBaseFromStreamUrl(gameInfo.config?.streamURL);
         // Persist homeserver origin for mxc:// avatar URL resolution
         const streamUrl = gameInfo.config?.streamURL;
@@ -156,12 +150,38 @@ function App() {
           }
         }
 
-        if (unsealBase && hostToken) {
+        // ── Step 3: enter + query room via SDK ────────────────────────────
+        if (hostRoomId) {
+          // Task 2: replace unsealClient.enter() with iframeMessage.room.enter()
+          const entered = await iframeAuth.iframeMessage.room.enter(hostRoomId);
+          unsealJwt = entered.token;
+          if (entered.user?.userId) {
+            writeMatrixIdentity(
+              entered.user.userId,
+              entered.user.displayName ?? entered.user.userId
+            );
+          }
+
+          // Task 3: replace unsealClient.getRoom() with iframeMessage.room.query()
+          try {
+            const roomInfo = await iframeAuth.iframeMessage.room.query(hostRoomId);
+            linkRoomId = roomInfo.linkRoomId || linkRoomId;
+            // Task 4: isAdmin via adminId instead of powerLevel
+            admin = roomInfo.adminId === gameInfo.userId;
+          } catch {
+            // Room may not exist yet; keep going with defaults
+          }
+        }
+        setIsAdmin(admin);
+
+        // ── Step 4: unsealClient kept only for linkRoom ───────────────────
+        let unsealClient: UnsealClient | undefined;
+        if (unsealBase && unsealJwt) {
           let unsealClientForRefresh: UnsealClient;
           unsealClient = createUnsealClient(unsealBase, {
             refreshJwt: async () => {
-              const freshHostToken = await refreshHostToken();
-              const refreshed = await unsealClientForRefresh.enter(freshHostToken);
+              await refreshHostToken();
+              const refreshed = await iframeAuth.iframeMessage.room.enter();
               unsealJwt = refreshed.token;
               hostSessionRef.current = {
                 ...hostSessionRef.current,
@@ -179,29 +199,9 @@ function App() {
             },
           });
           unsealClientForRefresh = unsealClient;
-          const entered = await unsealClient.enter(hostToken);
-          unsealJwt = entered.token;
-
-          if (entered.user?.userId) {
-            writeMatrixIdentity(
-              entered.user.userId,
-              entered.user.displayName ?? entered.user.userId
-            );
-          }
-
-          if (hostRoomId) {
-            try {
-              const room = await unsealClient.getRoom(hostRoomId, unsealJwt);
-              linkRoomId = room.linkRoomId;
-            } catch (error) {
-              if (!(error instanceof UnsealApiError && error.code === "ROOM_002")) {
-                throw error;
-              }
-            }
-          }
         }
 
-        // ── Step 4: routing decision ───────────────────────────────────────
+        // ── Step 5: routing decision ───────────────────────────────────────
         const session: HostSession = { hostRoomId, unsealClient, unsealJwt };
         hostSessionRef.current = session;
 
@@ -220,16 +220,16 @@ function App() {
         }
         if (decision.kind === "wait-for-host-link") {
           setHostBootstrap({ status: "waiting", hostRoomId: decision.hostRoomId });
-          if (unsealClient && unsealJwt) {
-            void pollForLink(unsealClient, decision.hostRoomId, unsealJwt);
+          if (hostRoomId) {
+            void pollForLink(decision.hostRoomId);
           }
           return;
         }
         // decision.kind === "create": admin sees create page, but still poll so
         // that if a linked room appears (e.g. created by someone else or by this
         // admin on another device) we navigate automatically.
-        if (unsealClient && unsealJwt && hostRoomId) {
-          void pollForLink(unsealClient, hostRoomId, unsealJwt);
+        if (hostRoomId) {
+          void pollForLink(hostRoomId);
         }
         setHostBootstrap({ status: "ready", session });
       } catch (error) {
