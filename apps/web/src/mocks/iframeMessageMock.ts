@@ -3,7 +3,7 @@
  * 读取 .env.development.local 中的配置返回测试数据，
  * 实现完整的 IFrameMessageType 接口。
  */
-import type { IFrameMessageType, RoomAuthResult, RoomInfo } from "@unseal-network/game-sdk";
+import type { AgentUser, IFrameMessageType, RoomAuthResult, RoomInfo } from "@unseal-network/game-sdk";
 
 const env = import.meta.env;
 
@@ -118,7 +118,7 @@ export function createIframeMessageMock(): IFrameMessageType {
         console.info("[mock] room.link()", gameRoomId);
         return Promise.resolve();
       },
-      getAgents: (roomId: string) => {
+      getAgents: (roomId: string): Promise<AgentUser[]> => {
         console.info("[mock] room.getAgents()", roomId);
         return Promise.resolve([]);
       },

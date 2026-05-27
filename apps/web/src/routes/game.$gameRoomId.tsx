@@ -43,7 +43,7 @@ import { resolveAvatarUrl } from "../matrix/media";
 import { appendTimelineEvent, useSnapshotSse } from "../runtime/snapshotSse";
 import { isHostRuntime } from "../runtime/hostBridge";
 import { useIframeAuth } from "../hooks/useIframeAuth";
-import type { MemberInfo } from "@unseal-network/game-sdk";
+import type { AgentUser, MemberInfo } from "@unseal-network/game-sdk";
 
 interface UserSeatState {
   seatNo: number;
@@ -1092,23 +1092,22 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
     setAgentError(undefined);
     try {
       if (isHostRuntime()) {
-        const members = await iframeMessage.getMembers();
+        const info = await iframeMessage.getInfo();
+        setAgentSourceRoomId(info.roomId ?? info.linkRoomId ?? undefined);
+        const list: AgentUser[] = await iframeMessage.room.getAgents(info.roomId);
         const activePlayers = room?.players.filter((p) => !p.leftAt) ?? [];
         const joinedUserIds = new Set<string>([
           ...activePlayers.map((p) => p.userId).filter((id): id is string => Boolean(id)),
           ...activePlayers.map((p) => p.agentId).filter((id): id is string => Boolean(id)),
         ]);
-        const candidates: AgentCandidate[] = members.map((m) => ({
+        const candidates: AgentCandidate[] = list.map((m) => ({
           userId: m.userId,
           displayName: m.displayName,
-          ...(m.avatarUrl ? { avatarUrl: m.avatarUrl } : {}),
-          userType: m.isAgent ? "agent" : "user",
+          userType: "agent",
           membership: "join",
           alreadyJoined: joinedUserIds.has(m.userId),
         }));
         setAgentCandidates(candidates);
-        const info = await iframeMessage.getInfo();
-        setAgentSourceRoomId(info.roomId ?? info.linkRoomId ?? undefined);
       } else {
         const result = await client.listAgentCandidates(gameRoomId);
         setAgentCandidates(result.agents);

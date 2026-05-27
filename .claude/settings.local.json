@@ -81,7 +81,10 @@
       "Bash(grep -n \"useIframeAuth\\\\|iframeAuth\\\\|enter\\\\b\\\\|getRoom\\\\b\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -60)",
       "Bash(grep -n \"powerLevel\\\\|isAdmin\\\\|creatorId\\\\|adminId\\\\|refereeId\" /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -40)",
       "Bash(pnpm --filter werewolf-engine test)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(grep -n \"agents\\\\|getAgents\\\\|getMembers\" \"/Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx\" | head -30)",
+      "Bash(grep -n 'getAgents\\\\|getMembers\\\\|agentSourceRoomId\\\\|agentCandidates\\\\|AgentCandidate\\\\|MemberInfo' /Users/ranjun/Desktop/Works/me/document-demo/works/unseal/unseal-web/werewolf/apps/web/src/routes/game.\\\\$gameRoomId.tsx | head -40)",
+      "Bash(xargs ls -la)"
     ]
   }
 }
