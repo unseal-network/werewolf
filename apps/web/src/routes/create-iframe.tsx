@@ -22,6 +22,7 @@ import {
   readStoredMatrixDisplayName,
   readStoredMatrixUserId,
 } from "../matrix/session";
+import { co } from "@unseal-network/mobile-sdk";
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
   async function handleCreate() {
     setError("");
     const token  = readMatrixToken().trim();
-    const roomId = (localStorage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? "").trim();
+    const roomId = (co.storage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? "").trim();
     if (!roomId) { setError(t.noRoomError); return; }
     await submit({ sourceMatrixRoomId: roomId, matrixToken: token });
   }

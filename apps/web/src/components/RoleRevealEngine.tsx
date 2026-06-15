@@ -4,6 +4,7 @@ import {
   getRoleRevealTiltFromOrientation,
   getRoleRevealTiltFromPointer,
 } from "./roleRevealTilt";
+import { co } from "@unseal-network/mobile-sdk";
 
 interface RoleRevealEngineProps {
   roleCard?: EngineRoleCardState | undefined;
@@ -19,7 +20,7 @@ export function RoleRevealEngine({ roleCard, onClose, gameId }: RoleRevealEngine
   function handleClose() {
     if (closeBlockedRef.current) return;
     if (gameId && roleCard?.nonce) {
-      localStorage.setItem(`role-reveal-seen:${gameId}`, String(roleCard.nonce));
+      co.storage.setItem(`role-reveal-seen:${gameId}`, String(roleCard.nonce));
     }
     onClose?.();
   }
@@ -102,7 +103,7 @@ export function RoleRevealEngine({ roleCard, onClose, gameId }: RoleRevealEngine
   if (!roleCard?.visible || roleCard.nonce <= 0) return null;
 
   // 已看过：同步返回 null，不渲染，避免闪屏
-  if (gameId && localStorage.getItem(`role-reveal-seen:${gameId}`) === String(roleCard.nonce)) {
+  if (gameId && co.storage.getItem(`role-reveal-seen:${gameId}`) === String(roleCard.nonce)) {
     return null;
   }
 

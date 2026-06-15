@@ -21,6 +21,7 @@ import {
 } from "../matrix/session";
 import { FormSelect, type FormSelectOption } from "../components/FormSelect";
 import { useCreateGame } from "../hooks/useCreateGame";
+import { co } from "@unseal-network/mobile-sdk";
 
 export interface TestCreatePageProps {
   initialError?: string;
@@ -71,7 +72,7 @@ export function TestCreatePage({
     () => readStoredMatrixDisplayName() ?? ""
   );
   const [sourceMatrixRoomId, setSourceMatrixRoomId] = useState(
-    () => localStorage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? defaultRoom
+    () => co.storage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? defaultRoom
   );
   const [joinedRooms, setJoinedRooms] = useState<string[]>([]);
   const [roomDisplayNames, setRoomDisplayNames] = useState<
@@ -112,7 +113,7 @@ export function TestCreatePage({
         matrixClient.joinedRooms(matrixBase),
       ]);
       if (whoami.user_id) {
-        localStorage.setItem(MATRIX_USER_ID_STORAGE_KEY, whoami.user_id);
+        co.storage.setItem(MATRIX_USER_ID_STORAGE_KEY, whoami.user_id);
         writeMatrixIdentity(
           whoami.user_id,
           whoami.display_name ?? whoami.user_id

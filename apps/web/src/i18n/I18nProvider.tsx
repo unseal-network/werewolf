@@ -14,6 +14,7 @@ import {
   format,
   type Locale,
 } from "./dictionary";
+import { co } from "@unseal-network/mobile-sdk";
 
 export interface I18nContextValue {
   locale: Locale;
@@ -33,7 +34,7 @@ function readInitialLocale(): Locale {
   if (fromUrl && SUPPORTED_LOCALES.includes(fromUrl as Locale)) {
     return fromUrl as Locale;
   }
-  const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
+  const stored = co.storage.getItem(LOCALE_STORAGE_KEY);
   if (stored && SUPPORTED_LOCALES.includes(stored as Locale)) {
     return stored as Locale;
   }
@@ -47,7 +48,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+    co.storage.setItem(LOCALE_STORAGE_KEY, locale);
     document.documentElement.lang = locale === "zh-CN" ? "zh-Hans" : "en";
   }, [locale]);
 

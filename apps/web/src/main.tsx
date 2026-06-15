@@ -24,9 +24,9 @@ import {
 } from "./runtime/bootstrap";
 import { isHostRuntime } from "./runtime/hostBridge";
 import { createUnsealClient, type UnsealClient } from "./runtime/unsealClient";
-import { un } from "./runtime/devLog";
 import "./index.css";
 import "./styles/game-room.css";
+import { co } from "@unseal-network/mobile-sdk";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -72,6 +72,7 @@ function App() {
 
   // ── Host runtime bootstrap ─────────────────────────────────────────────────
   useEffect(() => {
+    console.log('main init');
     if (!hostRuntime) return;
     let cancelled = false;
     let pollTimer: number | null = null;
@@ -97,6 +98,7 @@ function App() {
       if (cancelled) return;
       try {
         const roomData = await iframeAuth.iframeMessage.room.query(hostRoomId);
+        console.log('[gameInfo] roomData', roomData);
         if (roomData.linkRoomId) {
           setGameUrl(roomData.linkRoomId);
           setHostBootstrap({ status: "ready", session: hostSessionRef.current });
@@ -113,9 +115,13 @@ function App() {
     async function run() {
       setHostBootstrap({ status: "checking" });
       try {
+        console.log('[gameInfo] 111');
         // ── Step 1: get GameInfo + Token via SDK hook ──────────────────────
         const gameInfo = await iframeAuth.init();
+        // un.log('[gameInfo]', gameInfo);
+        console.log('[gameInfo] gameInfo', gameInfo);
         const hostToken = iframeAuth.getTokenSync().trim();
+        console.log('[gameInfo] token', hostToken);
 
         if (cancelled) return;
 
@@ -133,8 +139,9 @@ function App() {
         }
         const hostRoomId = gameInfo.gameRoomId || undefined;
         if (hostRoomId) {
-          localStorage.setItem(SOURCE_ROOM_STORAGE_KEY, hostRoomId);
+          co.storage.setItem(SOURCE_ROOM_STORAGE_KEY, hostRoomId);
         }
+        console.log('[sddsss]', hostRoomId)
 
         let linkRoomId: string | null = gameInfo.linkRoomId || null;
         let unsealJwt: string | undefined;
@@ -182,6 +189,8 @@ function App() {
             refreshJwt: async () => {
               await refreshHostToken();
               const refreshed = await iframeAuth.iframeMessage.room.enter();
+
+              console.log('[gameInfo] enter', refreshed);
               unsealJwt = refreshed.token;
               hostSessionRef.current = {
                 ...hostSessionRef.current,

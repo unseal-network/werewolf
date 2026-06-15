@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createApiClient, defaultApiBaseUrl } from "../api/client";
 import { useI18n } from "../i18n/I18nProvider";
 import { SOURCE_ROOM_STORAGE_KEY, writeMatrixToken } from "../matrix/session";
+import { co } from "@unseal-network/mobile-sdk";
 
 export interface UseCreateGameOptions {
   onGameCreated?: ((
@@ -71,13 +72,13 @@ export function useCreateGame({
     try {
       // Persist before the API call
       writeMatrixToken(token);
-      localStorage.setItem(SOURCE_ROOM_STORAGE_KEY, roomId);
+      co.storage.setItem(SOURCE_ROOM_STORAGE_KEY, roomId);
 
       const client = createApiClient({
         baseUrl,
         getMatrixToken: () => token,
       });
-
+      console.log('[create] init', roomId)
       const result = await client.createGame({
         sourceMatrixRoomId: roomId,
         title,
@@ -90,6 +91,7 @@ export function useCreateGame({
           agentSpeechRate,
         },
       });
+      console.log('[create] result', result)
 
       try {
         await onGameCreated?.(result.gameRoomId, roomId);

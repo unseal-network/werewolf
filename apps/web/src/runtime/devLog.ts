@@ -1,4 +1,5 @@
 import { un as mobileLog } from "@unseal-network/mobile-log";
+import { co } from "@unseal-network/mobile-sdk";
 
 export const DEV_LOG_STORAGE_KEY = "werewolfDevLog";
 export const DEV_LOG_QUERY_KEY = "devLog";
@@ -11,7 +12,7 @@ function readDevLogFlag(): boolean {
   if (queryValue === "1" || queryValue === "true") return true;
   if (queryValue === "0" || queryValue === "false") return false;
 
-  return localStorage.getItem(DEV_LOG_STORAGE_KEY) === "1";
+  return co.storage.getItem(DEV_LOG_STORAGE_KEY) === "1";
 }
 
 export const un = {

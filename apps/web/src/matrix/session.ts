@@ -1,3 +1,5 @@
+import { co } from "@unseal-network/mobile-sdk";
+
 export const DEMO_TOKEN = "syt_a2ltaWdhbWUx_WEnXKgiFtirbEiSPTMwU_2p1YIY";
 export const DEMO_USER_ID = "@kimigame1:keepsecret.io";
 export const DEMO_DISPLAY_NAME = "kimi game 1";
@@ -66,7 +68,7 @@ function clearCookie(name: string): void {
 function readStoredValue(storageKey: string, cookieKey: string): string | null {
   const cookieValue = readCookie(cookieKey);
   if (cookieValue) return cookieValue;
-  return localStorage.getItem(storageKey);
+  return co.storage.getItem(storageKey);
 }
 
 export function readMatrixToken(): string {
@@ -75,14 +77,14 @@ export function readMatrixToken(): string {
 
 export function writeMatrixToken(token: string): void {
   writeCookie(MATRIX_TOKEN_COOKIE_KEY, token);
-  localStorage.setItem(MATRIX_TOKEN_STORAGE_KEY, token);
+  co.storage.setItem(MATRIX_TOKEN_STORAGE_KEY, token);
 }
 
 export function writeMatrixIdentity(userId: string, displayName: string): void {
   writeCookie(MATRIX_USER_ID_COOKIE_KEY, userId);
   writeCookie(MATRIX_DISPLAY_NAME_COOKIE_KEY, displayName);
-  localStorage.setItem(MATRIX_USER_ID_STORAGE_KEY, userId);
-  localStorage.setItem(MATRIX_DISPLAY_NAME_STORAGE_KEY, displayName);
+  co.storage.setItem(MATRIX_USER_ID_STORAGE_KEY, userId);
+  co.storage.setItem(MATRIX_DISPLAY_NAME_STORAGE_KEY, displayName);
 }
 
 export function writeMatrixSession(profile: MatrixSessionProfile): void {
@@ -120,17 +122,17 @@ export function clearMatrixSession(): void {
   clearCookie(MATRIX_TOKEN_COOKIE_KEY);
   clearCookie(MATRIX_USER_ID_COOKIE_KEY);
   clearCookie(MATRIX_DISPLAY_NAME_COOKIE_KEY);
-  localStorage.removeItem(MATRIX_TOKEN_STORAGE_KEY);
-  localStorage.removeItem(MATRIX_USER_ID_STORAGE_KEY);
-  localStorage.removeItem(MATRIX_DISPLAY_NAME_STORAGE_KEY);
+  co.storage.removeItem(MATRIX_TOKEN_STORAGE_KEY);
+  co.storage.removeItem(MATRIX_USER_ID_STORAGE_KEY);
+  co.storage.removeItem(MATRIX_DISPLAY_NAME_STORAGE_KEY);
 }
 
 export function writeMatrixHomeserver(homeserver: string): void {
-  localStorage.setItem(MATRIX_HOMESERVER_STORAGE_KEY, homeserver);
+  co.storage.setItem(MATRIX_HOMESERVER_STORAGE_KEY, homeserver);
 }
 
 export function readMatrixHomeserver(): string {
-  return localStorage.getItem(MATRIX_HOMESERVER_STORAGE_KEY) ?? "https://keepsecret.io";
+  return co.storage.getItem(MATRIX_HOMESERVER_STORAGE_KEY) ?? "https://keepsecret.io";
 }
 
 export function matrixServerBaseFromToken(token: string): string {
