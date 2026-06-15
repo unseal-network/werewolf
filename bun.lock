@@ -60,7 +60,7 @@
       "name": "@werewolf/web",
       "dependencies": {
         "@tanstack/react-router": "^1.140.0",
-        "@unseal-network/game-sdk": "^0.0.17",
+        "@unseal-network/game-sdk": "^0.0.18",
         "@unseal-network/mobile-log": "^0.0.10",
         "@unseal-network/mobile-sdk": "^0.0.2",
         "@vitejs/plugin-react": "^5.0.0",
@@ -386,7 +386,7 @@
 
     "@types/ws": ["@types/ws@8.18.1", "", { "dependencies": { "@types/node": "25.9.0" } }, "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="],
 
-    "@unseal-network/game-sdk": ["@unseal-network/game-sdk@0.0.17", "https://npm.pkg.github.com/download/@unseal-network/game-sdk/0.0.17/32c654610cbb1e0bf9be84489f2e138b6aacf328", { "peerDependencies": { "@unseal-network/mobile-sdk": ">=0.0.1" } }, "sha512-WxCfzYhjW1qZhqb50dNLWteaTct8Dz3RX62vEdCAY241vestyd7srwLo4xcOsUFD6ED8hP+BwF8hLEGla2kT1Q=="],
+    "@unseal-network/game-sdk": ["@unseal-network/game-sdk@0.0.18", "https://npm.pkg.github.com/download/@unseal-network/game-sdk/0.0.18/55f3480be79baafb46bc519ed2b1ffb3c7573dde", { "peerDependencies": { "@unseal-network/mobile-sdk": ">=0.0.1" } }, "sha512-UMnF/Gutg40iY33UscpYSzHs1LPH91dNwNAZw7Y3zzYWh2x69uJmX8r0vn823TNwB6G93BBWXsqxDQ2UcrX3kg=="],
 
     "@unseal-network/mobile-log": ["@unseal-network/mobile-log@0.0.10", "https://npm.pkg.github.com/@unseal-network/mobile-log/-/mobile-log-0.0.10.tgz", {}, "sha512-Zu7pLdqBCSauVmOsl+j832GKgI2oOYbE6bY1Em4KORKO3JQPe61zS/F8PwA+vUFUaVliPuBKyL/Ij5YROt6Ufg=="],
 
