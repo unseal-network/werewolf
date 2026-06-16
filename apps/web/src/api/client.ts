@@ -414,7 +414,9 @@ export function createApiClient(options: ApiClientOptions) {
     },
     subscribeUrl(gameRoomId: string) {
       const token = encodeURIComponent(options.getMatrixToken());
-      return `${baseUrl}/games/${gameRoomId}/subscribe?access_token=${token}`;
+      const { userId } = options.caller ?? {};
+      const userIdParam = userId ? `&userId=${encodeURIComponent(userId)}` : "";
+      return `${baseUrl}/games/${gameRoomId}/subscribe?access_token=${token}${userIdParam}`;
     },
     async whoAmI(matrixServerBase: string): Promise<MatrixWhoAmI> {
       const response = await fetch(

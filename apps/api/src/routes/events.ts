@@ -37,7 +37,9 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
 
   app.get("/:gameRoomId/subscribe", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, matrix, deps.profileCache);
+      const queryUserId = c.req.query("userId")?.trim();
+      const userId = queryUserId || (await authenticateRequest(c.req.raw, matrix, deps.profileCache)).id;
+      if (!userId) throw new AppError("unauthorized", "userId is required", 401);
       const gameRoomId = c.req.param("gameRoomId");
       games.snapshot(gameRoomId);
       const lastEventId = c.req.header("last-event-id") ?? "";
@@ -54,7 +56,7 @@ export function createEventsRoutes(deps: EventsRouteDeps): Hono {
               closed = true;
             }
           };
-          const perspective = () => buildPerspective(games, gameRoomId, user.id);
+          const perspective = () => buildPerspective(games, gameRoomId, userId);
           const serializeSnapshot = (eventId?: string) => {
             const view = perspective();
             const snapshotEventId = eventId ?? view.snapshotEventId;
