@@ -8,10 +8,17 @@ type RoleId = "werewolf" | "seer" | "witch" | "guard" | "villager";
 
 type PlayerRoleState = "wolf" | "good";
 
+export interface CallerIdentity {
+  userId?: string | undefined;
+  displayName?: string | undefined;
+  avatarUrl?: string | undefined;
+}
+
 export interface ApiClientOptions {
   baseUrl: string;
   getMatrixToken(): string;
   refreshMatrixToken?: (() => Promise<string | null | undefined>) | undefined;
+  caller?: CallerIdentity | undefined;
 }
 
 export interface CreatedGame {
@@ -218,6 +225,16 @@ export function createApiClient(options: ApiClientOptions) {
   const baseUrl = trimTrailingSlash(options.baseUrl);
   let refreshedMatrixToken: string | null = null;
 
+  function withCaller(body: Record<string, unknown>): Record<string, unknown> {
+    const { userId, displayName, avatarUrl } = options.caller ?? {};
+    return {
+      ...body,
+      ...(userId ? { userId } : {}),
+      ...(displayName ? { displayName } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
+    };
+  }
+
   function currentMatrixToken(): string {
     return refreshedMatrixToken ?? options.getMatrixToken();
   }
@@ -261,7 +278,7 @@ export function createApiClient(options: ApiClientOptions) {
     createGame(body: unknown) {
       return request<CreatedGame>("/games", {
         method: "POST",
-        body: JSON.stringify(body),
+        body: JSON.stringify(withCaller(body as Record<string, unknown>)),
       });
     },
     whoAmIAgainstApi() {
@@ -272,6 +289,7 @@ export function createApiClient(options: ApiClientOptions) {
         method: "POST",
         headers: idempotentHeaders("join"),
         body: JSON.stringify({
+          ...withCaller({}),
           ...(seatNo ? { seatNo } : {}),
           ...(displayName ? { displayName } : {}),
           ...(avatarUrl ? { avatarUrl } : {}),
@@ -282,6 +300,7 @@ export function createApiClient(options: ApiClientOptions) {
       return request<{ player: RoomPlayer }>(`/games/${gameRoomId}/leave`, {
         method: "POST",
         headers: idempotentHeaders("leave"),
+        body: JSON.stringify(withCaller({})),
       });
     },
     swapSeat(gameRoomId: string, seatNo: number) {
@@ -290,7 +309,7 @@ export function createApiClient(options: ApiClientOptions) {
         {
           method: "POST",
           headers: idempotentHeaders("swapSeat"),
-          body: JSON.stringify({ seatNo }),
+          body: JSON.stringify(withCaller({ seatNo })),
         }
       );
     },
@@ -303,6 +322,7 @@ export function createApiClient(options: ApiClientOptions) {
       }>(`/games/${gameRoomId}/start`, {
         method: "POST",
         headers: idempotentHeaders("start"),
+        body: JSON.stringify(withCaller({})),
       });
     },
     getGame(gameRoomId: string) {
@@ -340,7 +360,7 @@ export function createApiClient(options: ApiClientOptions) {
       return request<FillAgentsResponse>(`/games/${gameRoomId}/agents/fill`, {
         method: "POST",
         headers: idempotentHeaders("fillAgents"),
-        body: JSON.stringify({ targetPlayerCount }),
+        body: JSON.stringify(withCaller({ targetPlayerCount })),
       });
     },
     removePlayer(gameRoomId: string, matrixUserId: string) {
@@ -362,7 +382,7 @@ export function createApiClient(options: ApiClientOptions) {
         {
           method: "POST",
           headers: idempotentHeaders(`action-${body.kind}`),
-          body: JSON.stringify(body),
+          body: JSON.stringify(withCaller(body as Record<string, unknown>)),
         }
       );
     },

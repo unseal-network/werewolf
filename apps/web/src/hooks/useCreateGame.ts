@@ -14,6 +14,9 @@ export interface UseCreateGameOptions {
 export interface SubmitParams {
   sourceMatrixRoomId: string;
   matrixToken: string;
+  userId?: string | undefined;
+  displayName?: string | undefined;
+  avatarUrl?: string | undefined;
 }
 
 export interface UseCreateGameReturn {
@@ -62,7 +65,7 @@ export function useCreateGame({
   // A stable base URL reference — token is supplied per-submit
   const baseUrl = useMemo(() => defaultApiBaseUrl(), []);
 
-  async function submit({ sourceMatrixRoomId, matrixToken }: SubmitParams) {
+  async function submit({ sourceMatrixRoomId, matrixToken, userId, displayName, avatarUrl }: SubmitParams) {
     setError("");
     setSubmitting(true);
 
@@ -77,6 +80,7 @@ export function useCreateGame({
       const client = createApiClient({
         baseUrl,
         getMatrixToken: () => token,
+        caller: userId ? { userId, displayName, avatarUrl } : undefined,
       });
       console.log('[create] init', roomId)
       const result = await client.createGame({

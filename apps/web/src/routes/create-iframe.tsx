@@ -131,7 +131,7 @@ export function IframeCreatePage({ onGameCreated, onLeave }: IframeCreatePagePro
     const token  = readMatrixToken().trim();
     const roomId = (co.storage.getItem(SOURCE_ROOM_STORAGE_KEY) ?? "").trim();
     if (!roomId) { setError(t.noRoomError); return; }
-    await submit({ sourceMatrixRoomId: roomId, matrixToken: token });
+    await submit({ sourceMatrixRoomId: roomId, matrixToken: token, userId, displayName });
   }
 
   function handleLeave() {

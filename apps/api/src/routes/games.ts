@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 import { AppError, type GameEvent } from "@werewolf/shared";
 import {
+  authenticateFromBody,
   authenticateRequest,
   type MatrixAuthClient,
   type MatrixProfileCache,
@@ -91,6 +92,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
     const path = uri.slice("mxc://".length);
     const slash = path.indexOf("/");
     if (slash <= 0 || slash === path.length - 1) return undefined;
+    console.log('homeserverUrl', homeserverUrl)
     return `${homeserverUrl.replace(/\/+$/, "")}/_matrix/media/v3/download/${encodeURIComponent(
       path.slice(0, slash)
     )}/${encodeURIComponent(path.slice(slash + 1))}`;
@@ -219,8 +221,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = await c.req.json();
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       const { room, card } = deps.games.createGame(body, user.id);
       return c.json({ gameRoomId: room.id, card }, 201);
     } catch (error) {
@@ -236,15 +242,15 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/join", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = await readOptionalJson(c.req.raw);
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       const seatNo = numberValue(body.seatNo);
-      // 前端（host/iframe 模式）会随 join body 传来 displayName / avatarUrl，
-      // 优先使用 body 中的值，避免服务端再发起 Matrix /profile 请求。
-      const bodyDisplayName = stringField(body.displayName);
-      const bodyAvatarUrl = stringField(body.avatarUrl);
-      const resolvedDisplayName = bodyDisplayName ?? user.displayName;
-      const resolvedAvatarUrl = bodyAvatarUrl ?? user.avatarUrl;
+      const resolvedDisplayName = stringField(body.displayName) ?? user.displayName;
+      const resolvedAvatarUrl = stringField(body.avatarUrl) ?? user.avatarUrl;
 
       const result = await dispatchActorCommand(deps, c.req.raw, {
         commandId: commandId(c.req.raw),
@@ -255,19 +261,6 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
         ...(seatNo ? { seatNo } : {}),
       });
-
-      // 将前端传来的 displayName/avatarUrl 同步写入 game_users，
-      // 保证后续 authenticateRequest 内存缓存过期后直接走 DB，不再发起 /profile 请求。
-      if (deps.profileCache && bodyDisplayName) {
-        await deps.profileCache
-          .upsert({
-            matrixUserId: user.id,
-            displayName: resolvedDisplayName,
-            ...(resolvedAvatarUrl ? { avatarUrl: resolvedAvatarUrl } : {}),
-            profileSyncedAt: new Date(),
-          })
-          .catch(() => undefined);
-      }
 
       return c.json(result);
     } catch (error) {
@@ -281,7 +274,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/leave", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const body = await readOptionalJson(c.req.raw);
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       return c.json(
         await dispatchActorCommand(deps, c.req.raw, {
           commandId: commandId(c.req.raw),
@@ -301,7 +299,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/start", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const body = await readOptionalJson(c.req.raw);
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       return c.json(
         await dispatchActorCommand(deps, c.req.raw, {
           commandId: commandId(c.req.raw),
@@ -321,8 +324,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/actions", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       const kind = stringValue(body.kind);
       if (
         !kind ||
@@ -555,8 +562,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/agents/fill", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       const targetPlayerCount = positiveIntegerValue(body.targetPlayerCount);
       if (!targetPlayerCount) {
         throw new AppError("invalid_action", "targetPlayerCount is required", 400);
@@ -634,8 +645,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/agents", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       const agentUserId = stringValue(body.agentUserId);
       if (!agentUserId) {
         throw new AppError("invalid_action", "agentUserId is required", 400);
@@ -665,8 +680,12 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.post("/:gameRoomId/seat", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
       const body = (await c.req.json()) as Record<string, unknown>;
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: stringField(body.userId),
+        displayName: stringField(body.displayName),
+        avatarUrl: stringField(body.avatarUrl),
+      }, deps.profileCache);
       const seatNo = numberValue(body.seatNo);
       if (!seatNo) {
         throw new AppError("invalid_action", "seatNo is required", 400);

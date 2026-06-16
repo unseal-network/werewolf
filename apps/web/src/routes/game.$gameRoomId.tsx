@@ -253,8 +253,11 @@ export function GameRoomPage({ gameRoomId, onLeave }: { gameRoomId: string; onLe
       createApiClient({
         baseUrl: apiBaseUrl,
         getMatrixToken: () => matrixToken,
+        caller: matrixUserId
+          ? { userId: matrixUserId, displayName: matrixDisplayName ?? undefined }
+          : undefined,
       }),
-    [matrixToken]
+    [matrixToken, matrixUserId, matrixDisplayName]
   );
 
   // 获取当前用户身份：host 模式从 iframeMessage.getInfo() 取，避免调 /profile；

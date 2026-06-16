@@ -53,6 +53,88 @@ export function clearAuthTokenCacheForTests(): void {
   authTokenCache.clear();
 }
 
+export async function authenticateFromBody(
+  request: Request,
+  _matrix: MatrixAuthClient,
+  bodyIdentity: { userId?: string | undefined; displayName?: string | undefined; avatarUrl?: string | undefined },
+  profileCache?: MatrixProfileCache
+): Promise<AuthenticatedUser> {
+  const header = request.headers.get("authorization") ?? "";
+  const match = header.match(/^Bearer\s+(.+)$/);
+  const token = match?.[1];
+  if (!token) {
+    throw new AppError("unauthorized", "Matrix bearer token is required", 401);
+  }
+
+  const demoToken = process.env.DEMO_USER_TOKEN;
+  if (demoToken && token === demoToken) {
+    const demoUserId = process.env.DEMO_USER_ID ?? "@kimigame1:keepsecret.io";
+    return {
+      id: demoUserId,
+      matrixUserId: demoUserId,
+      displayName: "kimi game 1",
+      ...(process.env.DEMO_USER_AVATAR_URL
+        ? { avatarUrl: process.env.DEMO_USER_AVATAR_URL }
+        : {}),
+    };
+  }
+
+  const cachedAuth = authTokenCache.get(token);
+  if (cachedAuth && cachedAuth.expiresAt > Date.now()) {
+    return cachedAuth.user;
+  }
+
+  const cacheAndReturn = (user: AuthenticatedUser): AuthenticatedUser => {
+    authTokenCache.set(token, { user, expiresAt: Date.now() + authTokenCacheTtlMs });
+    return user;
+  };
+
+  // Body has userId — skip whoami, trust the SDK-provided identity.
+  const { userId, displayName, avatarUrl } = bodyIdentity;
+  if (userId) {
+    const resolvedDisplayName = displayName ?? userId;
+    const user: AuthenticatedUser = {
+      id: userId,
+      matrixUserId: userId,
+      displayName: resolvedDisplayName,
+      ...(avatarUrl ? { avatarUrl } : {}),
+    };
+    if (profileCache && displayName) {
+      void profileCache
+        .upsert({ matrixUserId: userId, displayName: resolvedDisplayName, ...(avatarUrl ? { avatarUrl } : {}), profileSyncedAt: new Date() })
+        .catch(() => undefined);
+    }
+    return cacheAndReturn(user);
+  }
+
+  // Fallback: no body identity, call whoami as usual.
+  try {
+    const whoami = await _matrix.whoami(token);
+    const cached = profileCache
+      ? await profileCache.get(whoami.user_id).catch(() => null)
+      : null;
+    if (cached) {
+      void Promise.resolve(profileCache?.touch?.(whoami.user_id)).catch(() => undefined);
+      return cacheAndReturn({
+        id: whoami.user_id,
+        matrixUserId: whoami.user_id,
+        displayName: cached.displayName,
+        ...(cached.avatarUrl ? { avatarUrl: cached.avatarUrl } : {}),
+      });
+    }
+    const fallbackDisplayName = whoami.displayname ?? whoami.display_name ?? whoami.user_id;
+    const fallbackAvatarUrl = whoami.avatarUrl ?? whoami.avatar_url;
+    return cacheAndReturn({
+      id: whoami.user_id,
+      matrixUserId: whoami.user_id,
+      displayName: fallbackDisplayName,
+      ...(fallbackAvatarUrl ? { avatarUrl: fallbackAvatarUrl } : {}),
+    });
+  } catch {
+    throw new AppError("unauthorized", "Invalid Matrix bearer token", 401);
+  }
+}
+
 export async function authenticateRequest(
   request: Request,
   _matrix: MatrixAuthClient,

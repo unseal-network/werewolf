@@ -229,7 +229,12 @@ export function TestCreatePage({
       setError(t("create.roomRequired"));
       return;
     }
-    await submit({ sourceMatrixRoomId: roomId, matrixToken: token });
+    await submit({
+      sourceMatrixRoomId: roomId,
+      matrixToken: token,
+      userId: selectedUserId || undefined,
+      displayName: selectedDisplayName || undefined,
+    });
   }
 
   function logout() {
