@@ -215,7 +215,7 @@ export function defaultApiBaseUrl(): string {
     protocol === "http:" &&
     (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1");
   if (isLocalDev && appBasePath() === "/") {
-    return "http://localhost:3000";
+    return "";
   }
 
   return `${origin}${trimTrailingSlash(appBasePath())}/api`;
