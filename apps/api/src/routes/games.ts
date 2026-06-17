@@ -375,7 +375,8 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.get("/:gameRoomId/events/:eventId/transcript", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const queryUserId = c.req.query("userId")?.trim();
+      const userId = queryUserId || (await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache)).id;
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const eventId = c.req.param("eventId");
       const event = room.events.find((candidate) => candidate.id === eventId);
@@ -383,7 +384,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         throw new AppError("not_found", "Transcript event not found", 404);
       }
       const myPlayer = room.players.find(
-        (p) => p.userId === user.id && !p.leftAt
+        (p) => p.userId === userId && !p.leftAt
       );
       const myPrivateState = myPlayer
         ? room.privateStates.find((s) => s.playerId === myPlayer.id)
@@ -424,7 +425,8 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.get("/:gameRoomId/events/:eventId/stream", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const queryUserId = c.req.query("userId")?.trim();
+      const userId = queryUserId || (await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache)).id;
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const eventId = c.req.param("eventId");
       const event = room.events.find((candidate) => candidate.id === eventId);
@@ -432,7 +434,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         throw new AppError("not_found", "Stream event not found", 404);
       }
       const myPlayer = room.players.find(
-        (p) => p.userId === user.id && !p.leftAt
+        (p) => p.userId === userId && !p.leftAt
       );
       const myPrivateState = myPlayer
         ? room.privateStates.find((s) => s.playerId === myPlayer.id)
@@ -466,9 +468,10 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.get("/:gameRoomId", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const queryUserId = c.req.query("userId")?.trim();
+      const userId = queryUserId || (await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache)).id;
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
-      const view = buildGameReadView(room, user.id);
+      const view = buildGameReadView(room, userId);
       const snapshotEventId = room.events.at(-1)?.id ?? "";
       return c.json({
         snapshot: {
@@ -493,7 +496,8 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.get("/:gameRoomId/timeline", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const queryUserId = c.req.query("userId")?.trim();
+      const userId = queryUserId || (await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache)).id;
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const after = c.req.query("after") ?? "";
       const before = c.req.query("before") ?? "";
@@ -505,7 +509,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         500,
         Math.max(1, Number.isFinite(requestedLimit) ? Math.trunc(requestedLimit) : 100)
       );
-      const view = buildGameReadView(room, user.id);
+      const view = buildGameReadView(room, userId);
       const ordered = [...view.events].sort((a, b) => a.id.localeCompare(b.id));
       const events = before
         ? ordered.filter((event) => event.id < before).slice(-limit)
@@ -710,7 +714,8 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
 
   app.delete("/:gameRoomId/players/:matrixUserId", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const queryUserId = c.req.query("userId")?.trim();
+      const userId = queryUserId || (await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache)).id;
       const room = deps.games.snapshot(c.req.param("gameRoomId"));
       const playerId = resolvePlayerIdByMatrixUserId(
         room,
@@ -720,7 +725,7 @@ export function createGamesRoutes(deps: GamesRouteDeps): Hono {
         await dispatchActorCommand(deps, c.req.raw, {
           commandId: commandId(c.req.raw),
           gameRoomId: c.req.param("gameRoomId"),
-          actorUserId: user.id,
+          actorUserId: userId,
           kind: "removePlayer",
           playerId,
         })

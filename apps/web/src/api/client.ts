@@ -326,7 +326,9 @@ export function createApiClient(options: ApiClientOptions) {
       });
     },
     getGame(gameRoomId: string) {
-      return request<GameReadResponse>(`/games/${gameRoomId}`);
+      const { userId } = options.caller ?? {};
+      const suffix = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+      return request<GameReadResponse>(`/games/${gameRoomId}${suffix}`);
     },
     getTimeline(
       gameRoomId: string,
@@ -336,6 +338,8 @@ export function createApiClient(options: ApiClientOptions) {
       if (params.after) search.set("after", params.after);
       if (params.before) search.set("before", params.before);
       if (params.limit !== undefined) search.set("limit", String(params.limit));
+      const { userId } = options.caller ?? {};
+      if (userId) search.set("userId", userId);
       const suffix = search.toString() ? `?${search.toString()}` : "";
       return request<TimelinePageResponse>(`/games/${gameRoomId}/timeline${suffix}`);
     },
@@ -364,8 +368,10 @@ export function createApiClient(options: ApiClientOptions) {
       });
     },
     removePlayer(gameRoomId: string, matrixUserId: string) {
+      const { userId } = options.caller ?? {};
+      const suffix = userId ? `?userId=${encodeURIComponent(userId)}` : "";
       return request<{ player: RoomPlayer }>(
-        `/games/${gameRoomId}/players/${encodeURIComponent(matrixUserId)}`,
+        `/games/${gameRoomId}/players/${encodeURIComponent(matrixUserId)}${suffix}`,
         { method: "DELETE", headers: idempotentHeaders("removePlayer") }
       );
     },
@@ -395,11 +401,14 @@ export function createApiClient(options: ApiClientOptions) {
         canPublish?: boolean;
       }>(`/games/${gameRoomId}/livekit-token`, {
         method: "POST",
+        body: JSON.stringify(withCaller({})),
       });
     },
     downloadTranscript(gameRoomId: string, eventId: string) {
+      const { userId } = options.caller ?? {};
+      const suffix = userId ? `?userId=${encodeURIComponent(userId)}` : "";
       return fetch(
-        `${baseUrl}/games/${encodeURIComponent(gameRoomId)}/events/${encodeURIComponent(eventId)}/transcript`,
+        `${baseUrl}/games/${encodeURIComponent(gameRoomId)}/events/${encodeURIComponent(eventId)}/transcript${suffix}`,
         {
           headers: {
             authorization: `Bearer ${options.getMatrixToken()}`,

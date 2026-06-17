@@ -46,10 +46,9 @@ export async function ensureDatabase(databaseUrl: string): Promise<void> {
     throw new Error(`Invalid DATABASE_URL: no database name found in "${databaseUrl}"`);
   }
 
-  const migrationsFolder = resolve(
-    dirname(fileURLToPath(import.meta.url)),
-    "../drizzle"
-  );
+  const migrationsFolder =
+    process.env.MIGRATIONS_FOLDER ??
+    resolve(dirname(fileURLToPath(import.meta.url)), "../drizzle");
 
   const runMigrations = async () => {
     const migrationSql = postgres(databaseUrl, { max: 1, onnotice: () => {} });

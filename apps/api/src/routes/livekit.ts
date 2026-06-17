@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { AccessToken, WebhookReceiver } from "livekit-server-sdk";
 import { AppError } from "@werewolf/shared";
 import {
+  authenticateFromBody,
   authenticateRequest,
   type MatrixAuthClient,
   type MatrixProfileCache,
@@ -41,7 +42,13 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
   // Generate LiveKit access token for a player to join the voice room
   app.post("/:gameRoomId/livekit-token", async (c) => {
     try {
-      const user = await authenticateRequest(c.req.raw, deps.matrix, deps.profileCache);
+      const body = await c.req.json().catch(() => ({})) as Record<string, unknown>;
+      const bodyUserId = typeof body.userId === "string" && body.userId.trim() ? body.userId.trim() : undefined;
+      const bodyDisplayName = typeof body.displayName === "string" && body.displayName.trim() ? body.displayName.trim() : undefined;
+      const user = await authenticateFromBody(c.req.raw, deps.matrix, {
+        userId: bodyUserId,
+        displayName: bodyDisplayName,
+      }, deps.profileCache);
       const gameRoomId = c.req.param("gameRoomId");
       const room = deps.games.snapshot(gameRoomId);
       const player = room.players.find(
@@ -52,7 +59,7 @@ export function createLivekitRoutes(deps: LivekitRouteDeps): Hono {
 
       const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
         identity,
-        name: player?.displayName ?? user.displayName,
+        name: player?.displayName ?? bodyDisplayName ?? user.displayName,
         ttl: "24h",
       });
       at.addGrant({

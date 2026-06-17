@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
         : undefined,
         proxy: {
           '/games': {
-            target: 'http://localhost:3000',
+            target: 'http://localhost:12003',
             changeOrigin: true,
           },
         }
